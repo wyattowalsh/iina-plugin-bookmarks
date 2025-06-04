@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import useDebounce from "../hooks/useDebounce";
+import { usePersistentFilterState } from "../hooks/usePersistentState";
 
 export interface FilterState {
   searchTerm: string;
@@ -21,6 +22,7 @@ interface FilterComponentProps {
   compact?: boolean;
   showAdvanced?: boolean;
   initialFilters?: Partial<FilterState>;
+  viewId?: string;
 }
 
 const defaultFilters: FilterState = {
@@ -39,31 +41,38 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
   resultsCount,
   compact = false,
   showAdvanced = false,
-  initialFilters = {}
+  initialFilters = {},
+  viewId = 'default'
 }) => {
-  const [filters, setFilters] = useState<FilterState>({
-    ...defaultFilters,
-    ...initialFilters
-  });
+  // Use persistent state for filters, but merge with initial filters
+  const baseFilters = { ...defaultFilters, ...initialFilters };
+  const [persistentFilters, setPersistentFilters] = usePersistentFilterState(viewId, baseFilters);
+  
+  // For non-persistent state like UI interactions
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(showAdvanced);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
-  const [searchInput, setSearchInput] = useState(filters.searchTerm);
+  const [searchInput, setSearchInput] = useState(persistentFilters.searchTerm);
 
   // Debounce search input for performance
   const debouncedSearchTerm = useDebounce(searchInput, 300);
 
   const updateFilters = useCallback((newFilters: Partial<FilterState>) => {
-    const updatedFilters = { ...filters, ...newFilters };
-    setFilters(updatedFilters);
+    const updatedFilters = { ...persistentFilters, ...newFilters };
+    setPersistentFilters(updatedFilters);
     onFilterChange(updatedFilters);
-  }, [filters, onFilterChange]);
+  }, [persistentFilters, onFilterChange, setPersistentFilters]);
 
   // Update filters when debounced search term changes
   React.useEffect(() => {
-    if (debouncedSearchTerm !== filters.searchTerm) {
+    if (debouncedSearchTerm !== persistentFilters.searchTerm) {
       updateFilters({ searchTerm: debouncedSearchTerm });
     }
-  }, [debouncedSearchTerm, filters.searchTerm, updateFilters]);
+  }, [debouncedSearchTerm, persistentFilters.searchTerm, updateFilters]);
+
+  // Initialize parent component with persistent filters on mount
+  React.useEffect(() => {
+    onFilterChange(persistentFilters);
+  }, []); // Only run on mount
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
@@ -76,40 +85,40 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
 
   const handleDateRangeChange = useCallback((field: 'start' | 'end', value: string) => {
     updateFilters({
-      dateRange: { ...filters.dateRange, [field]: value }
+      dateRange: { ...persistentFilters.dateRange, [field]: value }
     });
-  }, [filters.dateRange, updateFilters]);
+  }, [persistentFilters.dateRange, updateFilters]);
 
   const handleTagToggle = useCallback((tag: string) => {
-    const newTags = filters.tags.includes(tag)
-      ? filters.tags.filter(t => t !== tag)
-      : [...filters.tags, tag];
+    const newTags = persistentFilters.tags.includes(tag)
+      ? persistentFilters.tags.filter(t => t !== tag)
+      : [...persistentFilters.tags, tag];
     updateFilters({ tags: newTags });
-  }, [filters.tags, updateFilters]);
+  }, [persistentFilters.tags, updateFilters]);
 
   const handleRemoveTag = useCallback((tag: string) => {
-    updateFilters({ tags: filters.tags.filter(t => t !== tag) });
-  }, [filters.tags, updateFilters]);
+    updateFilters({ tags: persistentFilters.tags.filter(t => t !== tag) });
+  }, [persistentFilters.tags, updateFilters]);
 
   const handleFileFilterChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     updateFilters({ fileFilter: e.target.value });
   }, [updateFilters]);
 
   const clearAllFilters = useCallback(() => {
-    setFilters(defaultFilters);
+    setPersistentFilters(defaultFilters);
     setSearchInput('');
     onFilterChange(defaultFilters);
   }, [onFilterChange]);
 
   const hasActiveFilters = useMemo(() => {
-    return filters.searchTerm || 
-           filters.dateRange.start || 
-           filters.dateRange.end || 
-           filters.tags.length > 0 || 
-           filters.fileFilter;
-  }, [filters]);
+    return persistentFilters.searchTerm || 
+           persistentFilters.dateRange.start || 
+           persistentFilters.dateRange.end || 
+           persistentFilters.tags.length > 0 || 
+           persistentFilters.fileFilter;
+  }, [persistentFilters]);
 
-  const currentSortValue = `${filters.sortBy}-${filters.sortDirection}`;
+  const currentSortValue = `${persistentFilters.sortBy}-${persistentFilters.sortDirection}`;
 
   return (
     <div className={`filter-container ${compact ? 'compact' : ''}`}>
@@ -144,7 +153,7 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
           <div className="filter-group">
             <select
               className={`filter-select ${compact ? 'compact' : ''}`}
-              value={filters.fileFilter}
+              value={persistentFilters.fileFilter}
               onChange={handleFileFilterChange}
             >
               <option value="">All Files</option>
@@ -162,7 +171,7 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
                 className={`dropdown-toggle ${compact ? 'compact' : ''}`}
                 onClick={() => setTagDropdownOpen(!tagDropdownOpen)}
               >
-                Tags ({filters.tags.length})
+                Tags ({persistentFilters.tags.length})
               </button>
               {tagDropdownOpen && (
                 <div className="dropdown-menu">
@@ -174,7 +183,7 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
                     >
                       <input
                         type="checkbox"
-                        checked={filters.tags.includes(tag)}
+                        checked={persistentFilters.tags.includes(tag)}
                         readOnly
                       />
                       <span>{tag}</span>
@@ -188,9 +197,9 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
       </div>
 
       {/* Active Filter Tags */}
-      {filters.tags.length > 0 && (
+      {persistentFilters.tags.length > 0 && (
         <div className="filter-tags">
-          {filters.tags.map(tag => (
+          {persistentFilters.tags.map(tag => (
             <span key={tag} className="filter-tag">
               {tag}
               <span className="remove-tag" onClick={() => handleRemoveTag(tag)}>×</span>
@@ -218,13 +227,13 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
                   <div className="date-range-picker">
                     <input
                       type="date"
-                      value={filters.dateRange.start}
+                      value={persistentFilters.dateRange.start}
                       onChange={(e) => handleDateRangeChange('start', e.target.value)}
                     />
                     <span className="date-separator">to</span>
                     <input
                       type="date"
-                      value={filters.dateRange.end}
+                      value={persistentFilters.dateRange.end}
                       onChange={(e) => handleDateRangeChange('end', e.target.value)}
                     />
                   </div>
