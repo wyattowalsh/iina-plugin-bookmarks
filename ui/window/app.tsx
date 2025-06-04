@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+import FilterComponent, { FilterState } from "../components/FilterComponent";
+import TextHighlighter from "../components/TextHighlighter";
+import useBookmarkFilters from "../hooks/useBookmarkFilters";
 
 interface BookmarkData {
   id: string;
@@ -7,6 +10,7 @@ interface BookmarkData {
   filepath: string;
   description?: string;
   createdAt: string;
+  tags?: string[];
 }
 
 interface AppWindow extends Window {
@@ -19,14 +23,26 @@ interface AppWindow extends Window {
 
 const App: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortBy, setSortBy] = useState<"timestamp" | "title" | "createdAt">("createdAt");
   const [selectedBookmark, setSelectedBookmark] = useState<BookmarkData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
+  const [filters, setFilters] = useState<FilterState>({
+    searchTerm: '',
+    dateRange: { start: '', end: '' },
+    tags: [],
+    sortBy: 'createdAt',
+    sortDirection: 'desc',
+    fileFilter: ''
+  });
+
   const appWindow = window as unknown as AppWindow;
+
+  const { filteredBookmarks, resultsCount, availableFiles, availableTags } = useBookmarkFilters({
+    bookmarks,
+    filters
+  });
 
   useEffect(() => {
     const handleMessage = (event: any) => {
@@ -54,7 +70,6 @@ const App: React.FC = () => {
 
     if (appWindow.iina?.postMessage) {
       appWindow.iina.postMessage("UI_READY", { uiType: "window" });
-      // Request current file path for context (e.g., for new bookmarks)
       appWindow.iina.postMessage("REQUEST_FILE_PATH"); 
     }
 
@@ -64,15 +79,10 @@ const App: React.FC = () => {
     };
   }, [selectedBookmark]);
 
-  // No separate useEffect for REQUEST_FILE_PATH for window as it primarily shows all bookmarks.
-  // currentFile is mostly for context if needed.
-
   const handleAddBookmark = () => {
-    // When adding from main window, it should ideally add to the *currently active* video in IINA
-    // The plugin's addBookmark method already uses core.status.path for this.
     appWindow.iina?.postMessage?.("ADD_BOOKMARK", { 
       title: `New Bookmark ${new Date().toLocaleTimeString()}`,
-      timestamp: null, // Plugin will use current time of active video
+      timestamp: null,
       description: "Added from bookmark manager window"
     });
   };
@@ -99,28 +109,10 @@ const App: React.FC = () => {
         data: { title: editTitle, description: editDescription }
       });
       setIsEditing(false);
-      // Optimistically update UI, or wait for BOOKMARKS_UPDATED from plugin
       setSelectedBookmark(prev => prev ? {...prev, title: editTitle, description: editDescription} : null);
       setBookmarks(prevBks => prevBks.map(b => b.id === selectedBookmark.id ? {...b, title: editTitle, description: editDescription} : b));
     }
   };
-
-  const filteredAndSortedBookmarks = useMemo(() => {
-    return bookmarks // Window UI receives all bookmarks, filtering is client-side
-      .filter(b => 
-        b.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        (b.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.filepath.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .sort((a, b) => {
-        if (sortBy === "title") return a.title.localeCompare(b.title);
-        if (sortBy === "timestamp") { // Timestamp sort is less meaningful without file context unless comparing within same file
-            if (a.filepath === b.filepath) return a.timestamp - b.timestamp;
-            return 0; // Or sort by filepath first, then timestamp
-        }
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-  }, [bookmarks, searchTerm, sortBy]);
 
   const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
   const formatTime = (seconds: number) => new Date(seconds * 1000).toISOString().substr(11, 8);
@@ -134,34 +126,41 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <div className="controls-main">
-        <input 
-          type="text" 
-          placeholder="Search all bookmarks (title, description, path)..." 
-          value={searchTerm} 
-          onChange={e => setSearchTerm(e.target.value)} 
-          className="search-input-large"
-        />
-        <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="sort-select-large">
-          <option value="createdAt">Sort by Date Added</option>
-          <option value="title">Sort by Title</option>
-          <option value="timestamp">Sort by Timestamp (within file)</option>
-        </select>
-      </div>
+      <FilterComponent
+        onFilterChange={setFilters}
+        availableTags={availableTags}
+        availableFiles={availableFiles}
+        resultsCount={resultsCount}
+        showAdvanced={true}
+        initialFilters={filters}
+      />
 
       <div className="content-area">
         <div className="bookmark-list-panel">
-          {filteredAndSortedBookmarks.length === 0 ? (
-            <p className="empty-state-text">No bookmarks found, or none match your search.</p>
+          {filteredBookmarks.length === 0 ? (
+            <p className="empty-state-text">No bookmarks match your current filters.</p>
           ) : (
-            filteredAndSortedBookmarks.map(bookmark => (
+            filteredBookmarks.map(bookmark => (
               <div 
                 key={bookmark.id} 
                 className={`bookmark-entry ${selectedBookmark?.id === bookmark.id ? 'selected' : ''}`}
                 onClick={() => setSelectedBookmark(bookmark)}
               >
-                <h4>{bookmark.title}</h4>
+                <h4>
+                  <TextHighlighter
+                    text={bookmark.title}
+                    searchTerms={filters.searchTerm}
+                    caseSensitive={false}
+                  />
+                </h4>
                 <p className="filepath" title={bookmark.filepath}>{bookmark.filepath.split('/').pop()} ({formatTime(bookmark.timestamp)})</p>
+                {bookmark.tags && bookmark.tags.length > 0 && (
+                  <div className="bookmark-tags-small">
+                    {bookmark.tags.map(tag => (
+                      <span key={tag} className="bookmark-tag-small">{tag}</span>
+                    ))}
+                  </div>
+                )}
                 <p className="created-date-small">Added: {new Date(bookmark.createdAt).toLocaleDateString()}</p>
               </div>
             ))
@@ -182,10 +181,25 @@ const App: React.FC = () => {
               </div>
             ) : (
               <div className="details-view">
-                <h3>{selectedBookmark.title}</h3>
+                <h3>
+                  <TextHighlighter
+                    text={selectedBookmark.title}
+                    searchTerms={filters.searchTerm}
+                    caseSensitive={false}
+                  />
+                </h3>
                 <p><strong>File:</strong> <span title={selectedBookmark.filepath}>{selectedBookmark.filepath}</span></p>
                 <p><strong>Time:</strong> {formatTime(selectedBookmark.timestamp)}</p>
-                <p><strong>Description:</strong> {selectedBookmark.description || "N/A"}</p>
+                <p><strong>Description:</strong> 
+                  <TextHighlighter
+                    text={selectedBookmark.description || "N/A"}
+                    searchTerms={filters.searchTerm}
+                    caseSensitive={false}
+                  />
+                </p>
+                {selectedBookmark.tags && selectedBookmark.tags.length > 0 && (
+                  <p><strong>Tags:</strong> {selectedBookmark.tags.join(', ')}</p>
+                )}
                 <p><strong>Created:</strong> {formatDate(selectedBookmark.createdAt)}</p>
                 <div className="detail-actions">
                     <button onClick={() => handleJumpToBookmark(selectedBookmark.id)} className="jump-btn">Jump To</button>
@@ -196,7 +210,7 @@ const App: React.FC = () => {
             )}
           </div>
         )}
-         {!selectedBookmark && filteredAndSortedBookmarks.length > 0 && (
+         {!selectedBookmark && filteredBookmarks.length > 0 && (
             <div className="bookmark-detail-panel placeholder-panel">
                 <p>Select a bookmark from the list to view or edit its details.</p>
             </div>

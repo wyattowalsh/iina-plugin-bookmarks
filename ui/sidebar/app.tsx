@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+import FilterComponent, { FilterState } from "../components/FilterComponent";
+import TextHighlighter from "../components/TextHighlighter";
+import useBookmarkFilters from "../hooks/useBookmarkFilters";
 
 interface BookmarkData {
   id: string;
@@ -7,6 +10,7 @@ interface BookmarkData {
   filepath: string;
   description?: string;
   createdAt: string;
+  tags?: string[];
 }
 
 interface AppWindow extends Window {
@@ -19,10 +23,22 @@ interface AppWindow extends Window {
 
 const App: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortBy, setSortBy] = useState<"timestamp" | "title" | "createdAt">("createdAt");
   const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
+  const [filters, setFilters] = useState<FilterState>({
+    searchTerm: '',
+    dateRange: { start: '', end: '' },
+    tags: [],
+    sortBy: 'createdAt',
+    sortDirection: 'desc',
+    fileFilter: ''
+  });
+
   const appWindow = window as unknown as AppWindow;
+
+  const { filteredBookmarks, resultsCount, availableTags } = useBookmarkFilters({
+    bookmarks,
+    filters
+  });
 
   useEffect(() => {
     const handleMessage = (event: any) => {
@@ -75,18 +91,6 @@ const App: React.FC = () => {
   const handleJumpToBookmark = (id: string) => {
     appWindow.iina?.postMessage?.("JUMP_TO_BOOKMARK", { id });
   };
-  
-  const filteredAndSortedBookmarks = useMemo(() => {
-    return bookmarks // Bookmarks are already filtered by path by the plugin for sidebar
-      .filter(b => 
-         (b.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-          (b.description || "").toLowerCase().includes(searchTerm.toLowerCase())))
-      .sort((a, b) => {
-        if (sortBy === "title") return a.title.localeCompare(b.title);
-        if (sortBy === "timestamp") return a.timestamp - b.timestamp;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-  }, [bookmarks, searchTerm, sortBy]); // Removed currentFile dependency as plugin sends filtered data
 
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString();
 
@@ -96,26 +100,40 @@ const App: React.FC = () => {
         <h2>Bookmarks (Current File)</h2>
         <button onClick={handleAddBookmark} className="add-bookmark-btn">Add Bookmark</button>
       </div>
-      <div className="controls">
-        <input 
-          type="text" 
-          placeholder="Search current file bookmarks..." 
-          value={searchTerm} 
-          onChange={e => setSearchTerm(e.target.value)} 
-          className="search-input"
-        />
-        <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="sort-select">
-          <option value="createdAt">Sort by Date</option>
-          <option value="title">Sort by Title</option>
-          <option value="timestamp">Sort by Time</option>
-        </select>
-      </div>
+
+      <FilterComponent
+        onFilterChange={setFilters}
+        availableTags={availableTags}
+        resultsCount={resultsCount}
+        compact={true}
+        initialFilters={filters}
+      />
+
       <ul className="bookmark-list">
-        {filteredAndSortedBookmarks.map(bookmark => (
+        {filteredBookmarks.map(bookmark => (
           <li key={bookmark.id} className="bookmark-item">
             <div className="bookmark-content" onClick={() => handleJumpToBookmark(bookmark.id)}>
-              <h4 className="bookmark-title">{bookmark.title}</h4>
-              <p className="bookmark-description">{bookmark.description}</p>
+              <h4 className="bookmark-title">
+                <TextHighlighter
+                  text={bookmark.title}
+                  searchTerms={filters.searchTerm}
+                  caseSensitive={false}
+                />
+              </h4>
+              <p className="bookmark-description">
+                <TextHighlighter
+                  text={bookmark.description || ''}
+                  searchTerms={filters.searchTerm}
+                  caseSensitive={false}
+                />
+              </p>
+              {bookmark.tags && bookmark.tags.length > 0 && (
+                <div className="bookmark-tags">
+                  {bookmark.tags.map(tag => (
+                    <span key={tag} className="bookmark-tag">{tag}</span>
+                  ))}
+                </div>
+              )}
               <div className="bookmark-meta">
                 <span className="timestamp">{new Date((bookmark.timestamp || 0) * 1000).toISOString().substr(11, 8)}</span>
                 <span className="created-date">{formatDate(bookmark.createdAt)}</span>
@@ -124,7 +142,7 @@ const App: React.FC = () => {
             <button onClick={() => handleDeleteBookmark(bookmark.id)} className="delete-btn">&times;</button>
           </li>
         ))}
-        {filteredAndSortedBookmarks.length === 0 && <p className="empty-state">No bookmarks for this file, or none match your search.</p>}
+        {filteredBookmarks.length === 0 && <p className="empty-state">No bookmarks match your current filters.</p>}
       </ul>
     </div>
   );

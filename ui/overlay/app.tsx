@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import TextHighlighter from "../components/TextHighlighter";
 
 interface BookmarkData {
   id: string;
@@ -21,6 +22,7 @@ const App: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
   const [isVisible, setIsVisible] = useState(true); 
   const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const appWindow = window as unknown as AppWindow;
 
   useEffect(() => {
@@ -66,8 +68,15 @@ const App: React.FC = () => {
     setIsVisible(false); 
   };
 
+  // Filter bookmarks by current file and search term
   const displayedBookmarks = currentFile 
-    ? bookmarks.filter(b => b.filepath === currentFile) 
+    ? bookmarks.filter(b => {
+        const matchesFile = b.filepath === currentFile;
+        const matchesSearch = !searchTerm || 
+          b.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (b.description && b.description.toLowerCase().includes(searchTerm.toLowerCase()));
+        return matchesFile && matchesSearch;
+      })
     : []; // Show empty if no currentFile to avoid showing all
 
   if (!isVisible || displayedBookmarks.length === 0) {
@@ -80,15 +89,33 @@ const App: React.FC = () => {
         <h3>Bookmarks ({displayedBookmarks.length})</h3>
         <button onClick={handleClose} className="close-btn" data-clickable="true">&times;</button>
       </div>
+      {bookmarks.filter(b => b.filepath === currentFile).length > 3 && (
+        <div className="overlay-search">
+          <input
+            type="text"
+            placeholder="Search bookmarks..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="overlay-search-input"
+          />
+        </div>
+      )}
       <ul className="bookmark-list">
         {displayedBookmarks.map((bookmark) => (
           <li 
             key={bookmark.id} 
+            className="bookmark-item"
             onClick={() => handleBookmarkClick(bookmark.id)} 
             title={`Click to jump to ${bookmark.title}`}
             data-clickable="true"
           >
-            <span className="bookmark-title">{bookmark.title}</span>
+            <span className="bookmark-title">
+              <TextHighlighter
+                text={bookmark.title}
+                searchTerms={searchTerm}
+                caseSensitive={false}
+              />
+            </span>
             <span className="bookmark-time">{new Date((bookmark.timestamp || 0) * 1000).toISOString().substr(11, 8)}</span>
           </li>
         ))}

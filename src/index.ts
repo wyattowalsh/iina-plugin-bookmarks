@@ -17,6 +17,7 @@ interface BookmarkData {
   filepath: string;
   description?: string;
   createdAt: string; // ISO string
+  tags?: string[];
 }
 
 // For communication from UI to plugin
@@ -86,8 +87,8 @@ class BookmarkManager {
           case "HIDE_OVERLAY":
             overlay.hide();
             break;
-          case "ADD_BOOKMARK": // Assuming payload is { title, timestamp, description }
-             this.addBookmark(message.payload?.title, message.payload?.timestamp, message.payload?.description);
+          case "ADD_BOOKMARK": // Assuming payload is { title, timestamp, description, tags }
+             this.addBookmark(message.payload?.title, message.payload?.timestamp, message.payload?.description, message.payload?.tags);
             break;
           case "DELETE_BOOKMARK":
             if (message.payload?.id) {
@@ -189,7 +190,7 @@ class BookmarkManager {
     );
   }
 
-  public addBookmark(title?: string, timestamp?: number, description?: string): void {
+  public addBookmark(title?: string, timestamp?: number, description?: string, tags?: string[]): void {
     const currentFile = core.status.path;
     const mediaTitle = core.status.title || "Unknown Media";
     const currentTime = timestamp ?? core.status.position;
@@ -209,6 +210,7 @@ class BookmarkManager {
       filepath: currentFile,
       description: description || `Recorded on ${new Date().toLocaleDateString()}`,
       createdAt: new Date().toISOString(),
+      tags: tags || [],
     };
     this.bookmarks.push(bookmark);
     this.saveBookmarks(); // This will call refreshUIs()

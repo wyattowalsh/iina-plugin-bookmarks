@@ -49,7 +49,36 @@
     }
   }
 
+  .overlay-search {
+    margin-bottom: 12px;
+    
+    .overlay-search-input {
+      width: 100%;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: white;
+      font-size: 14px;
+      transition: all 0.2s ease;
+      
+      &::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+      }
+      
+      &:focus {
+        outline: none;
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.4);
+      }
+    }
+  }
+
   .bookmark-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    
     .bookmark-item {
       display: flex;
       align-items: center;
@@ -74,6 +103,16 @@
         font-weight: 500;
       }
 
+      .bookmark-title {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.95);
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+      
       .bookmark-description {
         font-size: 13px;
         color: rgba(255, 255, 255, 0.9);
