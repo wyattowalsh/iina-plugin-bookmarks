@@ -1,0 +1,54 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Plugin-UI Communication Patterns
+
+Communication between the IINA Bookmarks plugin core ([src/index.ts](mdc:src/index.ts)) and its various UI components ([ui/overlay/app.tsx](mdc:ui/overlay/app.tsx), [ui/sidebar/app.tsx](mdc:ui/sidebar/app.tsx), [ui/window/app.tsx](mdc:ui/window/app.tsx)) is exclusively handled via IINA's `postMessage` API. This ensures a decoupled architecture where UIs do not have direct access to the plugin's internal `BookmarkManager` instance.
+
+**Key Principles:**
+
+*   **Bidirectional Communication:** Messages can be sent from the plugin core to UIs and from UIs to the plugin core.
+*   **Message-Based:** All interactions are defined by structured messages.
+*   **Serialization:** Data sent via `postMessage` must be JSON-serializable. For example, `Date` objects are converted to ISO 8601 strings (`BookmarkData.createdAt`).
+
+**Message Structure:**
+
+A `UIMessage` interface is defined in [src/index.ts](mdc:src/index.ts) (though not explicitly shared as a type with UIs, the structure is adhered to):
+
+```typescript
+interface UIMessage {
+  type: string; // e.g., 'ADD_BOOKMARK', 'BOOKMARKS_UPDATED'
+  payload?: any; // Data associated with the message
+  source?: 'overlay' | 'sidebar' | 'window'; // Optional: identifies the UI source
+}
+```
+
+**Plugin Core to UI Communication (`plugin.postMessage()`):**
+
+The `BookmarkManager` in [src/index.ts](mdc:src/index.ts) sends messages to the UIs, typically to provide data or notify of state changes:
+
+*   **`BOOKMARKS_UPDATED`**: Sent when the list of bookmarks changes (add, delete, update). The `payload` contains the updated array of `BookmarkData` objects, filtered by `filepath` for overlay and sidebar, and unfiltered for the main window.
+*   **`CURRENT_FILE_PATH`**: Sent when a UI signals it's ready (`UI_READY`) or when a new file is loaded in IINA. The `payload` is the current media file path.
+
+**UI to Plugin Core Communication (`appWindow.iina.postMessage()`):**
+
+UI components (e.g., [ui/overlay/app.tsx](mdc:ui/overlay/app.tsx)) send messages to the plugin core to request actions or data:
+
+*   **`UI_READY`**: Sent when a UI component mounts. The plugin core responds by sending initial data like `BOOKMARKS_UPDATED` and `CURRENT_FILE_PATH`.
+*   **`REQUEST_FILE_PATH`**: (Less common now with `UI_READY` providing initial path) UIs can request the current file path.
+*   **CRUD Operations:**
+    *   `ADD_BOOKMARK`: `payload` contains the `BookmarkData` (without `id` and `createdAt`, which are set by the core).
+    *   `UPDATE_BOOKMARK`: `payload` contains the full, updated `BookmarkData`.
+    *   `DELETE_BOOKMARK`: `payload` contains the `id` of the bookmark to delete.
+*   **`JUMP_TO_BOOKMARK`**: `payload` contains the `timestamp` (in seconds) to seek to.
+*   **`HIDE_OVERLAY`**: Sent by the overlay UI to request the plugin core to hide it.
+*   **Other specific actions** as needed by each UI.
+
+**Message Handling:**
+
+*   **Plugin Core ([src/index.ts](mdc:src/index.ts)):** The `setupUIMessageListeners()` method in `BookmarkManager` uses `iina.event.on('message', handler)` to listen for messages from all UIs. A `switch` statement on `message.type` routes the message to the appropriate handler function.
+*   **UI Components (e.g., [ui/overlay/app.tsx](mdc:ui/overlay/app.tsx)):** Each UI uses `appWindow.iina.onMessage((messageName: string, messageData: any) => { ... });` (or similar, depending on the exact IINA webview API) to listen for messages. They typically check `messageName` (equivalent to `UIMessage.type`) to handle relevant updates.
+
+This message-passing system is crucial for maintaining separation of concerns and adhering to IINA plugin development best practices.

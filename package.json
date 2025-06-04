@@ -1,0 +1,62 @@
+{
+  "name": "iina-plugin-bookmarks",
+  "version": "1.0.0",
+  "description": "IINA plugin for user-friendly media bookmark management",
+  "main": "src/index.ts",
+  "scripts": {
+    "serve-window": "parcel serve ui/window/index.html --dist-dir dist/ui/window",
+    "serve-sidebar": "parcel serve ui/sidebar/index.html --dist-dir dist/ui/sidebar",
+    "serve-overlay": "parcel serve ui/overlay/index.html --dist-dir dist/ui/overlay",
+    "build": "rm -rf dist && parcel build .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "type-check": "tsc --noEmit"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@parcel/transformer-sass": "^2.8.3",
+    "@parcel/transformer-typescript": "^2.8.3",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "iina-plugin-definition": "^0.0.7",
+    "prettier": "^2.8.8",
+    "process": "^0.11.10",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "parcel": "^2.8.3",
+    "parcel-optimizer-webview": "git+https://github.com/iina/parcel-optimizer-webview.git",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "browserslist": "safari >= 9",
+  "entry": "src/index.ts",
+  "targets": {
+    "main": false,
+    "window": {
+      "distDir": "./dist/ui/window",
+      "source": "ui/window/index.html",
+      "publicUrl": "./"
+    },
+    "overlay": {
+      "distDir": "./dist/ui/overlay",
+      "source": "ui/overlay/index.html",
+      "publicUrl": "./"
+    },
+    "sidebar": {
+      "distDir": "./dist/ui/sidebar",
+      "source": "ui/sidebar/index.html",
+      "publicUrl": "./"
+    },
+    "global": {
+      "distDir": "./dist/",
+      "source": "src/global.ts",
+      "isLibrary": false
+    },
+    "entry": {
+      "distDir": "./dist/",
+      "source": "src/index.ts",
+      "isLibrary": false
+    }
+  }
+}

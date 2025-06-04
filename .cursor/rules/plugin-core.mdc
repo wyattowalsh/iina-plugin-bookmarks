@@ -1,0 +1,28 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Plugin Core Logic (src/)
+
+The primary logic for the IINA Bookmarks plugin resides in the [src/](mdc:src/) directory.
+
+**Key Files:**
+
+*   **[src/index.ts](mdc:src/index.ts):** This is the main entry point for the plugin. It contains the `BookmarkManager` class which is responsible for:
+    *   Loading and saving bookmarks (using IINA's `preferences` API).
+    *   Handling communication with the UIs (overlay, sidebar, window) via IINA's `postMessage` API.
+    *   Managing event listeners (e.g., `file-loaded`).
+    *   Adding menu items to the IINA interface.
+    *   Interacting with IINA core functions (e.g., `core.status`, `core.seek`, `core.open`).
+*   **[src/global.ts](mdc:src/global.ts):** Intended for any global configurations or utility functions that might be needed across the plugin. Currently, it's minimal.
+
+**Core Class: `BookmarkManager`**
+
+*   Manages an array of `BookmarkData` objects.
+*   `BookmarkData` interface defines the structure for a bookmark, including `id`, `title`, `timestamp`, `filepath`, `description`, and `createdAt` (as an ISO string).
+*   Initializes Web UIs by loading their respective `index.html` files from the `dist/ui/` directory.
+*   Sets up message listeners (`setupUIMessageListeners`) to handle requests and data from the UI components.
+*   Provides methods for adding, removing, updating, and jumping to bookmarks.
+
+See [communication-patterns.mdc](mdc:.cursor/rules/communication-patterns.mdc) for details on how the plugin core interacts with the UIs.

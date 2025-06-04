@@ -1,0 +1,25 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# IINA Bookmarks Plugin: Overview
+
+This project is an IINA plugin for managing media bookmarks. It allows users to add, view, and navigate to saved timestamps in videos.
+
+**Key Technologies:**
+
+*   **Plugin Core:** TypeScript ([src/index.ts](mdc:src/index.ts))
+*   **User Interface (UI):** React with TypeScript (.tsx files in [ui/](mdc:ui/))
+*   **Styling:** SCSS ([ui/shared.scss](mdc:ui/shared.scss) and component-specific .scss files)
+*   **Build Tool:** Parcel ([.parcelrc](mdc:.parcelrc), [package.json](mdc:package.json) scripts)
+*   **IINA Plugin Manifest:** [Info.json](mdc:Info.json)
+
+**Main Components:**
+
+*   **Plugin Logic (`src/`):** Handles bookmark storage, communication with IINA player, and serves as the backend for UIs.
+*   **Overlay UI (`ui/overlay/`):** Displays bookmarks directly on the video.
+*   **Sidebar UI (`ui/sidebar/`):** Provides a tab in IINA's sidebar for managing bookmarks.
+*   **Standalone Window UI (`ui/window/`):** A separate window for comprehensive bookmark management.
+
+Refer to [Project Structure in iina-plugin-bookmarks.md.txt](mdc:.cursor/context/iina-plugin-bookmarks.md.txt) for a detailed file tree.
