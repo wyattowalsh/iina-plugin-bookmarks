@@ -1,0 +1,1 @@
+# iina-plugin-bookmarks
