@@ -33,7 +33,6 @@
     "react-dom": "^18.2.0"
   },
   "browserslist": "safari >= 9",
-  "entry": "src/index.ts",
   "targets": {
     "main": false,
     "window": {
@@ -59,6 +58,7 @@
     "entry": {
       "distDir": "./dist/",
       "source": "src/index.ts",
+      "outputFormat": "global",
       "isLibrary": false
     }
   }

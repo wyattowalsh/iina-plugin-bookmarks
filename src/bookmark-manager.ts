@@ -314,10 +314,10 @@ export class BookmarkManager {
     tags.push(mediaType);
     
     // Time-based tags
-    const hours = Math.floor(timestamp / 3600);
-    if (hours === 0) tags.push('beginning');
-    else if (hours < 1) tags.push('early');
-    else if (hours >= 2) tags.push('late');
+    const minutes = Math.floor(timestamp / 60);
+    if (minutes < 5) tags.push('beginning');
+    else if (minutes < 60) tags.push('early');
+    else if (minutes >= 120) tags.push('late');
     
     // File location tags
     const pathParts = filepath.toLowerCase().split('/');
@@ -337,7 +337,7 @@ export class BookmarkManager {
       { pattern: /(19|20)\d{2}/i, tag: 'dated-content' },
       { pattern: /trailer/i, tag: 'trailer' },
       { pattern: /interview/i, tag: 'interview' },
-      { pattern: /behind.the.scenes|bts/i, tag: 'behind-scenes' },
+      { pattern: /behind.the.scenes|behind.scenes|bts/i, tag: 'behind-scenes' },
       { pattern: /documentary|docu/i, tag: 'documentary' },
       { pattern: /concert|live/i, tag: 'live-performance' }
     ];
