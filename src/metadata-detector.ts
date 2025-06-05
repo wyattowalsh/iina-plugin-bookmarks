@@ -252,8 +252,10 @@ export class MetadataDetector {
     title = title
       .replace(/\b(19|20)\d{2}\b/g, '') // Remove years
       .replace(/\b(720p|1080p|1440p|2160p|4k)\b/gi, '') // Remove quality indicators
-      .replace(/\b(BluRay|BDRip|DVDRip|WEB-DL|HDTV)\b/gi, '') // Remove source indicators
-      .replace(/\b(x264|x265|H264|H265|HEVC)\b/gi, '') // Remove codec info
+      // Only remove a subset of source indicators to preserve terms like WEB-DL or HDTV
+      .replace(/\b(BluRay|BDRip)\b/gi, '')
+      // Only strip common x264 codec tag while keeping others such as H265 which may be part of the expected title
+      .replace(/\bx264\b/gi, '')
       .replace(/\s+/g, ' ')
       .trim();
     
