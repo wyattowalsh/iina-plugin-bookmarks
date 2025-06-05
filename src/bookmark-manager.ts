@@ -1,3 +1,5 @@
+import { MetadataDetector, MediaMetadata, IINACore } from './metadata-detector';
+
 interface BookmarkData {
   id: string;
   title: string;
@@ -28,6 +30,8 @@ interface IINADependencies {
     status: {
       path?: string;
       currentTime?: number;
+      title?: string;
+      duration?: number;
     };
   };
   event: {
@@ -64,6 +68,7 @@ export class BookmarkManager {
   private readonly STORAGE_KEY = "bookmarks";
   private readonly SORT_PREFERENCES_KEY = "sortPreferences";
   private deps: IINADependencies;
+  private metadataDetector: MetadataDetector;
 
   constructor(dependencies?: IINADependencies) {
     // Default to empty implementations for testing
@@ -78,6 +83,18 @@ export class BookmarkManager {
       standaloneWindow: { loadFile: () => {}, postMessage: () => {}, onMessage: () => {}, show: () => {} }
     };
 
+    // Initialize metadata detector
+    this.metadataDetector = new MetadataDetector(
+      this.deps.core as IINACore,
+      this.deps.console,
+      {
+        retryAttempts: 3,
+        retryDelay: 100,
+        cacheTimeout: 30000,
+        enableLogging: true
+      }
+    );
+
     this.loadBookmarks();
     this.loadSortPreferences();
     
@@ -85,7 +102,8 @@ export class BookmarkManager {
       this.setupEventListeners();
       this.setupWebUI();
       this.setupUIMessageListeners();
-      this.deps.console.log("IINA Bookmarks Plugin initialized. Message passing enabled.");
+      this.setupMetadataChangeListener();
+      this.deps.console.log("IINA Bookmarks Plugin with enhanced metadata detection initialized. Message passing enabled.");
     }
   }
 
@@ -137,7 +155,8 @@ export class BookmarkManager {
             this.deps.overlay.hide();
             break;
           case "ADD_BOOKMARK":
-             this.addBookmark(message.payload?.title, message.payload?.timestamp, message.payload?.description, message.payload?.tags);
+            this.addBookmark(message.payload?.title, message.payload?.timestamp, message.payload?.description, message.payload?.tags)
+              .catch(error => this.deps.console.error("Failed to add bookmark:", error.message));
             break;
           case "DELETE_BOOKMARK":
             if (message.payload?.id) {
@@ -170,6 +189,14 @@ export class BookmarkManager {
     this.deps.overlay.onMessage(createHandler('overlay'));
     this.deps.standaloneWindow.onMessage(createHandler('window'));
     this.deps.console.log("UI Message Listeners are set up.");
+  }
+
+  private setupMetadataChangeListener(): void {
+    this.metadataDetector.onMediaChange((metadata: MediaMetadata) => {
+      this.deps.console.log(`Media changed: ${metadata.title} (${metadata.filepath})`);
+      // Refresh UIs when media changes
+      this.refreshUIs();
+    });
   }
 
   private loadBookmarks(): void {
@@ -219,12 +246,16 @@ export class BookmarkManager {
   private setupEventListeners(): void {
     this.deps.event.on("file-loaded", () => {
       this.deps.console.log("File loaded event triggered.");
-      this.refreshUIs(); 
+      // Refresh metadata cache when file changes
+      this.metadataDetector.refreshMetadata()
+        .then(() => this.refreshUIs())
+        .catch(error => this.deps.console.error("Failed to refresh metadata on file load:", error.message));
     });
 
     this.deps.menu.addItem(
       this.deps.menu.item("Add Bookmark at Current Time", () => {
-        this.addBookmark();
+        this.addBookmark()
+          .catch(error => this.deps.console.error("Failed to add bookmark from menu:", error.message));
       })
     );
     this.deps.menu.addItem(
@@ -244,33 +275,47 @@ export class BookmarkManager {
     );
   }
 
-  public addBookmark(title?: string, timestamp?: number, description?: string, tags?: string[]): void {
-    const currentPath = this.deps.core.status.path || '/test/video.mp4'; // Default for testing
-    const currentTime = timestamp !== undefined ? timestamp : (this.deps.core.status.currentTime || 0);
-    const mediaTitle = this.extractMediaTitle(currentPath);
-    
-    const metadata = this.generateBookmarkMetadata(
-      currentPath, 
-      mediaTitle, 
-      currentTime, 
-      title, 
-      description, 
-      tags
-    );
+  public async addBookmark(title?: string, timestamp?: number, description?: string, tags?: string[]): Promise<void> {
+    try {
+      const currentPath = this.deps.core.status.path || '/test/video.mp4'; // Default for testing
+      const currentTime = timestamp !== undefined ? timestamp : (this.deps.core.status.currentTime || 0);
+      
+      // Use enhanced metadata detection
+      let detectedTitle: string;
+      try {
+        const metadataTitle = await this.metadataDetector.getCurrentTitle();
+        detectedTitle = metadataTitle || this.extractMediaTitle(currentPath);
+      } catch (error: any) {
+        this.deps.console.warn(`Metadata detection failed, falling back to filename: ${error.message}`);
+        detectedTitle = this.extractMediaTitle(currentPath);
+      }
+      
+      const metadata = this.generateBookmarkMetadata(
+        currentPath, 
+        detectedTitle, 
+        currentTime, 
+        title, 
+        description, 
+        tags
+      );
 
-    const bookmark: BookmarkData = {
-      id: this.generateUniqueId(),
-      title: metadata.title,
-      timestamp: currentTime,
-      filepath: currentPath,
-      description: metadata.description,
-      createdAt: new Date().toISOString(),
-      tags: metadata.tags
-    };
+      const bookmark: BookmarkData = {
+        id: this.generateUniqueId(),
+        title: metadata.title,
+        timestamp: currentTime,
+        filepath: currentPath,
+        description: metadata.description,
+        createdAt: new Date().toISOString(),
+        tags: metadata.tags
+      };
 
-    this.bookmarks.push(bookmark);
-    this.saveBookmarks();
-    this.deps.console.log("Bookmark added:", bookmark.title);
+      this.bookmarks.push(bookmark);
+      this.saveBookmarks();
+      this.deps.console.log("Bookmark added with enhanced metadata detection:", bookmark.title);
+    } catch (error: any) {
+      this.deps.console.error("Error adding bookmark:", error.message);
+      throw error;
+    }
   }
 
   private extractMediaTitle(filepath: string): string {
