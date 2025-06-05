@@ -8,23 +8,26 @@
     "serve-sidebar": "parcel serve ui/sidebar/index.html --dist-dir dist/ui/sidebar",
     "serve-overlay": "parcel serve ui/overlay/index.html --dist-dir dist/ui/overlay",
     "build": "rm -rf dist && parcel build .",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
     "type-check": "tsc --noEmit"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@parcel/transformer-sass": "^2.8.3",
-    "@parcel/transformer-typescript": "^2.8.3",
+    "@parcel/transformer-sass": "^2.15.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@vitest/ui": "^1.6.0",
     "iina-plugin-definition": "^0.0.7",
+    "jsdom": "^24.1.0",
     "prettier": "^2.8.8",
     "process": "^0.11.10",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^1.6.0"
   },
   "dependencies": {
-    "parcel": "^2.8.3",
+    "parcel": "^2.12.0",
     "parcel-optimizer-webview": "git+https://github.com/iina/parcel-optimizer-webview.git",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
