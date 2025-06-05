@@ -1,0 +1,118 @@
+---
+title: Media Title Detection
+description: Intelligent media title detection with smart fallback logic
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+# Media Title Detection
+
+The IINA Plugin Bookmarks includes a sophisticated media title detection system that automatically identifies and formats media titles for your bookmarks.
+
+## How It Works
+
+The plugin uses a hierarchical approach to determine the best possible title for your media content:
+
+<Steps>
+  <Step>
+    ### Metadata Title (Highest Priority)
+    
+    The plugin first attempts to use the media's embedded metadata title from IINA's core status.
+    
+    ```typescript
+    const metadataTitle = iina.core.status.title;
+    ```
+    
+    This provides the most accurate title when available in the media file's metadata.
+  </Step>
+  
+  <Step>
+    ### Intelligent Fallback
+    
+    If no metadata title is available, or if the metadata title is just the filename, the plugin falls back to cleaning the filename.
+    
+    The cleaning process includes:
+    - Removing file extensions (`.mp4`, `.mkv`, etc.)
+    - Replacing separators with spaces (`.`, `_`, `-`)
+    - Removing quality indicators (`720p`, `1080p`, `4K`, etc.)
+    - Removing source indicators (`BluRay`, `WEB-DL`, `DVDRip`, etc.)
+    - Capitalizing words appropriately
+  </Step>
+  
+  <Step>
+    ### Final Fallback
+    
+    If all else fails, the plugin uses a generic "Unknown" title to ensure bookmarks are always created successfully.
+  </Step>
+</Steps>
+
+## Title Cleaning Examples
+
+Here are some examples of how filenames are transformed into clean titles:
+
+| Original Filename | Cleaned Title |
+|-------------------|---------------|
+| `The.Great.Movie.2023.1080p.mp4` | "The Great Movie" |
+| `TV_Show_S01E01_Episode_Name.mkv` | "TV Show S01E01 Episode Name" |
+| `Documentary-About-Nature-4K.mp4` | "Documentary About Nature" |
+| `simple_movie.avi` | "Simple Movie" |
+
+## Quality Indicators Removed
+
+The system automatically removes common quality and source indicators:
+
+### Video Quality
+- Resolution indicators: `720p`, `1080p`, `1440p`, `2160p`, `4K`, `8K`
+- Quality terms: `HD`, `FHD`, `UHD`, `HDR`, `SDR`
+
+### Source Indicators
+- Physical media: `BluRay`, `Blu-ray`, `DVD`, `DVDRip`, `BD`
+- Digital sources: `WEB-DL`, `WEBRip`, `NetFlix`, `Amazon`, `Hulu`
+- Encoding: `x264`, `x265`, `HEVC`, `AVC`, `VP9`
+
+### Audio Information
+- Audio codecs: `AAC`, `AC3`, `DTS`, `FLAC`, `MP3`
+- Audio quality: `5.1`, `7.1`, `Atmos`, `TrueHD`
+
+## Configuration
+
+<Callout type="info">
+  The media detection system works automatically and doesn't require configuration. However, you can override detected titles when creating bookmarks.
+</Callout>
+
+## Technical Implementation
+
+The media detection is handled by the `MetadataDetector` class:
+
+```typescript
+class MetadataDetector {
+  async getCurrentTitle(): Promise<string> {
+    // 1. Try metadata title
+    const metadataTitle = this.core.status.title;
+    if (metadataTitle && this.isValidTitle(metadataTitle)) {
+      return metadataTitle;
+    }
+    
+    // 2. Fall back to cleaned filename
+    const cleanedTitle = this.extractTitleFromFilename();
+    if (cleanedTitle) {
+      return cleanedTitle;
+    }
+    
+    // 3. Final fallback
+    return 'Unknown';
+  }
+}
+```
+
+## Best Practices
+
+- **Metadata First**: The plugin prioritizes embedded metadata when available
+- **Smart Cleaning**: Filename cleaning removes technical details while preserving meaningful information
+- **Consistent Format**: All titles are formatted consistently regardless of source
+- **User Override**: You can always manually edit titles when creating bookmarks
+
+<Callout type="tip">
+  For the best experience, use media files with proper embedded metadata. This ensures the most accurate title detection.
+</Callout> 

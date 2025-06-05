@@ -1,0 +1,254 @@
+---
+title: Advanced Filtering & Search
+description: Comprehensive guide to bookmark filtering with advanced search syntax, presets, and analytics
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+# Advanced Filtering & Search
+
+The IINA Bookmarks Plugin includes powerful filtering capabilities that allow you to quickly find and organize your bookmarks using advanced search syntax, quick filter presets, and intelligent suggestions.
+
+## Quick Start
+
+<Callout type="info">
+  **New to filtering?** Start with basic search by typing in any search box - it works like traditional search. Click "Advanced Search" to unlock powerful field-specific syntax.
+</Callout>
+
+## Advanced Search Syntax
+
+### Field-Specific Search
+
+Search within specific bookmark fields using the `field:value` syntax:
+
+<Tabs>
+<Tab title="Title Search" value="title">
+```
+title:"meeting notes"
+title:presentation
+```
+Search specifically within bookmark titles for exact phrases or keywords.
+</Tab>
+
+<Tab title="Description Search" value="description">
+```
+description:important
+description:"project details"
+```
+Filter bookmarks by their description content.
+</Tab>
+
+<Tab title="Tag Search" value="tag">
+```
+tag:work
+tag:personal
+```
+Filter by specific tags assigned to bookmarks.
+</Tab>
+
+<Tab title="File Path Search" value="filepath">
+```
+filepath:movie.mp4
+filepath:*.mkv
+```
+Filter by file path patterns or specific filenames.
+</Tab>
+
+<Tab title="Date Search" value="date">
+```
+created:today
+created:this-week
+created:>2024-01-01
+```
+Filter by creation date using shortcuts or specific dates.
+</Tab>
+</Tabs>
+
+### Boolean Operators
+
+Combine search terms with logical operators for complex queries:
+
+| Operator | Example | Description |
+|----------|---------|-------------|
+| `AND` | `tag:work AND title:meeting` | Must match both conditions |
+| `OR` | `tag:personal OR tag:family` | Must match either condition |
+| `NOT` | `title:video NOT tag:completed` | Must match first but not second |
+
+#### Complex Query Examples
+
+```
+tag:work AND title:meeting NOT tag:completed
+description:"project review" OR title:"weekly sync"
+created:this-week AND tag:urgent
+filepath:*.mp4 AND tag:favorite
+```
+
+### Date Shortcuts
+
+Use convenient date filters for time-based searches:
+
+| Shortcut | Description |
+|----------|-------------|
+| `created:today` | Bookmarks created today |
+| `created:yesterday` | Bookmarks from yesterday |
+| `created:this-week` | Bookmarks from the past 7 days |
+| `created:this-month` | Bookmarks from current month |
+| `created:>2024-01-01` | Bookmarks after specific date |
+| `created:<2024-12-31` | Bookmarks before specific date |
+
+## Quick Filter Presets
+
+### Built-in Presets
+
+The plugin includes several pre-configured filter presets:
+
+- **Recent** 🕒 - Bookmarks created today
+- **This Week** 📅 - Bookmarks from the past 7 days  
+- **Untagged** 🏷️ - Bookmarks without any tags
+- **Favorites** ⭐ - Bookmarks with favorite tag
+- **Need Description** 📝 - Bookmarks missing descriptions
+
+### Custom Presets
+
+Create and manage your own filter presets:
+
+1. **Save Current Filter** - Save your current filter combination as a custom preset
+2. **Name and Describe** - Give your presets meaningful names and descriptions
+3. **Usage Statistics** - Track which presets you use most often
+4. **Export/Import** - Backup presets or share them between installations
+
+<Callout type="tip">
+  **Pro Tip**: Save complex filter combinations as presets for quick access to your most common searches.
+</Callout>
+
+## Filter Analytics
+
+Monitor your filtering efficiency with built-in analytics:
+
+- **Results Count** - Number of bookmarks matching current filters
+- **Reduction Percentage** - How much the filters narrowed down results
+- **Performance Metrics** - Track filter usage patterns over time
+
+## Search History
+
+The plugin automatically maintains your search history:
+
+- **Recent Searches** - Automatically saves your last 10 search queries
+- **Quick Access** - Click any recent search to reapply it instantly
+- **Smart Suggestions** - Get autocomplete suggestions based on:
+  - Available tags in your bookmark collection
+  - Field operators (title:, tag:, etc.)
+  - Boolean operators (AND, OR, NOT)
+  - Your recent searches
+  - Date shortcuts
+
+## User Interface Variations
+
+### Window View (Full-Featured)
+- Complete filter presets panel with custom preset management
+- Advanced search toggle with full syntax support
+- Filter analytics display
+- Search history management panel
+
+### Sidebar View (Compact)
+- Streamlined advanced search toggle
+- Essential filtering controls optimized for narrow space
+- Quick access to recent searches
+- Responsive design for smaller screens
+
+### Overlay View (Minimal)
+- Basic advanced search with toggle button
+- Context-aware filtering (auto-applies current file filter)
+- Compact suggestions dropdown
+- Optimized for use during video playback
+
+## Usage Tips
+
+### Getting Started
+
+1. **Basic Search**: Start typing in any search box - it works like traditional search
+2. **Enable Advanced**: Click the "Advanced Search" toggle to access field-specific syntax
+3. **Use Suggestions**: As you type, suggestions appear to help with syntax
+4. **Save Presets**: When you find useful filter combinations, save them as presets
+
+### Power User Tips
+
+<Callout type="info">
+  **Keyboard Navigation**: Use arrow keys to navigate suggestions, Enter to apply, Escape to close.
+</Callout>
+
+1. **Quoted Phrases**: Use quotes for exact phrase matching: `title:"exact phrase"`
+2. **Combine Filters**: Mix advanced search with traditional filter controls
+3. **Export Data**: Backup your search history and custom presets regularly
+4. **Debug Mode**: Enable debug logging with `localStorage.setItem('bookmark-filter-debug', 'true')`
+
+### Performance Optimization
+
+- **Debounced Search**: 200ms delay prevents excessive filtering during typing
+- **Efficient Filtering**: Filters are applied in optimal order for best performance
+- **Virtual Scrolling**: Large bookmark collections are handled efficiently
+- **Smart Caching**: Search results are cached to improve repeat query performance
+
+## Technical Implementation
+
+### Core Components
+
+| Component | Purpose |
+|-----------|---------|
+| **AdvancedSearch** | Intelligent search input with syntax parsing and suggestions |
+| **FilterPresets** | Quick filter management with custom preset support |
+| **Enhanced FilterComponent** | Backward-compatible filter interface with new analytics |
+| **useAdvancedBookmarkFilters** | Core filtering logic with performance optimization |
+| **useFilterHistory** | Persistent storage for search history and presets |
+
+### Data Persistence
+
+- **Search History**: Stored in localStorage (maximum 10 entries)
+- **Custom Presets**: Stored in localStorage (maximum 20 presets)
+- **Filter Statistics**: Usage analytics tracked for performance insights
+- **Export/Import**: JSON-based data portability for backup and sharing
+
+### Browser Compatibility
+
+- **Modern ES6+**: Features with Safari 9+ support
+- **Responsive Design**: Optimized for various screen sizes
+- **Dark Mode**: Support with system preference detection
+- **Accessibility**: Keyboard navigation and screen reader support
+
+## Troubleshooting
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Suggestions not appearing | Ensure you're in advanced search mode |
+| Syntax not working | Check for typos in field names (title:, tag:, etc.) |
+| Performance slow | Try more specific filters to reduce result set |
+| Presets not saving | Check browser localStorage permissions |
+
+### Debug Mode
+
+Enable detailed logging for troubleshooting:
+
+```javascript
+localStorage.setItem('bookmark-filter-debug', 'true')
+```
+
+This will log filter operations, performance metrics, and error details to the browser console.
+
+## Future Enhancements
+
+Planned features for upcoming releases:
+
+- **Regex Support**: Advanced pattern matching in search queries
+- **Saved Searches**: Persistent named searches with change notifications  
+- **Filter Sharing**: Share filter presets between users or installations
+- **AI Suggestions**: Smart filter recommendations based on usage patterns
+- **Bulk Operations**: Apply actions to filtered bookmark sets
+
+---
+
+<Callout type="note">
+  For technical support or feature requests, please [open an issue](https://github.com/wyattowalsh/iina-plugin-bookmarks/issues) on the project repository.
+</Callout> 

@@ -1,0 +1,190 @@
+---
+title: Bookmark Management
+description: Create, organize, and manage your media bookmarks
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+# Bookmark Management
+
+Learn how to create, organize, and manage your media bookmarks effectively with the IINA Plugin Bookmarks system.
+
+## Creating Bookmarks
+
+### Quick Bookmark Creation
+
+The fastest way to create a bookmark is using the keyboard shortcut while watching media:
+
+1. **Press the bookmark hotkey** (configurable in settings)
+2. **Instant bookmark** - Creates a bookmark with auto-detected title and current timestamp
+3. **Optional editing** - Modify title, description, or tags if needed
+
+### Manual Bookmark Creation
+
+For more control over your bookmarks:
+
+<Steps>
+  <Step>
+    ### Open the Add Bookmark Dialog
+    
+    - Use the plugin UI button
+    - Right-click context menu
+    - Keyboard shortcut (default: `Cmd+B`)
+  </Step>
+  
+  <Step>
+    ### Fill in Details
+    
+    - **Title**: Auto-detected or custom title
+    - **Timestamp**: Current time or custom timestamp
+    - **Description**: Optional description for context
+    - **Tags**: Organize with custom tags
+  </Step>
+  
+  <Step>
+    ### Save the Bookmark
+    
+    Click "Save" to add the bookmark to your collection
+  </Step>
+</Steps>
+
+## Bookmark Properties
+
+Each bookmark contains the following information:
+
+### Core Properties
+- **Title**: The media title (auto-detected or custom)
+- **Timestamp**: Precise playback position (in seconds)
+- **File Path**: Location of the media file
+- **Creation Date**: When the bookmark was created
+
+### Optional Properties
+- **Description**: Detailed notes about the bookmark
+- **Tags**: Categorical labels for organization
+- **Custom Title**: Override auto-detected titles
+- **Notes**: Additional context or comments
+
+## Organizing Bookmarks
+
+### Tag System
+
+Tags provide flexible organization for your bookmarks:
+
+```typescript
+// Example bookmark with tags
+{
+  title: "Epic Battle Scene",
+  timestamp: 2847.5,
+  tags: ["action", "climax", "favorite"],
+  description: "Amazing fight choreography"
+}
+```
+
+### Common Tag Strategies
+
+<Callout type="tip">
+  **Genre Tags**: `action`, `comedy`, `drama`, `documentary`
+  
+  **Content Tags**: `favorite`, `review-later`, `share`, `study`
+  
+  **Scene Tags**: `opening`, `climax`, `ending`, `blooper`
+  
+  **Quality Tags**: `best-scene`, `poor-quality`, `needs-review`
+</Callout>
+
+### Filtering and Searching
+
+Find your bookmarks quickly using:
+
+- **Text Search**: Search titles, descriptions, and file paths
+- **Tag Filtering**: Filter by one or multiple tags
+- **Date Range**: Find bookmarks from specific time periods
+- **Media Type**: Filter by file type or format
+
+## Bookmark Operations
+
+### Viewing Bookmarks
+
+Access your bookmarks through:
+
+1. **Plugin Sidebar** - Integrated with IINA
+2. **Standalone Window** - Dedicated bookmark manager
+3. **Quick Preview** - Hover tooltips with details
+
+### Editing Bookmarks
+
+Modify existing bookmarks:
+
+- **Double-click** to edit inline
+- **Right-click** for context menu options
+- **Bulk edit** multiple bookmarks at once
+- **Undo/Redo** support for changes
+
+### Jumping to Bookmarks
+
+Navigate to bookmarked positions:
+
+- **Single-click** - Jump to timestamp in current media
+- **Double-click** - Open media file and jump to position
+- **Preview mode** - View thumbnail at timestamp (if available)
+
+## Advanced Features
+
+### Duplicate Detection
+
+The system automatically:
+
+- Detects potential duplicate bookmarks
+- Suggests merging similar entries
+- Prevents exact duplicates by timestamp
+
+### Batch Operations
+
+Perform operations on multiple bookmarks:
+
+- **Bulk tagging** - Add tags to selected bookmarks
+- **Mass deletion** - Remove multiple bookmarks
+- **Export selection** - Export chosen bookmarks only
+- **Tag management** - Rename or merge tags across bookmarks
+
+### Smart Suggestions
+
+The plugin provides intelligent suggestions:
+
+- **Auto-complete tags** based on existing tags
+- **Similar bookmarks** detection
+- **Optimal timestamp** suggestions
+- **Title corrections** for common mistakes
+
+## Data Integrity
+
+### Automatic Backups
+
+- **Auto-save** - Changes saved immediately
+- **Backup rotation** - Multiple backup copies maintained
+- **Recovery options** - Restore from backup if needed
+
+### File Path Management
+
+- **Relative paths** - Bookmarks work across different systems
+- **Missing file detection** - Alerts when media files are moved
+- **Path updating** - Bulk update paths when media is reorganized
+
+<Callout type="warning">
+  Always backup your bookmark data before major system changes or media reorganization.
+</Callout>
+
+## Keyboard Shortcuts
+
+| Action | Default Shortcut | Description |
+|--------|------------------|-------------|
+| Create Bookmark | `Cmd+B` | Quick bookmark creation |
+| Open Manager | `Cmd+Shift+B` | Open standalone window |
+| Search Bookmarks | `Cmd+F` | Focus search box |
+| Delete Bookmark | `Delete` | Remove selected bookmark |
+| Edit Bookmark | `Enter` | Edit selected bookmark |
+
+<Callout type="info">
+  All keyboard shortcuts are customizable through the plugin settings.
+</Callout> 
