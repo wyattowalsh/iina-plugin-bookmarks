@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import FilterComponent, { FilterState } from "../components/FilterComponent";
+import AdvancedSearch, { ParsedSearchQuery } from "../components/AdvancedSearch";
 import TextHighlighter from "../components/TextHighlighter";
-import useBookmarkFilters from "../hooks/useBookmarkFilters";
+import useAdvancedBookmarkFilters from "../hooks/useAdvancedBookmarkFilters";
+import useFilterHistory from "../hooks/useFilterHistory";
 
 interface BookmarkData {
   id: string;
@@ -32,13 +34,18 @@ const App: React.FC = () => {
     sortDirection: 'desc',
     fileFilter: ''
   });
+  const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
+  const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
 
   const appWindow = window as unknown as AppWindow;
 
-  const { filteredBookmarks, resultsCount, availableTags } = useBookmarkFilters({
+  const { filteredBookmarks, resultsCount, availableTags } = useAdvancedBookmarkFilters({
     bookmarks,
-    filters
+    filters,
+    parsedQuery: useAdvancedSearch ? parsedQuery : undefined
   });
+
+  const { recentSearches, addRecentSearch } = useFilterHistory();
 
   useEffect(() => {
     const handleMessage = (event: any) => {
@@ -94,6 +101,14 @@ const App: React.FC = () => {
 
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString();
 
+  const handleAdvancedSearchChange = (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
+    setParsedQuery(parsedQuery);
+    setFilters(prev => ({ ...prev, searchTerm }));
+    if (searchTerm.trim()) {
+      addRecentSearch(searchTerm);
+    }
+  };
+
   return (
     <div className="bookmark-sidebar">
       <div className="sidebar-header">
@@ -101,13 +116,30 @@ const App: React.FC = () => {
         <button onClick={handleAddBookmark} className="add-bookmark-btn">Add Bookmark</button>
       </div>
 
-      <FilterComponent
-        onFilterChange={setFilters}
-        availableTags={availableTags}
-        resultsCount={resultsCount}
-        compact={true}
-        initialFilters={filters}
-      />
+      <div className="filter-row">
+        <div className="advanced-search-toggle" onClick={() => setUseAdvancedSearch(!useAdvancedSearch)}>
+          <span className={`toggle-icon ${useAdvancedSearch ? 'expanded' : ''}`}>▶</span>
+          <span>Advanced</span>
+        </div>
+      </div>
+
+      {useAdvancedSearch ? (
+        <AdvancedSearch
+          onSearchChange={handleAdvancedSearchChange}
+          availableTags={availableTags}
+          recentSearches={recentSearches}
+          placeholder="Search... (try: tag:work)"
+          className="compact"
+        />
+      ) : (
+        <FilterComponent
+          onFilterChange={setFilters}
+          availableTags={availableTags}
+          resultsCount={resultsCount}
+          compact={true}
+          initialFilters={filters}
+        />
+      )}
 
       <ul className="bookmark-list">
         {filteredBookmarks.map(bookmark => (

@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import FilterComponent, { FilterState } from "../components/FilterComponent";
+import AdvancedSearch, { ParsedSearchQuery } from "../components/AdvancedSearch";
+import FilterPresets from "../components/FilterPresets";
 import TextHighlighter from "../components/TextHighlighter";
-import useBookmarkFilters from "../hooks/useBookmarkFilters";
+import TagInput from "../components/TagInput";
+import useAdvancedBookmarkFilters from "../hooks/useAdvancedBookmarkFilters";
+import useFilterHistory from "../hooks/useFilterHistory";
 
 interface BookmarkData {
   id: string;
@@ -27,6 +31,7 @@ const App: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: '',
@@ -36,13 +41,26 @@ const App: React.FC = () => {
     sortDirection: 'desc',
     fileFilter: ''
   });
+  const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
+  const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
 
   const appWindow = window as unknown as AppWindow;
 
-  const { filteredBookmarks, resultsCount, availableFiles, availableTags } = useBookmarkFilters({
+  const { filteredBookmarks, resultsCount, availableFiles, availableTags, analytics } = useAdvancedBookmarkFilters({
     bookmarks,
-    filters
+    filters,
+    parsedQuery: useAdvancedSearch ? parsedQuery : undefined
   });
+
+  const {
+    recentSearches,
+    customPresets,
+    addRecentSearch,
+    clearRecentSearches,
+    saveFilterPreset,
+    deleteFilterPreset,
+    incrementPresetUsage
+  } = useFilterHistory();
 
   useEffect(() => {
     const handleMessage = (event: any) => {
@@ -99,6 +117,7 @@ const App: React.FC = () => {
     setSelectedBookmark(bookmark);
     setEditTitle(bookmark.title);
     setEditDescription(bookmark.description || "");
+    setEditTags(bookmark.tags || []);
     setIsEditing(true);
   };
 
@@ -106,16 +125,32 @@ const App: React.FC = () => {
     if (selectedBookmark) {
       appWindow.iina?.postMessage?.("UPDATE_BOOKMARK", {
         id: selectedBookmark.id,
-        data: { title: editTitle, description: editDescription }
+        data: { title: editTitle, description: editDescription, tags: editTags }
       });
       setIsEditing(false);
-      setSelectedBookmark(prev => prev ? {...prev, title: editTitle, description: editDescription} : null);
-      setBookmarks(prevBks => prevBks.map(b => b.id === selectedBookmark.id ? {...b, title: editTitle, description: editDescription} : b));
+      setSelectedBookmark(prev => prev ? {...prev, title: editTitle, description: editDescription, tags: editTags} : null);
+      setBookmarks(prevBks => prevBks.map(b => b.id === selectedBookmark.id ? {...b, title: editTitle, description: editDescription, tags: editTags} : b));
     }
   };
 
   const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
   const formatTime = (seconds: number) => new Date(seconds * 1000).toISOString().substr(11, 8);
+
+  const handleAdvancedSearchChange = (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
+    setParsedQuery(parsedQuery);
+    setFilters(prev => ({ ...prev, searchTerm }));
+    if (searchTerm.trim()) {
+      addRecentSearch(searchTerm);
+    }
+  };
+
+  const handleApplyPreset = (presetFilters: Partial<FilterState>) => {
+    setFilters(prev => ({ ...prev, ...presetFilters }));
+  };
+
+  const handleSavePreset = (name: string, description: string) => {
+    saveFilterPreset(name, description, filters);
+  };
 
   return (
     <div className="bookmark-window">
@@ -126,14 +161,55 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <FilterComponent
-        onFilterChange={setFilters}
-        availableTags={availableTags}
-        availableFiles={availableFiles}
-        resultsCount={resultsCount}
-        showAdvanced={true}
-        initialFilters={filters}
+      <FilterPresets
+        onApplyPreset={handleApplyPreset}
+        onSaveCurrentAsPreset={handleSavePreset}
+        currentFilters={filters}
+        customPresets={customPresets}
+        recentSearches={recentSearches}
+        onClearHistory={clearRecentSearches}
       />
+
+      <div className="filter-row">
+        <div className="advanced-search-toggle" onClick={() => setUseAdvancedSearch(!useAdvancedSearch)}>
+          <span className={`toggle-icon ${useAdvancedSearch ? 'expanded' : ''}`}>▶</span>
+          <span>Advanced Search</span>
+        </div>
+        {analytics.hasActiveFilters && (
+          <div className="filter-analytics">
+            <div className="analytics-item">
+              <span className="analytics-icon">📊</span>
+              <span className="analytics-value">{analytics.filteredCount}</span>
+              <span>of {analytics.totalBookmarks}</span>
+            </div>
+            {analytics.reductionPercentage > 0 && (
+              <div className={`analytics-item reduction-percentage ${analytics.reductionPercentage > 75 ? 'high-reduction' : ''}`}>
+                <span className="analytics-icon">📉</span>
+                <span className="analytics-value">{analytics.reductionPercentage}%</span>
+                <span>filtered out</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {useAdvancedSearch ? (
+        <AdvancedSearch
+          onSearchChange={handleAdvancedSearchChange}
+          availableTags={availableTags}
+          availableFiles={availableFiles}
+          recentSearches={recentSearches}
+        />
+      ) : (
+        <FilterComponent
+          onFilterChange={setFilters}
+          availableTags={availableTags}
+          availableFiles={availableFiles}
+          resultsCount={resultsCount}
+          showAdvanced={true}
+          initialFilters={filters}
+        />
+      )}
 
       <div className="content-area">
         <div className="bookmark-list-panel">
@@ -174,6 +250,7 @@ const App: React.FC = () => {
                 <h3>Edit Bookmark</h3>
                 <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" />
                 <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Description"></textarea>
+                                  <TagInput tags={editTags} onTagsChange={setEditTags} availableTags={availableTags} />
                 <div className="edit-actions">
                     <button onClick={handleSaveEdit} className="save-btn">Save Changes</button>
                     <button onClick={() => setIsEditing(false)} className="cancel-btn">Cancel</button>
