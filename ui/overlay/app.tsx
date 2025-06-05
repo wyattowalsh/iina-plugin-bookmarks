@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
+import AdvancedSearch, { ParsedSearchQuery } from "../components/AdvancedSearch";
 import TextHighlighter from "../components/TextHighlighter";
+import useAdvancedBookmarkFilters from "../hooks/useAdvancedBookmarkFilters";
+import { FilterState } from "../components/FilterComponent";
 
 interface BookmarkData {
   id: string;
@@ -23,7 +26,24 @@ const App: React.FC = () => {
   const [isVisible, setIsVisible] = useState(true); 
   const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [filters, setFilters] = useState<FilterState>({
+    searchTerm: '',
+    dateRange: { start: '', end: '' },
+    tags: [],
+    sortBy: 'createdAt',
+    sortDirection: 'desc',
+    fileFilter: ''
+  });
+  const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
+  const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
   const appWindow = window as unknown as AppWindow;
+
+  // Enhanced filtering
+  const { filteredBookmarks: allFilteredBookmarks, availableTags } = useAdvancedBookmarkFilters({
+    bookmarks,
+    filters,
+    parsedQuery: useAdvancedSearch ? parsedQuery : undefined
+  });
 
   useEffect(() => {
     const handleMessage = (event: any) => {
@@ -68,15 +88,15 @@ const App: React.FC = () => {
     setIsVisible(false); 
   };
 
+  const handleAdvancedSearchChange = (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
+    setParsedQuery(parsedQuery);
+    setFilters(prev => ({ ...prev, searchTerm, fileFilter: currentFile || '' }));
+    setSearchTerm(searchTerm);
+  };
+
   // Filter bookmarks by current file and search term
   const displayedBookmarks = currentFile 
-    ? bookmarks.filter(b => {
-        const matchesFile = b.filepath === currentFile;
-        const matchesSearch = !searchTerm || 
-          b.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (b.description && b.description.toLowerCase().includes(searchTerm.toLowerCase()));
-        return matchesFile && matchesSearch;
-      })
+    ? allFilteredBookmarks.filter(b => b.filepath === currentFile)
     : []; // Show empty if no currentFile to avoid showing all
 
   if (!isVisible || displayedBookmarks.length === 0) {
@@ -91,13 +111,34 @@ const App: React.FC = () => {
       </div>
       {bookmarks.filter(b => b.filepath === currentFile).length > 3 && (
         <div className="overlay-search">
-          <input
-            type="text"
-            placeholder="Search bookmarks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="overlay-search-input"
-          />
+          {useAdvancedSearch ? (
+            <AdvancedSearch
+              onSearchChange={handleAdvancedSearchChange}
+              availableTags={availableTags}
+              placeholder="Search... (try: tag:work)"
+              className="overlay-compact"
+            />
+          ) : (
+            <div className="search-with-toggle">
+              <input
+                type="text"
+                placeholder="Search bookmarks..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setFilters(prev => ({ ...prev, searchTerm: e.target.value, fileFilter: currentFile || '' }));
+                }}
+                className="overlay-search-input"
+              />
+              <button 
+                onClick={() => setUseAdvancedSearch(true)} 
+                className="advanced-toggle-btn"
+                title="Enable advanced search"
+              >
+                🔍+
+              </button>
+            </div>
+          )}
         </div>
       )}
       <ul className="bookmark-list">

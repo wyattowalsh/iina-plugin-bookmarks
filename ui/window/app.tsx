@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import FilterComponent, { FilterState } from "../components/FilterComponent";
+import AdvancedSearch, { ParsedSearchQuery } from "../components/AdvancedSearch";
+import FilterPresets from "../components/FilterPresets";
 import TextHighlighter from "../components/TextHighlighter";
-import useBookmarkFilters from "../hooks/useBookmarkFilters";
+import useAdvancedBookmarkFilters from "../hooks/useAdvancedBookmarkFilters";
+import useFilterHistory from "../hooks/useFilterHistory";
 
 interface BookmarkData {
   id: string;
@@ -36,13 +39,26 @@ const App: React.FC = () => {
     sortDirection: 'desc',
     fileFilter: ''
   });
+  const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
+  const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
 
   const appWindow = window as unknown as AppWindow;
 
-  const { filteredBookmarks, resultsCount, availableFiles, availableTags } = useBookmarkFilters({
+  const { filteredBookmarks, resultsCount, availableFiles, availableTags, analytics } = useAdvancedBookmarkFilters({
     bookmarks,
-    filters
+    filters,
+    parsedQuery: useAdvancedSearch ? parsedQuery : undefined
   });
+
+  const {
+    recentSearches,
+    customPresets,
+    addRecentSearch,
+    clearRecentSearches,
+    saveFilterPreset,
+    deleteFilterPreset,
+    incrementPresetUsage
+  } = useFilterHistory();
 
   useEffect(() => {
     const handleMessage = (event: any) => {
@@ -117,6 +133,22 @@ const App: React.FC = () => {
   const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
   const formatTime = (seconds: number) => new Date(seconds * 1000).toISOString().substr(11, 8);
 
+  const handleAdvancedSearchChange = (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
+    setParsedQuery(parsedQuery);
+    setFilters(prev => ({ ...prev, searchTerm }));
+    if (searchTerm.trim()) {
+      addRecentSearch(searchTerm);
+    }
+  };
+
+  const handleApplyPreset = (presetFilters: Partial<FilterState>) => {
+    setFilters(prev => ({ ...prev, ...presetFilters }));
+  };
+
+  const handleSavePreset = (name: string, description: string) => {
+    saveFilterPreset(name, description, filters);
+  };
+
   return (
     <div className="bookmark-window">
       <div className="window-header">
@@ -126,14 +158,55 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <FilterComponent
-        onFilterChange={setFilters}
-        availableTags={availableTags}
-        availableFiles={availableFiles}
-        resultsCount={resultsCount}
-        showAdvanced={true}
-        initialFilters={filters}
+      <FilterPresets
+        onApplyPreset={handleApplyPreset}
+        onSaveCurrentAsPreset={handleSavePreset}
+        currentFilters={filters}
+        customPresets={customPresets}
+        recentSearches={recentSearches}
+        onClearHistory={clearRecentSearches}
       />
+
+      <div className="filter-row">
+        <div className="advanced-search-toggle" onClick={() => setUseAdvancedSearch(!useAdvancedSearch)}>
+          <span className={`toggle-icon ${useAdvancedSearch ? 'expanded' : ''}`}>▶</span>
+          <span>Advanced Search</span>
+        </div>
+        {analytics.hasActiveFilters && (
+          <div className="filter-analytics">
+            <div className="analytics-item">
+              <span className="analytics-icon">📊</span>
+              <span className="analytics-value">{analytics.filteredCount}</span>
+              <span>of {analytics.totalBookmarks}</span>
+            </div>
+            {analytics.reductionPercentage > 0 && (
+              <div className={`analytics-item reduction-percentage ${analytics.reductionPercentage > 75 ? 'high-reduction' : ''}`}>
+                <span className="analytics-icon">📉</span>
+                <span className="analytics-value">{analytics.reductionPercentage}%</span>
+                <span>filtered out</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {useAdvancedSearch ? (
+        <AdvancedSearch
+          onSearchChange={handleAdvancedSearchChange}
+          availableTags={availableTags}
+          availableFiles={availableFiles}
+          recentSearches={recentSearches}
+        />
+      ) : (
+        <FilterComponent
+          onFilterChange={setFilters}
+          availableTags={availableTags}
+          availableFiles={availableFiles}
+          resultsCount={resultsCount}
+          showAdvanced={true}
+          initialFilters={filters}
+        />
+      )}
 
       <div className="content-area">
         <div className="bookmark-list-panel">
