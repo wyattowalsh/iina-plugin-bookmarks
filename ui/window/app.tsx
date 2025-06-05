@@ -6,6 +6,7 @@ import TextHighlighter from "../components/TextHighlighter";
 import TagInput from "../components/TagInput";
 import AddBookmarkDialog from "../components/AddBookmarkDialog";
 import ExportDialog from "../components/ExportDialog";
+import ImportDialog from "../components/ImportDialog";
 import useAdvancedBookmarkFilters from "../hooks/useAdvancedBookmarkFilters";
 import useFilterHistory from "../hooks/useFilterHistory";
 
@@ -47,6 +48,7 @@ const App: React.FC = () => {
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const appWindow = window as unknown as AppWindow;
 
@@ -81,6 +83,10 @@ const App: React.FC = () => {
         }
       } else if (messageData?.type === "CURRENT_FILE_PATH" && messageData.data) {
         setCurrentFile(messageData.data); 
+      } else if (messageData?.type === "IMPORT_RESULT") {
+        // Import result handling will be done by ImportDialog component
+      } else if (messageData?.type === "IMPORT_STARTED") {
+        // Import started handling will be done by ImportDialog component
       }
     };
 
@@ -167,6 +173,7 @@ const App: React.FC = () => {
         <h1>Manage All Bookmarks</h1>
         <div className="header-actions">
           <button onClick={handleAddBookmark} className="add-bookmark-btn">Add Bookmark to Current Video</button>
+          <button onClick={() => setShowImportDialog(true)} className="import-btn">Import Bookmarks</button>
           <button onClick={() => setShowExportDialog(true)} className="export-btn">Export Bookmarks</button>
         </div>
       </div>
@@ -176,6 +183,12 @@ const App: React.FC = () => {
         onClose={() => setShowAddDialog(false)}
         onSave={handleSaveBookmark}
         availableTags={availableTags}
+        postMessage={appWindow.iina?.postMessage}
+      />
+
+      <ImportDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
         postMessage={appWindow.iina?.postMessage}
       />
 

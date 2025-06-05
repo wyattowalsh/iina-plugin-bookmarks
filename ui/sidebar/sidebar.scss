@@ -22,6 +22,12 @@
       color: #fff;
     }
 
+    .sidebar-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
     .add-bookmark-btn {
       background: #007aff;
       color: white;
@@ -35,6 +41,48 @@
 
       &:hover {
         background: #0056b3;
+        transform: translateY(-1px);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+    }
+
+    .export-btn {
+      background: #34c759;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #28a745;
+        transform: translateY(-1px);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+    }
+
+    .import-btn {
+      background: #007aff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #0056cc;
         transform: translateY(-1px);
       }
 
@@ -61,7 +109,10 @@
       transition: border-color 0.2s ease;
 
       &:focus {
-        border-color: #007aff;
+        border-color: var(--focus-outline);
+        outline: 2px solid var(--focus-outline);
+        outline-offset: var(--focus-outline-offset);
+        box-shadow: var(--focus-shadow);
       }
 
       &::placeholder {
@@ -80,7 +131,10 @@
       cursor: pointer;
 
       &:focus {
-        border-color: #007aff;
+        border-color: var(--focus-outline);
+        outline: 2px solid var(--focus-outline);
+        outline-offset: var(--focus-outline-offset);
+        box-shadow: var(--focus-shadow);
       }
     }
   }
@@ -107,12 +161,26 @@
       margin-bottom: 8px;
       cursor: pointer;
       transition: all 0.2s ease;
+      outline: none;
 
       &:hover {
         background: #333;
         border-color: #444;
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      &:focus {
+        background: var(--hover-background);
+        border-color: var(--focus-outline);
+        outline: 2px solid var(--focus-outline);
+        outline-offset: var(--focus-outline-offset);
+        transform: translateY(-1px);
+        box-shadow: var(--focus-shadow), 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      &:focus:not(:focus-visible) {
+        outline: none;
       }
 
       .bookmark-header {
@@ -150,6 +218,18 @@
             background: rgba(255, 71, 87, 0.2);
             opacity: 1;
           }
+
+          &:focus {
+            background: rgba(255, 71, 87, 0.2);
+            opacity: 1;
+            outline: 2px solid var(--danger-color);
+            outline-offset: var(--focus-outline-offset);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+          }
+
+          &:focus:not(:focus-visible) {
+            outline: none;
+          }
         }
       }
 
@@ -171,6 +251,22 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .bookmark-tags {
+        margin-bottom: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+
+        .bookmark-tag {
+          background: rgba(0, 122, 255, 0.2);
+          color: #007aff;
+          font-size: 10px;
+          padding: 2px 6px;
+          border-radius: 10px;
+          border: 1px solid rgba(0, 122, 255, 0.3);
+        }
       }
 
       .bookmark-meta {
