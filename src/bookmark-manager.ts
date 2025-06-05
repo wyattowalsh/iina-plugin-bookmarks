@@ -41,6 +41,21 @@ interface ExportResult {
   error?: string;
 }
 
+interface ImportOptions {
+  duplicateHandling: 'skip' | 'replace' | 'merge';
+  validateData: boolean;
+  preserveIds: boolean;
+}
+
+interface ImportResult {
+  success: boolean;
+  importedCount: number;
+  skippedCount: number;
+  errorCount: number;
+  errors?: string[];
+  duplicates?: number;
+}
+
 interface IINADependencies {
   console: {
     log: (message: string) => void;
@@ -65,6 +80,16 @@ interface IINADependencies {
   menu: {
     addItem: (item: any) => void;
     item: (label: string, callback: () => void) => any;
+  };
+  utils: {
+    chooseFile: (title: string, options?: { chooseDir?: boolean; allowedFileTypes?: string[] }) => string;
+    prompt: (title: string) => string;
+    ask: (title: string) => boolean;
+  };
+  file: {
+    write: (path: string, content: string) => void;
+    read: (path: string) => string;
+    exists: (path: string) => boolean;
   };
   sidebar: {
     loadFile: (path: string) => void;
@@ -103,6 +128,8 @@ export class BookmarkManager {
       core: { status: {} },
       event: { on: () => {} },
       menu: { addItem: () => {}, item: () => ({}) },
+      utils: { chooseFile: () => '', prompt: () => '', ask: () => false },
+      file: { write: () => {}, read: () => '', exists: () => false },
       sidebar: { loadFile: () => {}, postMessage: () => {}, onMessage: () => {} },
       overlay: { loadFile: () => {}, postMessage: () => {}, onMessage: () => {}, setClickable: () => {}, show: () => {}, hide: () => {}, isVisible: () => false },
       standaloneWindow: { loadFile: () => {}, postMessage: () => {}, onMessage: () => {}, show: () => {} }
@@ -215,6 +242,12 @@ export class BookmarkManager {
           case "EXPORT_BOOKMARKS":
             this.handleExportBookmarks(message.payload, uiSource);
             break;
+          case "IMPORT_BOOKMARKS":
+            this.handleImportBookmarks(message.payload.bookmarks, message.payload.options, uiSource);
+            break;
+          case "REQUEST_IMPORT_FILE":
+            this.handleImportFromFile(uiSource);
+            break;
           default:
             this.deps.console.warn(`[${uiSource}] Unknown message type:`, message.type);
         }
@@ -307,6 +340,18 @@ export class BookmarkManager {
           this.refreshUIs('overlay');
           this.deps.overlay.show();
         }
+      })
+    );
+    this.deps.menu.addItem(
+      this.deps.menu.item("Export Bookmarks", () => {
+        this.handleExportFromMenu()
+          .catch(error => this.deps.console.error("Failed to export bookmarks from menu:", error.message));
+      })
+    );
+    this.deps.menu.addItem(
+      this.deps.menu.item("Import Bookmarks", () => {
+        this.handleImportFromMenu()
+          .catch(error => this.deps.console.error("Failed to import bookmarks from menu:", error.message));
       })
     );
   }
@@ -525,6 +570,24 @@ export class BookmarkManager {
     return [...this.bookmarks];
   }
 
+  /**
+   * Handle export from plugin menu with default settings
+   */
+  private async handleExportFromMenu(): Promise<void> {
+    try {
+      // Use default export options optimized for quick access from menu
+      const defaultExportOptions: ExportOptions = {
+        format: 'json',
+        includeMetadata: true
+      };
+
+      await this.handleExportBookmarks(defaultExportOptions, 'window');
+    } catch (error: any) {
+      this.deps.console.error("Error exporting bookmarks from menu:", error.message);
+      throw error;
+    }
+  }
+
   private formatTime(seconds: number): string {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -560,6 +623,23 @@ export class BookmarkManager {
       // Get bookmarks to export (apply filters if specified)
       let bookmarksToExport = this.getFilteredBookmarksForExport(options);
       
+      // Prompt user for file path if not provided
+      if (!options.filePath) {
+        const selectedPath = this.promptForExportPath(options.format);
+        if (!selectedPath) {
+          // User cancelled the file selection
+          const responseTarget = uiSource === 'overlay' ? this.deps.overlay : 
+                               (uiSource === 'sidebar' ? this.deps.sidebar : this.deps.standaloneWindow);
+          
+          responseTarget.postMessage(JSON.stringify({ 
+            type: "EXPORT_RESULT", 
+            data: { success: false, recordCount: 0, error: "Export cancelled by user" } 
+          }));
+          return;
+        }
+        options.filePath = selectedPath;
+      }
+      
       // Generate export data
       const exportResult = await this.exportBookmarks(bookmarksToExport, options);
       
@@ -583,6 +663,57 @@ export class BookmarkManager {
         type: "EXPORT_RESULT", 
         data: { success: false, recordCount: 0, error: error.message } 
       }));
+    }
+  }
+
+  private promptForExportPath(format: 'json' | 'csv'): string | null {
+    try {
+      // Step 1: Let user choose directory
+      const selectedDir = this.deps.utils.chooseFile(
+        "Choose folder to save exported bookmarks", 
+        { chooseDir: true }
+      );
+      
+      if (!selectedDir) {
+        this.deps.console.log("User cancelled directory selection");
+        return null;
+      }
+      
+      // Step 2: Prompt for filename
+      const defaultFilename = `bookmarks-export-${new Date().toISOString().replace(/[:.]/g, '-')}.${format}`;
+      const filename = this.deps.utils.prompt(`Enter filename for export (with .${format} extension):`);
+      
+      if (!filename) {
+        this.deps.console.log("User cancelled filename input");
+        return null;
+      }
+      
+      // Step 3: Ensure proper file extension
+      let finalFilename = filename;
+      if (!finalFilename.toLowerCase().endsWith(`.${format}`)) {
+        finalFilename += `.${format}`;
+      }
+      
+      // Step 4: Combine directory and filename
+      const fullPath = `${selectedDir}/${finalFilename}`;
+      
+      // Step 5: Check if file exists and confirm overwrite
+      if (this.deps.file.exists(fullPath)) {
+        const overwrite = this.deps.utils.ask(
+          `File "${finalFilename}" already exists. Do you want to overwrite it?`
+        );
+        if (!overwrite) {
+          this.deps.console.log("User cancelled overwrite");
+          return null;
+        }
+      }
+      
+      this.deps.console.log(`Export path selected: ${fullPath}`);
+      return fullPath;
+      
+    } catch (error: any) {
+      this.deps.console.error(`Error selecting export path: ${error.message}`);
+      return null;
     }
   }
 
@@ -651,14 +782,34 @@ export class BookmarkManager {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const fileName = options.filePath || `bookmarks-export-${timestamp}.json`;
       
-      // In a real IINA environment, we'd use file APIs to save
-      // For now, we'll simulate success and return the data
-      return {
-        success: true,
-        filePath: fileName,
-        recordCount: bookmarks.length,
-        data: jsonString // Include data for testing/download in UI
-      } as ExportResult & { data: string };
+      // Save file using IINA's file API if filePath is provided
+      if (options.filePath) {
+        try {
+          this.deps.file.write(options.filePath, jsonString);
+          this.deps.console.log(`JSON export saved to: ${options.filePath}`);
+          
+          return {
+            success: true,
+            filePath: options.filePath,
+            recordCount: bookmarks.length
+          };
+        } catch (fileError: any) {
+          this.deps.console.error(`Failed to save JSON file: ${fileError.message}`);
+          return {
+            success: false,
+            recordCount: 0,
+            error: `Failed to save file: ${fileError.message}`
+          };
+        }
+      } else {
+        // Fallback: return data for UI download (for testing/development)
+        return {
+          success: true,
+          filePath: fileName,
+          recordCount: bookmarks.length,
+          data: jsonString // Include data for testing/download in UI
+        } as ExportResult & { data: string };
+      }
       
     } catch (error: any) {
       return {
@@ -712,12 +863,34 @@ export class BookmarkManager {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const fileName = options.filePath || `bookmarks-export-${timestamp}.csv`;
       
-      return {
-        success: true,
-        filePath: fileName,
-        recordCount: bookmarks.length,
-        data: csvContent // Include data for testing/download in UI
-      } as ExportResult & { data: string };
+      // Save file using IINA's file API if filePath is provided
+      if (options.filePath) {
+        try {
+          this.deps.file.write(options.filePath, csvContent);
+          this.deps.console.log(`CSV export saved to: ${options.filePath}`);
+          
+          return {
+            success: true,
+            filePath: options.filePath,
+            recordCount: bookmarks.length
+          };
+        } catch (fileError: any) {
+          this.deps.console.error(`Failed to save CSV file: ${fileError.message}`);
+          return {
+            success: false,
+            recordCount: 0,
+            error: `Failed to save file: ${fileError.message}`
+          };
+        }
+      } else {
+        // Fallback: return data for UI download (for testing/development)
+        return {
+          success: true,
+          filePath: fileName,
+          recordCount: bookmarks.length,
+          data: csvContent // Include data for testing/download in UI
+        } as ExportResult & { data: string };
+      }
       
     } catch (error: any) {
       return {
@@ -731,33 +904,608 @@ export class BookmarkManager {
   public validateExportData(bookmarks: BookmarkData[]): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
     
-    for (let i = 0; i < bookmarks.length; i++) {
-      const bookmark = bookmarks[i];
-      
-      if (!bookmark.id) {
-        errors.push(`Bookmark at index ${i} missing required field: id`);
-      }
-      
-      if (!bookmark.title) {
-        errors.push(`Bookmark at index ${i} missing required field: title`);
-      }
-      
-      if (typeof bookmark.timestamp !== 'number') {
-        errors.push(`Bookmark at index ${i} invalid timestamp: ${bookmark.timestamp}`);
-      }
-      
-      if (!bookmark.filepath) {
-        errors.push(`Bookmark at index ${i} missing required field: filepath`);
-      }
-      
-      if (!bookmark.createdAt) {
-        errors.push(`Bookmark at index ${i} missing required field: createdAt`);
-      }
+    if (!Array.isArray(bookmarks)) {
+      errors.push("Data must be an array of bookmarks");
+      return { isValid: false, errors };
     }
     
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+    if (bookmarks.length === 0) {
+      errors.push("No bookmarks found to export");
+      return { isValid: false, errors };
+    }
+    
+    bookmarks.forEach((bookmark, index) => {
+      if (!bookmark.id || typeof bookmark.id !== 'string') {
+        errors.push(`Bookmark ${index + 1}: Invalid or missing ID`);
+      }
+      if (!bookmark.title || typeof bookmark.title !== 'string') {
+        errors.push(`Bookmark ${index + 1}: Invalid or missing title`);
+      }
+      if (!bookmark.filepath || typeof bookmark.filepath !== 'string') {
+        errors.push(`Bookmark ${index + 1}: Invalid or missing filepath`);
+      }
+      if (typeof bookmark.timestamp !== 'number' || bookmark.timestamp < 0) {
+        errors.push(`Bookmark ${index + 1}: Invalid timestamp`);
+      }
+    });
+    
+    return { isValid: errors.length === 0, errors };
+  }
+
+  public async handleImportBookmarks(bookmarks: BookmarkData[], options: ImportOptions, uiSource: 'sidebar' | 'overlay' | 'window'): Promise<void> {
+    try {
+      this.deps.console.log(`Starting import with options:`, options);
+      this.deps.console.log(`Importing ${bookmarks.length} bookmarks`);
+      
+      // Import bookmarks
+      const importResult = await this.importBookmarks(bookmarks, options);
+      
+      // Send result back to UI
+      const responseTarget = uiSource === 'overlay' ? this.deps.overlay : 
+                           (uiSource === 'sidebar' ? this.deps.sidebar : this.deps.standaloneWindow);
+      
+      responseTarget.postMessage(JSON.stringify({ 
+        type: "IMPORT_RESULT", 
+        data: importResult 
+      }));
+      
+      this.deps.console.log(`Import completed: ${importResult.importedCount} imported, ${importResult.skippedCount} skipped, ${importResult.errorCount} errors`);
+      
+      // Refresh UIs if any bookmarks were imported
+      if (importResult.importedCount > 0) {
+        this.refreshUIs();
+      }
+    } catch (error: any) {
+      this.deps.console.error("Import failed:", error.message);
+      
+      const responseTarget = uiSource === 'overlay' ? this.deps.overlay : 
+                           (uiSource === 'sidebar' ? this.deps.sidebar : this.deps.standaloneWindow);
+      
+      responseTarget.postMessage(JSON.stringify({ 
+        type: "IMPORT_RESULT", 
+        data: { 
+          success: false, 
+          importedCount: 0, 
+          skippedCount: 0, 
+          errorCount: 1, 
+          errors: [error.message] 
+        } 
+      }));
+    }
+  }
+
+  private async importBookmarks(bookmarks: BookmarkData[], options: ImportOptions): Promise<ImportResult> {
+    try {
+      let importedCount = 0;
+      let skippedCount = 0;
+      let errorCount = 0;
+      let duplicateCount = 0;
+      const errors: string[] = [];
+
+      // Validate imported data if requested
+      if (options.validateData) {
+        const validation = this.validateImportData(bookmarks);
+        if (!validation.isValid) {
+          return {
+            success: false,
+            importedCount: 0,
+            skippedCount: 0,
+            errorCount: validation.errors.length,
+            errors: validation.errors
+          };
+        }
+      }
+
+      // Process each bookmark
+      for (const bookmark of bookmarks) {
+        try {
+          const existingBookmark = this.findExistingBookmark(bookmark);
+          
+          if (existingBookmark) {
+            duplicateCount++;
+            
+            switch (options.duplicateHandling) {
+              case 'skip':
+                skippedCount++;
+                this.deps.console.log(`Skipping duplicate bookmark: ${bookmark.title}`);
+                continue;
+                
+              case 'replace':
+                this.updateExistingBookmark(existingBookmark.id, bookmark);
+                importedCount++;
+                this.deps.console.log(`Replaced bookmark: ${bookmark.title}`);
+                break;
+                
+              case 'merge':
+                this.mergeBookmarks(existingBookmark, bookmark);
+                importedCount++;
+                this.deps.console.log(`Merged bookmark: ${bookmark.title}`);
+                break;
+            }
+          } else {
+            // Create new bookmark
+            const newBookmark: BookmarkData = {
+              id: options.preserveIds ? bookmark.id : this.generateUniqueId(),
+              title: bookmark.title,
+              timestamp: bookmark.timestamp,
+              filepath: bookmark.filepath,
+              description: bookmark.description || '',
+              createdAt: bookmark.createdAt || new Date().toISOString(),
+              tags: bookmark.tags || []
+            };
+            
+            this.bookmarks.push(newBookmark);
+            importedCount++;
+            this.deps.console.log(`Imported new bookmark: ${bookmark.title}`);
+          }
+        } catch (error: any) {
+          errorCount++;
+          errors.push(`Failed to import "${bookmark.title}": ${error.message}`);
+          this.deps.console.error(`Import error for bookmark "${bookmark.title}":`, error.message);
+        }
+      }
+
+      // Save bookmarks if any were imported
+      if (importedCount > 0) {
+        this.saveBookmarks();
+      }
+
+      return {
+        success: errorCount === 0 || importedCount > 0,
+        importedCount,
+        skippedCount,
+        errorCount,
+        errors: errors.length > 0 ? errors : undefined,
+        duplicates: duplicateCount
+      };
+      
+    } catch (error: any) {
+      this.deps.console.error("Critical import error:", error.message);
+      return {
+        success: false,
+        importedCount: 0,
+        skippedCount: 0,
+        errorCount: 1,
+        errors: [`Critical import error: ${error.message}`]
+      };
+    }
+  }
+
+  private validateImportData(bookmarks: BookmarkData[]): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    if (!Array.isArray(bookmarks)) {
+      errors.push("Import data must be an array of bookmarks");
+      return { isValid: false, errors };
+    }
+    
+    if (bookmarks.length === 0) {
+      errors.push("No bookmarks found to import");
+      return { isValid: false, errors };
+    }
+    
+    bookmarks.forEach((bookmark, index) => {
+      if (!bookmark.id || typeof bookmark.id !== 'string') {
+        errors.push(`Bookmark ${index + 1}: Invalid or missing ID`);
+      }
+      if (!bookmark.title || typeof bookmark.title !== 'string') {
+        errors.push(`Bookmark ${index + 1}: Invalid or missing title`);
+      }
+      if (!bookmark.filepath || typeof bookmark.filepath !== 'string') {
+        errors.push(`Bookmark ${index + 1}: Invalid or missing filepath`);
+      }
+      if (typeof bookmark.timestamp !== 'number' || bookmark.timestamp < 0) {
+        errors.push(`Bookmark ${index + 1}: Invalid timestamp`);
+      }
+      if (bookmark.tags && !Array.isArray(bookmark.tags)) {
+        errors.push(`Bookmark ${index + 1}: Tags must be an array`);
+      }
+    });
+    
+    return { isValid: errors.length === 0, errors };
+  }
+
+  private findExistingBookmark(bookmark: BookmarkData): BookmarkData | undefined {
+    // Check for exact ID match first
+    let existing = this.bookmarks.find(b => b.id === bookmark.id);
+    if (existing) return existing;
+    
+    // Check for functional duplicates (same file, same timestamp)
+    existing = this.bookmarks.find(b => 
+      b.filepath === bookmark.filepath && 
+      Math.abs(b.timestamp - bookmark.timestamp) < 1.0 // Allow 1 second tolerance
+    );
+    if (existing) return existing;
+    
+    // Check for title + filepath match
+    existing = this.bookmarks.find(b => 
+      b.title === bookmark.title && 
+      b.filepath === bookmark.filepath
+    );
+    
+    return existing;
+  }
+
+  private updateExistingBookmark(existingId: string, newBookmark: BookmarkData): void {
+    const index = this.bookmarks.findIndex(b => b.id === existingId);
+    if (index !== -1) {
+      this.bookmarks[index] = {
+        ...newBookmark,
+        id: existingId, // Preserve original ID
+        createdAt: this.bookmarks[index].createdAt // Preserve original creation date
+      };
+    }
+  }
+
+  private mergeBookmarks(existing: BookmarkData, imported: BookmarkData): void {
+    const index = this.bookmarks.findIndex(b => b.id === existing.id);
+    if (index !== -1) {
+      // Merge tags
+      const existingTags = existing.tags || [];
+      const importedTags = imported.tags || [];
+      const mergedTags = [...new Set([...existingTags, ...importedTags])];
+      
+      // Update with newest data but keep original creation info
+      this.bookmarks[index] = {
+        ...imported,
+        id: existing.id, // Preserve original ID
+        createdAt: existing.createdAt, // Preserve original creation date
+        tags: mergedTags,
+        // Keep imported description if existing is empty
+        description: imported.description || existing.description || ''
+      };
+    }
+  }
+
+  /**
+   * Handle import from menu - prompts user for file and imports
+   */
+  private async handleImportFromMenu(): Promise<void> {
+    try {
+      const filePath = this.promptForImportPath();
+      if (!filePath) {
+        this.deps.console.log("Import cancelled by user.");
+        return;
+      }
+
+      const importResult = await this.importBookmarksFromFile(filePath, {
+        duplicateHandling: 'skip',
+        validateData: true,
+        preserveIds: false
+      });
+
+      if (importResult.success) {
+        this.deps.console.log(`Import successful: ${importResult.importedCount} bookmarks imported`);
+        if (importResult.skippedCount > 0) {
+          this.deps.console.log(`${importResult.skippedCount} bookmarks skipped as duplicates`);
+        }
+      } else {
+        this.deps.console.error(`Import failed: ${importResult.errors?.join(', ')}`);
+      }
+    } catch (error: any) {
+      this.deps.console.error("Import from menu failed:", error.message);
+    }
+  }
+
+  /**
+   * Handle import request from UI - prompts for file selection and sends data back
+   */
+  private async handleImportFromFile(uiSource: 'sidebar' | 'overlay' | 'window'): Promise<void> {
+    try {
+      const filePath = this.promptForImportPath();
+      if (!filePath) {
+        this.sendImportResponse(uiSource, {
+          success: false,
+          importedCount: 0,
+          skippedCount: 0,
+          errorCount: 1,
+          errors: ["Import cancelled by user"]
+        });
+        return;
+      }
+
+      const importResult = await this.importBookmarksFromFile(filePath, {
+        duplicateHandling: 'skip',
+        validateData: true,
+        preserveIds: false
+      });
+
+      this.sendImportResponse(uiSource, importResult);
+
+      // Refresh UIs if any bookmarks were imported
+      if (importResult.importedCount > 0) {
+        this.refreshUIs();
+      }
+
+    } catch (error: any) {
+      this.deps.console.error("Import from file failed:", error.message);
+      this.sendImportResponse(uiSource, {
+        success: false,
+        importedCount: 0,
+        skippedCount: 0,
+        errorCount: 1,
+        errors: [error.message]
+      });
+    }
+  }
+
+  /**
+   * Prompt user to select import file path
+   */
+  private promptForImportPath(): string | null {
+    try {
+      const filePath = this.deps.utils.chooseFile("Select bookmark file to import", {
+        allowedFileTypes: ['json', 'csv']
+      });
+      
+      if (!filePath || filePath.trim() === '') {
+        return null;
+      }
+
+      // Validate file exists
+      if (!this.deps.file.exists(filePath)) {
+        throw new Error("Selected file does not exist");
+      }
+
+      return filePath;
+    } catch (error: any) {
+      this.deps.console.error("Error selecting import file:", error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Import bookmarks from file (JSON or CSV)
+   */
+  private async importBookmarksFromFile(filePath: string, options: ImportOptions): Promise<ImportResult> {
+    try {
+      this.deps.console.log(`Starting import from file: ${filePath}`);
+
+      // Validate file exists
+      if (!this.deps.file.exists(filePath)) {
+        throw new Error("File does not exist");
+      }
+
+      // Read file content
+      const fileContent = this.deps.file.read(filePath);
+      if (!fileContent || fileContent.trim() === '') {
+        throw new Error("File is empty or could not be read");
+      }
+
+      // Determine file format and parse
+      const format = this.detectFileFormat(filePath, fileContent);
+      let bookmarks: BookmarkData[];
+
+      if (format === 'json') {
+        bookmarks = this.parseJSONFile(fileContent);
+      } else if (format === 'csv') {
+        bookmarks = this.parseCSVFile(fileContent);
+      } else {
+        throw new Error("Unsupported file format. Only JSON and CSV files are supported.");
+      }
+
+      this.deps.console.log(`Parsed ${bookmarks.length} bookmarks from ${format.toUpperCase()} file`);
+
+      // Import the parsed bookmarks
+      return await this.importBookmarks(bookmarks, options);
+
+    } catch (error: any) {
+      this.deps.console.error("Failed to import from file:", error.message);
+      return {
+        success: false,
+        importedCount: 0,
+        skippedCount: 0,
+        errorCount: 1,
+        errors: [`Failed to import from file: ${error.message}`]
+      };
+    }
+  }
+
+  /**
+   * Detect file format based on extension and content
+   */
+  private detectFileFormat(filePath: string, content: string): 'json' | 'csv' {
+    const extension = filePath.split('.').pop()?.toLowerCase();
+    
+    if (extension === 'json') {
+      return 'json';
+    } else if (extension === 'csv') {
+      return 'csv';
+    }
+
+    // Fallback: try to detect by content
+    try {
+      JSON.parse(content);
+      return 'json';
+    } catch {
+      // If not JSON, assume CSV
+      return 'csv';
+    }
+  }
+
+  /**
+   * Parse JSON bookmark file
+   */
+  private parseJSONFile(content: string): BookmarkData[] {
+    try {
+      const parsed = JSON.parse(content);
+      
+      if (Array.isArray(parsed)) {
+        return parsed;
+      } else if (parsed && typeof parsed === 'object' && parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
+        // Handle wrapped format: { bookmarks: [...] }
+        return parsed.bookmarks;
+      } else {
+        throw new Error("JSON file must contain an array of bookmarks or an object with a 'bookmarks' property");
+      }
+    } catch (error: any) {
+      throw new Error(`Failed to parse JSON file: ${error.message}`);
+    }
+  }
+
+  /**
+   * Parse CSV bookmark file
+   */
+  private parseCSVFile(content: string): BookmarkData[] {
+    try {
+      const lines = content.trim().split('\n');
+      if (lines.length === 0) {
+        throw new Error("CSV file is empty");
+      }
+
+      // Parse header line
+      const headers = this.parseCSVLine(lines[0]);
+      if (headers.length === 0) {
+        throw new Error("CSV file has no headers");
+      }
+
+      // Validate required headers
+      const requiredHeaders = ['id', 'title', 'timestamp', 'filepath'];
+      const missingHeaders = requiredHeaders.filter(header => !headers.includes(header));
+      if (missingHeaders.length > 0) {
+        throw new Error(`CSV file missing required headers: ${missingHeaders.join(', ')}`);
+      }
+
+      // Parse data lines
+      const bookmarks: BookmarkData[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === '') continue; // Skip empty lines
+
+        const values = this.parseCSVLine(line);
+        if (values.length !== headers.length) {
+          this.deps.console.warn(`CSV line ${i + 1} has ${values.length} values but expected ${headers.length}, skipping`);
+          continue;
+        }
+
+        const bookmark = this.csvRowToBookmark(headers, values, i + 1);
+        if (bookmark) {
+          bookmarks.push(bookmark);
+        }
+      }
+
+      return bookmarks;
+    } catch (error: any) {
+      throw new Error(`Failed to parse CSV file: ${error.message}`);
+    }
+  }
+
+  /**
+   * Parse a single CSV line, handling quoted values and commas
+   */
+  private parseCSVLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    let i = 0;
+
+    while (i < line.length) {
+      const char = line[i];
+      
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          // Escaped quote
+          current += '"';
+          i += 2;
+        } else {
+          // Toggle quote state
+          inQuotes = !inQuotes;
+          i++;
+        }
+      } else if (char === ',' && !inQuotes) {
+        // Field separator
+        result.push(current.trim());
+        current = '';
+        i++;
+      } else {
+        current += char;
+        i++;
+      }
+    }
+
+    // Add the last field
+    result.push(current.trim());
+    
+    return result;
+  }
+
+  /**
+   * Convert CSV row to BookmarkData object
+   */
+  private csvRowToBookmark(headers: string[], values: string[], lineNumber: number): BookmarkData | null {
+    try {
+      const bookmark: any = {};
+      
+      for (let i = 0; i < headers.length; i++) {
+        const header = headers[i].toLowerCase();
+        const value = values[i];
+
+        switch (header) {
+          case 'id':
+            bookmark.id = value;
+            break;
+          case 'title':
+            bookmark.title = value;
+            break;
+          case 'timestamp':
+            bookmark.timestamp = parseFloat(value);
+            if (isNaN(bookmark.timestamp)) {
+              throw new Error(`Invalid timestamp: ${value}`);
+            }
+            break;
+          case 'filepath':
+            bookmark.filepath = value;
+            break;
+          case 'description':
+            bookmark.description = value || '';
+            break;
+          case 'createdat':
+          case 'created_at':
+            bookmark.createdAt = value || new Date().toISOString();
+            break;
+          case 'tags':
+            if (value && value.trim() !== '') {
+              // Handle tags as JSON array or comma-separated string
+              try {
+                bookmark.tags = JSON.parse(value);
+              } catch {
+                // Parse as comma-separated string
+                bookmark.tags = value.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+              }
+            } else {
+              bookmark.tags = [];
+            }
+            break;
+        }
+      }
+
+      // Validate required fields
+      if (!bookmark.id || !bookmark.title || !bookmark.filepath || typeof bookmark.timestamp !== 'number') {
+        throw new Error("Missing required fields");
+      }
+
+      // Set defaults
+      bookmark.description = bookmark.description || '';
+      bookmark.createdAt = bookmark.createdAt || new Date().toISOString();
+      bookmark.tags = bookmark.tags || [];
+
+      return bookmark as BookmarkData;
+    } catch (error: any) {
+      this.deps.console.warn(`Failed to parse CSV line ${lineNumber}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Send import result to UI
+   */
+  private sendImportResponse(uiSource: 'sidebar' | 'overlay' | 'window', result: ImportResult): void {
+    const responseTarget = uiSource === 'overlay' ? this.deps.overlay : 
+                         (uiSource === 'sidebar' ? this.deps.sidebar : this.deps.standaloneWindow);
+    
+    responseTarget.postMessage(JSON.stringify({ 
+      type: "IMPORT_RESULT", 
+      data: result 
+    }));
   }
 } 
