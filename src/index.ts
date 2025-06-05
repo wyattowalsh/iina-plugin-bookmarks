@@ -1,14 +1,7 @@
-import {
-  standaloneWindow,
-  overlay,
-  sidebar,
-  event,
-  console,
-  menu,
-  core,
-  preferences,
-  iina
-} from "iina";
+// Global declarations for IINA environment
+declare global {
+  const iina: any;
+}
 
 interface BookmarkData {
   id: string;
@@ -30,26 +23,45 @@ interface UIMessage {
 class BookmarkManager {
   private bookmarks: BookmarkData[] = [];
   private readonly STORAGE_KEY = "bookmarks";
+  private standaloneWindow: any;
+  private overlay: any;
+  private sidebar: any;
+  private event: any;
+  private console: any;
+  private menu: any;
+  private core: any;
+  private preferences: any;
+  private iina: any;
 
-  constructor() {
+  constructor(deps: any) {
+    this.standaloneWindow = deps.standaloneWindow;
+    this.overlay = deps.overlay;
+    this.sidebar = deps.sidebar;
+    this.event = deps.event;
+    this.console = deps.console;
+    this.menu = deps.menu;
+    this.core = deps.core;
+    this.preferences = deps.preferences;
+    this.iina = deps.iina;
+
     this.loadBookmarks();
     this.setupEventListeners();
     this.setupWebUI();
     this.setupUIMessageListeners();
 
-    console.log("IINA Bookmarks Plugin initialized. Message passing enabled.");
+    this.console.log("IINA Bookmarks Plugin initialized. Message passing enabled.");
   }
 
   private setupWebUI(): void {
     try {
-      sidebar.loadFile("dist/ui/sidebar/index.html");
-      overlay.loadFile("dist/ui/overlay/index.html");
-      overlay.setClickable(true);
-      overlay.hide();
-      standaloneWindow.loadFile("dist/ui/window/index.html");
-      console.log("Web UIs loaded successfully.");
+      this.sidebar.loadFile("dist/ui/sidebar/index.html");
+      this.overlay.loadFile("dist/ui/overlay/index.html");
+      this.overlay.setClickable(true);
+      this.overlay.hide();
+      this.standaloneWindow.loadFile("dist/ui/window/index.html");
+      this.console.log("Web UIs loaded successfully.");
     } catch (e: any) {
-      console.error(`Error loading Web UIs: ${e.message}`);
+      this.console.error(`Error loading Web UIs: ${e.message}`);
     }
   }
 
@@ -61,22 +73,22 @@ class BookmarkManager {
           try {
             message = JSON.parse(messageContent) as UIMessage;
           } catch (e) {
-            console.error(`[${uiSource}] Error parsing JSON message:`, messageContent, e);
+            this.console.error(`[${uiSource}] Error parsing JSON message:`, messageContent, e);
             return;
           }
         } else if (typeof messageContent === 'object' && messageContent !== null && 'type' in messageContent) {
           message = messageContent as UIMessage;
         } else {
-          console.warn(`[${uiSource}] Received non-standard message:`, messageContent);
+          this.console.warn(`[${uiSource}] Received non-standard message:`, messageContent);
           return;
         }
         
-        console.log(`[${uiSource}] Received message:`, message);
+        this.console.log(`[${uiSource}] Received message:`, message);
 
         switch (message.type) {
           case "REQUEST_FILE_PATH":
-            const currentPath = core.status.path;
-            const responseTarget = uiSource === 'overlay' ? overlay : (uiSource === 'sidebar' ? sidebar : standaloneWindow);
+            const currentPath = this.core.status.path;
+            const responseTarget = uiSource === 'overlay' ? this.overlay : (uiSource === 'sidebar' ? this.sidebar : this.standaloneWindow);
             responseTarget.postMessage(JSON.stringify({ type: "CURRENT_FILE_PATH", data: currentPath }));
             break;
           case "JUMP_TO_BOOKMARK":
@@ -85,7 +97,7 @@ class BookmarkManager {
             }
             break;
           case "HIDE_OVERLAY":
-            overlay.hide();
+            this.overlay.hide();
             break;
           case "ADD_BOOKMARK": // Assuming payload is { title, timestamp, description, tags }
              this.addBookmark(message.payload?.title, message.payload?.timestamp, message.payload?.description, message.payload?.tags);
@@ -101,26 +113,26 @@ class BookmarkManager {
             }
             break;
           case "UI_READY": // A UI is ready and requests initial data
-            const targetUI = uiSource === 'overlay' ? overlay : (uiSource === 'sidebar' ? sidebar : standaloneWindow);
-            const bookmarksForUI = this.getBookmarks(core.status.path || undefined); // Send bookmarks for current file
+            const targetUI = uiSource === 'overlay' ? this.overlay : (uiSource === 'sidebar' ? this.sidebar : this.standaloneWindow);
+            const bookmarksForUI = this.getBookmarks(this.core.status.path || undefined); // Send bookmarks for current file
             targetUI.postMessage(JSON.stringify({ type: "BOOKMARKS_UPDATED", data: bookmarksForUI }));
-            console.log(`Sent initial bookmarks to ${uiSource} for path: ${core.status.path}`);
+            this.console.log(`Sent initial bookmarks to ${uiSource} for path: ${this.core.status.path}`);
             break;
           default:
-            console.warn(`[${uiSource}] Unknown message type:`, message.type);
+            this.console.warn(`[${uiSource}] Unknown message type:`, message.type);
         }
       };
     };
 
-    sidebar.onMessage(createHandler('sidebar'));
-    overlay.onMessage(createHandler('overlay'));
-    standaloneWindow.onMessage(createHandler('window'));
-    console.log("UI Message Listeners are set up.");
+    this.sidebar.onMessage(createHandler('sidebar'));
+    this.overlay.onMessage(createHandler('overlay'));
+    this.standaloneWindow.onMessage(createHandler('window'));
+    this.console.log("UI Message Listeners are set up.");
   }
 
   private loadBookmarks(): void {
     try {
-      const stored = preferences.get(this.STORAGE_KEY) as string;
+      const stored = this.preferences.get(this.STORAGE_KEY) as string;
       if (stored) {
         const parsedBookmarks = JSON.parse(stored) as BookmarkData[];
         this.bookmarks = parsedBookmarks.map(b => ({
@@ -128,76 +140,76 @@ class BookmarkManager {
             createdAt: b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()
         }));
       }
-      console.log("Bookmarks loaded:", this.bookmarks.length);
+      this.console.log("Bookmarks loaded:", this.bookmarks.length);
     } catch (error: any) {
-      console.error("Error loading bookmarks:", error.message);
+      this.console.error("Error loading bookmarks:", error.message);
       this.bookmarks = [];
     }
   }
 
   private saveBookmarks(): void {
     try {
-      preferences.set(this.STORAGE_KEY, JSON.stringify(this.bookmarks));
-      console.log("Bookmarks saved.");
+      this.preferences.set(this.STORAGE_KEY, JSON.stringify(this.bookmarks));
+      this.console.log("Bookmarks saved.");
       this.refreshUIs();
     } catch (error: any) {
-      console.error("Error saving bookmarks:", error.message);
+      this.console.error("Error saving bookmarks:", error.message);
     }
   }
 
   private refreshUIs(specificUI?: 'sidebar' | 'overlay' | 'window'): void {
-    const currentPath = core.status.path;
+    const currentPath = this.core.status.path;
     const bookmarksToSend = this.getBookmarks(currentPath || undefined);
     const message = { type: "BOOKMARKS_UPDATED", data: bookmarksToSend };
     const messageString = JSON.stringify(message);
 
-    console.log(`Refreshing UIs. Specific: ${specificUI || 'all'}. Path: ${currentPath}. Count: ${bookmarksToSend.length}`);
+    this.console.log(`Refreshing UIs. Specific: ${specificUI || 'all'}. Path: ${currentPath}. Count: ${bookmarksToSend.length}`);
 
     try {
-      if (!specificUI || specificUI === 'sidebar') sidebar.postMessage(messageString);
-      if (!specificUI || specificUI === 'overlay') overlay.postMessage(messageString);
-      if (!specificUI || specificUI === 'window') standaloneWindow.postMessage(messageString);
+      if (!specificUI || specificUI === 'sidebar') this.sidebar.postMessage(messageString);
+      if (!specificUI || specificUI === 'overlay') this.overlay.postMessage(messageString);
+      if (!specificUI || specificUI === 'window') this.standaloneWindow.postMessage(messageString);
     } catch (e: any) {
-        console.warn("Could not refresh one or more UIs. They might not be loaded yet.", e.message);
+        this.console.warn("Could not refresh one or more UIs. They might not be loaded yet.", e.message);
     }
   }
   
   private setupEventListeners(): void {
-    event.on("file-loaded", () => {
-      console.log("File loaded event triggered.");
+    this.event.on("file-loaded", () => {
+      this.console.log("File loaded event triggered.");
       this.refreshUIs(); 
     });
 
-    menu.addItem(
-      menu.item("Add Bookmark at Current Time", () => {
+    this.menu.addItem(
+      this.menu.item("Add Bookmark at Current Time", () => {
         this.addBookmark();
       })
     );
-    menu.addItem(
-      menu.item("Manage Bookmarks", () => {
-        standaloneWindow.show();
+    this.menu.addItem(
+      this.menu.item("Manage Bookmarks", () => {
+        this.standaloneWindow.show();
       })
     );
-    menu.addItem(
-      menu.item("Toggle Bookmarks Overlay", () => {
-        if (overlay.isVisible()) {
-          overlay.hide();
+    this.menu.addItem(
+      this.menu.item("Toggle Bookmarks Overlay", () => {
+        if (this.overlay.isVisible()) {
+          this.overlay.hide();
         } else {
           this.refreshUIs('overlay'); // Send current bookmarks before showing specifically to overlay
-          overlay.show();
+          this.overlay.show();
         }
       })
     );
   }
 
   public addBookmark(title?: string, timestamp?: number, description?: string, tags?: string[]): void {
-    const currentFile = core.status.path;
-    const mediaTitle = core.status.title || "Unknown Media";
-    const currentTime = timestamp ?? core.status.position;
+    const currentFile = this.core.status.path;
+    const mediaTitle = this.core.status.title || "Unknown Media";
+    const currentTime = timestamp ?? this.core.status.position;
 
     if (!currentFile) {
-      console.log("Cannot add bookmark: No file loaded.");
-      iina.postMessage("showNotification", { title: "Error", message: "No file loaded to add a bookmark.", type: "error" });
+      this.console.log("Cannot add bookmark: No file loaded.");
+      this.iina.postMessage("showNotification", { title: "Error", message: "No file loaded to add a bookmark.", type: "error" });
       return;
     }
 
@@ -214,15 +226,15 @@ class BookmarkManager {
     };
     this.bookmarks.push(bookmark);
     this.saveBookmarks(); // This will call refreshUIs()
-    console.log("Bookmark added:", bookmark.title);
-    iina.postMessage("showNotification", { title: "Bookmark Added", message: bookmark.title });
+    this.console.log("Bookmark added:", bookmark.title);
+    this.iina.postMessage("showNotification", { title: "Bookmark Added", message: bookmark.title });
   }
 
   public removeBookmark(id: string): void {
     this.bookmarks = this.bookmarks.filter((b) => b.id !== id);
     this.saveBookmarks(); // This will call refreshUIs()
-    console.log("Bookmark removed:", id);
-    iina.postMessage("showNotification", { title: "Bookmark Removed" });
+    this.console.log("Bookmark removed:", id);
+    this.iina.postMessage("showNotification", { title: "Bookmark Removed" });
   }
 
   public updateBookmark(id: string, data: Partial<Omit<BookmarkData, 'id' | 'filepath' | 'createdAt'>>): void {
@@ -237,32 +249,32 @@ class BookmarkManager {
         filepath: originalBookmark.filepath, // ensure filepath is not changed by data
       };
       this.saveBookmarks(); // This will call refreshUIs()
-      console.log("Bookmark updated:", id);
-      iina.postMessage("showNotification", { title: "Bookmark Updated" });
+      this.console.log("Bookmark updated:", id);
+      this.iina.postMessage("showNotification", { title: "Bookmark Updated" });
     } else {
-      console.log("Update failed: Bookmark not found", id);
+      this.console.log("Update failed: Bookmark not found", id);
     }
   }
 
   public jumpToBookmark(id: string): void {
     const bookmark = this.bookmarks.find((b) => b.id === id);
     if (bookmark) {
-      if (core.status.path !== bookmark.filepath) {
-        core.open(bookmark.filepath);
-        event.once("file-loaded", () => {
-          core.seek(bookmark.timestamp);
+      if (this.core.status.path !== bookmark.filepath) {
+        this.core.open(bookmark.filepath);
+        this.event.once("file-loaded", () => {
+          this.core.seek(bookmark.timestamp);
           this.refreshUIs('overlay'); // Refresh overlay after jump to new file
-          overlay.show();
+          this.overlay.show();
         });
       } else {
-        core.seek(bookmark.timestamp);
+        this.core.seek(bookmark.timestamp);
         this.refreshUIs('overlay'); // Refresh overlay after jump in same file
-        overlay.show();
+        this.overlay.show();
       }
-      console.log("Jumped to bookmark:", bookmark.title);
-      standaloneWindow.hide(); // Hide management window after jumping
+      this.console.log("Jumped to bookmark:", bookmark.title);
+      this.standaloneWindow.hide(); // Hide management window after jumping
     } else {
-      console.log("Jump failed: Bookmark not found", id);
+      this.console.log("Jump failed: Bookmark not found", id);
     }
   }
 
@@ -281,5 +293,37 @@ class BookmarkManager {
   }
 }
 
-// Initialize the plugin
-new BookmarkManager(); 
+// Main plugin entry point - only runs in IINA environment
+if (typeof iina !== 'undefined') {
+  const {
+    standaloneWindow,
+    overlay,
+    sidebar,
+    event,
+    console,
+    menu,
+    core,
+    preferences
+  } = iina;
+
+  // Create dependencies object for BookmarkManager
+  const iinaRuntimeDeps = {
+    standaloneWindow,
+    overlay,
+    sidebar,
+    event,
+    console,
+    menu,
+    core,
+    preferences,
+    iina
+  };
+
+  // Initialize the bookmark manager with IINA runtime dependencies
+  new BookmarkManager(iinaRuntimeDeps);
+  
+  console.log("IINA Bookmarks Plugin with Comprehensive Filtering initialized successfully!");
+} else {
+  // Build-time or non-IINA environment
+  console.log("IINA Bookmarks Plugin: Not running in IINA environment");
+} 
