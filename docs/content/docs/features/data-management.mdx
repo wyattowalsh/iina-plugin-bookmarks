@@ -1,0 +1,321 @@
+---
+title: Data Management
+description: Export, import, and manage your bookmark data
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+# Data Management
+
+Learn how to export, import, and manage your bookmark data effectively.
+
+## Export Functionality
+
+### Supported Export Formats
+
+The plugin supports multiple export formats:
+
+- **JSON** - Full data with all metadata
+- **CSV** - Spreadsheet-compatible format
+- **XML** - Structured markup format (planned)
+
+### Exporting Bookmarks
+
+<Steps>
+  <Step>
+    ### Open Export Dialog
+    
+    - Click "Export" button in the standalone window
+    - Or use the plugin menu: "Export Bookmarks"
+  </Step>
+  
+  <Step>
+    ### Choose Format
+    
+    Select your preferred export format:
+    - **JSON** for full data preservation
+    - **CSV** for spreadsheet applications
+  </Step>
+  
+  <Step>
+    ### Configure Options
+    
+    - **All bookmarks** or **selected bookmarks** only
+    - **Include descriptions** and tags
+    - **Date range** filtering
+  </Step>
+  
+  <Step>
+    ### Save File
+    
+    Choose location and filename for your export
+  </Step>
+</Steps>
+
+### JSON Export Format
+
+```json
+{
+  "version": "1.0",
+  "exportDate": "2024-01-01T12:00:00Z",
+  "bookmarks": [
+    {
+      "id": "bookmark-123",
+      "title": "Epic Scene",
+      "timestamp": 1847.5,
+      "filePath": "/Movies/Great.Movie.2023.mp4",
+      "description": "Amazing action sequence",
+      "tags": ["action", "favorite"],
+      "createdAt": "2024-01-01T10:30:00Z",
+      "updatedAt": "2024-01-01T10:30:00Z"
+    }
+  ]
+}
+```
+
+### CSV Export Format
+
+| Title | Timestamp | File Path | Description | Tags | Created |
+|-------|-----------|-----------|-------------|------|---------|
+| Epic Scene | 1847.5 | /Movies/Great.Movie.2023.mp4 | Amazing action sequence | action,favorite | 2024-01-01 10:30:00 |
+
+## Import Functionality
+
+### Supported Import Sources
+
+- **JSON files** exported from this plugin
+- **CSV files** with proper column headers
+- **Legacy bookmark formats** (planned)
+- **Other media players** (planned)
+
+### Importing Bookmarks
+
+<Steps>
+  <Step>
+    ### Open Import Dialog
+    
+    - Click "Import" button in the standalone window
+    - Or use the plugin menu: "Import Bookmarks"
+  </Step>
+  
+  <Step>
+    ### Select File
+    
+    Choose the file containing your bookmark data
+  </Step>
+  
+  <Step>
+    ### Configure Import
+    
+    - **Merge** with existing bookmarks or **replace** all
+    - **Duplicate handling** strategy
+    - **Field mapping** for CSV files
+  </Step>
+  
+  <Step>
+    ### Review and Import
+    
+    Preview the data and confirm the import
+  </Step>
+</Steps>
+
+### Import Options
+
+#### Duplicate Handling
+
+When importing bookmarks that might duplicate existing ones:
+
+- **Skip duplicates** - Keep existing bookmarks
+- **Update existing** - Overwrite with imported data
+- **Keep both** - Allow duplicates with different IDs
+- **Ask for each** - Manual decision for each duplicate
+
+#### Field Mapping (CSV)
+
+Map CSV columns to bookmark fields:
+
+```
+CSV Column    →    Bookmark Field
+Title         →    title
+Time          →    timestamp  
+Path          →    filePath
+Notes         →    description
+Categories    →    tags
+```
+
+## Data Migration
+
+### Upgrading Data Format
+
+The plugin automatically handles data format upgrades:
+
+1. **Backup creation** before migration
+2. **Format conversion** to new schema
+3. **Validation** of migrated data
+4. **Rollback** option if issues occur
+
+### Cross-Platform Compatibility
+
+Bookmarks can be transferred between different systems:
+
+- **Path normalization** for different file systems
+- **Relative path conversion** when possible
+- **Missing file detection** and reporting
+
+## Backup and Recovery
+
+### Automatic Backups
+
+The plugin automatically creates backups:
+
+- **Daily backups** of all bookmark data
+- **Pre-operation backups** before major changes
+- **Backup rotation** (keeps last 7 days)
+- **Manual backup** option available
+
+### Backup Location
+
+Backups are stored in:
+
+```
+~/.config/iina/plugins/bookmarks/backups/
+├── daily/
+│   ├── bookmarks-2024-01-01.json
+│   ├── bookmarks-2024-01-02.json
+│   └── ...
+└── manual/
+    └── user-backup-2024-01-01.json
+```
+
+### Recovery Process
+
+To restore from backup:
+
+<Steps>
+  <Step>
+    ### Access Recovery
+    
+    - Settings → Data Management → Restore from Backup
+    - Or manually copy backup file to data directory
+  </Step>
+  
+  <Step>
+    ### Select Backup
+    
+    Choose from available automatic or manual backups
+  </Step>
+  
+  <Step>
+    ### Confirm Restore
+    
+    Review backup contents and confirm restoration
+  </Step>
+</Steps>
+
+<Callout type="warning">
+  Restoring from backup will replace all current bookmark data. Create a manual backup first if you want to preserve recent changes.
+</Callout>
+
+## Data Security
+
+### Privacy Protection
+
+- **Local storage only** - No cloud synchronization by default
+- **No external services** - All processing happens locally
+- **File permissions** - Restricted access to bookmark files
+
+### Data Validation
+
+All imported data is validated:
+
+- **Schema validation** - Ensures proper data structure
+- **Type checking** - Validates data types
+- **Sanitization** - Removes potentially harmful content
+- **Integrity checks** - Verifies data consistency
+
+## Advanced Data Operations
+
+### Bulk Operations
+
+Perform operations on multiple bookmarks:
+
+```typescript
+// Example: Export bookmarks by tag
+const actionBookmarks = bookmarks.filter(b => 
+  b.tags.includes('action')
+);
+await exportBookmarks(actionBookmarks, 'json');
+```
+
+### Data Analysis
+
+The plugin can provide insights about your bookmarks:
+
+- **Most bookmarked media** files
+- **Tag usage statistics** 
+- **Bookmark frequency** over time
+- **Average timestamp** positions
+
+### Scripting Support
+
+For advanced users, the plugin supports scripting:
+
+```javascript
+// Export all bookmarks from last month
+const lastMonth = new Date();
+lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+const recentBookmarks = bookmarks.filter(b => 
+  new Date(b.createdAt) > lastMonth
+);
+
+await exportBookmarks(recentBookmarks, 'csv');
+```
+
+## Troubleshooting
+
+### Common Import Issues
+
+| Issue | Solution |
+|-------|----------|
+| "Invalid file format" | Ensure file is valid JSON/CSV |
+| "Missing required fields" | Check column headers in CSV |
+| "Duplicate bookmarks" | Choose duplicate handling strategy |
+| "Large file timeout" | Split large files into smaller chunks |
+
+### Export Problems
+
+| Issue | Solution |
+|-------|----------|
+| "Export failed" | Check available disk space |
+| "Permission denied" | Verify write permissions |
+| "Empty export" | Ensure bookmarks are selected |
+| "Corrupted file" | Try different export format |
+
+<Callout type="info">
+  For persistent data issues, check the plugin logs in the IINA console or create a support ticket with relevant error messages.
+</Callout>
+
+## Best Practices
+
+### Regular Backups
+
+- **Enable automatic backups** in settings
+- **Create manual backups** before major changes
+- **Test restore process** periodically
+- **Store backups** in multiple locations
+
+### Data Organization
+
+- **Use consistent tagging** for better organization
+- **Clean up unused tags** periodically
+- **Review and update** bookmark descriptions
+- **Remove outdated** bookmarks regularly
+
+### Performance Tips
+
+- **Export in batches** for large collections
+- **Use appropriate formats** for your use case
+- **Monitor file sizes** to prevent performance issues
+- **Clean up backup files** when no longer needed 

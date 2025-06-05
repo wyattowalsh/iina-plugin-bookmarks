@@ -1,0 +1,11 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "features/media-detection",
+    "features/bookmark-management", 
+    "features/data-management",
+    "development/architecture",
+    "development/contributing"
+  ]
+} 

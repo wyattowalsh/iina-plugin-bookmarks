@@ -333,4 +333,82 @@ describe('MetadataDetector', () => {
       expect(mockLogger.log).not.toHaveBeenCalled();
     });
   });
+
+  describe('fallback behavior', () => {
+    it('should use filename when no metadata title available', async () => {
+      mockCore.status.title = undefined;
+      mockCore.status.path = '/movies/The.Great.Movie.2023.1080p.mp4';
+      
+      const title = await detector.getCurrentTitle();
+      expect(title).toBe('The Great Movie');
+    });
+
+    it('should handle various filename patterns correctly', async () => {
+      const testCases = [
+        { path: '/test/simple_movie.mp4', expected: 'Simple Movie' },
+        { path: '/test/TV.Show.S01E01.Episode.Name.720p.mp4', expected: 'TV Show S01E01 Episode Name' },
+        { path: '/test/Documentary.About.Nature.2020.4K.mp4', expected: 'Documentary About Nature' },
+        { path: '/test/Concert.Live.Performance.BluRay.mp4', expected: 'Concert Live Performance' },
+        { path: '/test/movie-with-dashes.mkv', expected: 'Movie With Dashes' },
+        { path: '/test/file_with_underscores.avi', expected: 'File With Underscores' }
+      ];
+
+      for (const testCase of testCases) {
+        mockCore.status.path = testCase.path;
+        mockCore.status.title = undefined;
+        
+        const title = await detector.getCurrentTitle();
+        expect(title).toBe(testCase.expected);
+      }
+    });
+
+    it('should prefer metadata title over filename when available', async () => {
+      mockCore.status.title = 'Actual Movie Title';
+      mockCore.status.path = '/test/some_filename.mp4';
+      
+      const title = await detector.getCurrentTitle();
+      expect(title).toBe('Actual Movie Title');
+    });
+
+    it('should fall back to filename when metadata title is just the filename', async () => {
+      mockCore.status.title = 'some_filename.mp4';
+      mockCore.status.path = '/test/some_filename.mp4';
+      
+      const title = await detector.getCurrentTitle();
+      expect(title).toBe('Some Filename');
+    });
+
+    it('should fall back to filename when metadata title is "Unknown Media"', async () => {
+      mockCore.status.title = 'Unknown Media';
+      mockCore.status.path = '/test/actual_movie_name.mp4';
+      
+      const title = await detector.getCurrentTitle();
+      expect(title).toBe('Actual Movie Name');
+    });
+
+    it('should handle edge cases gracefully', async () => {
+      const edgeCases = [
+        { path: '/test/.hidden_file.mp4', expected: 'Hidden File' },
+        { path: '/test/file_without_extension', expected: 'File Without Extension' },
+        { path: '/test/file.with.multiple.dots.mp4', expected: 'File With Multiple Dots' },
+        { path: '/test/UPPERCASE_FILE.MP4', expected: 'UPPERCASE FILE' }
+      ];
+
+      for (const testCase of edgeCases) {
+        mockCore.status.path = testCase.path;
+        mockCore.status.title = undefined;
+        
+        const title = await detector.getCurrentTitle();
+        expect(title).toBe(testCase.expected);
+      }
+    });
+
+    it('should return "Unknown Media" as final fallback', async () => {
+      mockCore.status.path = '/test/';
+      mockCore.status.title = undefined;
+      
+      const title = await detector.getCurrentTitle();
+      expect(title).toBe('Unknown');
+    });
+  });
 }); 

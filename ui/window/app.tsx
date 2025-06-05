@@ -4,6 +4,7 @@ import AdvancedSearch, { ParsedSearchQuery } from "../components/AdvancedSearch"
 import FilterPresets from "../components/FilterPresets";
 import TextHighlighter from "../components/TextHighlighter";
 import TagInput from "../components/TagInput";
+import AddBookmarkDialog from "../components/AddBookmarkDialog";
 import useAdvancedBookmarkFilters from "../hooks/useAdvancedBookmarkFilters";
 import useFilterHistory from "../hooks/useFilterHistory";
 
@@ -43,6 +44,7 @@ const App: React.FC = () => {
   });
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   const appWindow = window as unknown as AppWindow;
 
@@ -98,10 +100,15 @@ const App: React.FC = () => {
   }, [selectedBookmark]);
 
   const handleAddBookmark = () => {
+    setShowAddDialog(true);
+  };
+
+  const handleSaveBookmark = (title: string, description: string, tags: string[], timestamp: number) => {
     appWindow.iina?.postMessage?.("ADD_BOOKMARK", { 
-      title: `New Bookmark ${new Date().toLocaleTimeString()}`,
-      timestamp: null,
-      description: "Added from bookmark manager window"
+      title,
+      description,
+      tags,
+      timestamp
     });
   };
 
@@ -160,6 +167,14 @@ const App: React.FC = () => {
           <button onClick={handleAddBookmark} className="add-bookmark-btn">Add Bookmark to Current Video</button>
         </div>
       </div>
+
+      <AddBookmarkDialog
+        isOpen={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        onSave={handleSaveBookmark}
+        availableTags={availableTags}
+        postMessage={appWindow.iina?.postMessage}
+      />
 
       <FilterPresets
         onApplyPreset={handleApplyPreset}

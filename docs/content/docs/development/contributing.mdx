@@ -1,0 +1,105 @@
+---
+title: Contributing Guide
+description: How to contribute to the IINA Plugin Bookmarks project
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+# Contributing Guide
+
+Thank you for your interest in contributing to IINA Plugin Bookmarks! This guide will help you get started.
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js** (v18 or higher)
+- **npm** or **pnpm** 
+- **Git**
+- **IINA** media player (for testing)
+- **TypeScript** knowledge (recommended)
+
+### Development Setup
+
+<Steps>
+  <Step>
+    ### Fork and Clone
+    
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/iina-plugin-bookmarks.git
+    cd iina-plugin-bookmarks
+    ```
+  </Step>
+  
+  <Step>
+    ### Install Dependencies
+    
+    ```bash
+    npm install
+    ```
+  </Step>
+  
+  <Step>
+    ### Build and Test
+    
+    ```bash
+    npm run build
+    npm test
+    ```
+  </Step>
+</Steps>
+
+## Development Workflow
+
+### Commit Guidelines
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```bash
+feat: add bookmark export functionality
+fix: resolve metadata detection for edge cases  
+docs: update installation instructions
+test: add unit tests for bookmark manager
+```
+
+### Code Standards
+
+- Use strict TypeScript settings
+- Add JSDoc comments for public APIs
+- Follow ESLint and Prettier configurations
+- Maintain 80%+ test coverage
+
+## Testing
+
+Write comprehensive tests using Vitest:
+
+```typescript
+describe('BookmarkManager', () => {
+  it('should create a new bookmark', async () => {
+    await manager.addBookmark('Test Movie', 120);
+    expect(manager.getBookmarks()).toHaveLength(1);
+  });
+});
+```
+
+## Pull Request Process
+
+1. Create feature branch from `develop`
+2. Make changes with tests
+3. Update documentation if needed
+4. Submit PR with clear description
+5. Address review feedback
+
+<Callout type="info">
+  For major changes, please open an issue for discussion first.
+</Callout>
+
+## Community Guidelines
+
+- Be respectful and inclusive
+- Provide constructive feedback
+- Help others learn and grow
+- Follow our Code of Conduct
+
+Thank you for contributing! 🎉 

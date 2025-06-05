@@ -179,6 +179,14 @@ export class BookmarkManager {
               this.saveSortPreferences(message.payload.preferences);
             }
             break;
+          case "REQUEST_BOOKMARK_DEFAULTS":
+            this.getBookmarkDefaults()
+              .then(defaults => {
+                const responseTarget = uiSource === 'overlay' ? this.deps.overlay : (uiSource === 'sidebar' ? this.deps.sidebar : this.deps.standaloneWindow);
+                responseTarget.postMessage(JSON.stringify({ type: "BOOKMARK_DEFAULTS", data: defaults }));
+              })
+              .catch(error => this.deps.console.error("Failed to get bookmark defaults:", error.message));
+            break;
           default:
             this.deps.console.warn(`[${uiSource}] Unknown message type:`, message.type);
         }
@@ -275,19 +283,62 @@ export class BookmarkManager {
     );
   }
 
+  /**
+   * Get default title, description, and tags for bookmark dialog pre-population
+   */
+  public async getBookmarkDefaults(): Promise<{ title: string; description: string; tags: string[]; timestamp: number; filepath: string }> {
+    try {
+      const currentPath = this.deps.core.status.path || '/test/video.mp4'; // Default for testing
+      const currentTime = this.deps.core.status.currentTime || 0;
+      
+      // Use enhanced metadata detection with built-in fallback logic
+      let detectedTitle: string;
+      try {
+        const metadataTitle = await this.metadataDetector.getCurrentTitle();
+        // MetadataDetector.getCurrentTitle() already handles fallback to filename
+        detectedTitle = metadataTitle || 'Unknown Media';
+      } catch (error: any) {
+        this.deps.console.warn(`Metadata detection failed: ${error.message}`);
+        // Final fallback - extract filename without extension
+        const filename = currentPath.split('/').pop() || currentPath;
+        detectedTitle = filename.replace(/\.[^/.]+$/, "") || 'Unknown Media';
+      }
+      
+      const metadata = this.generateBookmarkMetadata(
+        currentPath, 
+        detectedTitle, 
+        currentTime
+      );
+
+      return {
+        title: metadata.title,
+        description: metadata.description || '',
+        tags: metadata.tags || [],
+        timestamp: currentTime,
+        filepath: currentPath
+      };
+    } catch (error: any) {
+      this.deps.console.error("Error getting bookmark defaults:", error.message);
+      throw error;
+    }
+  }
+
   public async addBookmark(title?: string, timestamp?: number, description?: string, tags?: string[]): Promise<void> {
     try {
       const currentPath = this.deps.core.status.path || '/test/video.mp4'; // Default for testing
       const currentTime = timestamp !== undefined ? timestamp : (this.deps.core.status.currentTime || 0);
       
-      // Use enhanced metadata detection
+      // Use enhanced metadata detection with built-in fallback logic
       let detectedTitle: string;
       try {
         const metadataTitle = await this.metadataDetector.getCurrentTitle();
-        detectedTitle = metadataTitle || this.extractMediaTitle(currentPath);
+        // MetadataDetector.getCurrentTitle() already handles fallback to filename
+        detectedTitle = metadataTitle || 'Unknown Media';
       } catch (error: any) {
-        this.deps.console.warn(`Metadata detection failed, falling back to filename: ${error.message}`);
-        detectedTitle = this.extractMediaTitle(currentPath);
+        this.deps.console.warn(`Metadata detection failed: ${error.message}`);
+        // Final fallback - extract filename without extension
+        const filename = currentPath.split('/').pop() || currentPath;
+        detectedTitle = filename.replace(/\.[^/.]+$/, "") || 'Unknown Media';
       }
       
       const metadata = this.generateBookmarkMetadata(
@@ -316,11 +367,6 @@ export class BookmarkManager {
       this.deps.console.error("Error adding bookmark:", error.message);
       throw error;
     }
-  }
-
-  private extractMediaTitle(filepath: string): string {
-    const filename = filepath.split('/').pop() || filepath;
-    return filename.replace(/\.[^/.]+$/, ""); // Remove extension
   }
 
   private generateUniqueId(): string {

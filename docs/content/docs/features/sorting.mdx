@@ -1,0 +1,283 @@
+---
+title: Multi-Criteria Bookmark Sorting
+description: Advanced bookmark sorting with multiple criteria, priority-based ordering, and persistent preferences
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+# Multi-Criteria Bookmark Sorting
+
+The IINA Bookmarks Plugin features a comprehensive sorting system that allows you to organize bookmarks using multiple criteria with priority-based ordering, giving you precise control over how your bookmarks are displayed.
+
+## Sorting Options
+
+The plugin supports six different sorting fields that can be used individually or in combination:
+
+<Tabs>
+<Tab title="Title" value="title">
+**Alphabetical sorting (A-Z, Z-A)**
+- Sorts by bookmark title using proper Unicode handling
+- Case-insensitive comparison for consistent results
+</Tab>
+
+<Tab title="Timestamp" value="timestamp">
+**Chronological sorting by media timestamp**
+- Sorts by the time position within the media file
+- Useful for organizing bookmarks by where they occur in videos
+</Tab>
+
+<Tab title="Creation Date" value="creation-date">
+**Sort by bookmark creation time**
+- Chronological ordering by when bookmarks were created
+- Helpful for finding recently added bookmarks
+</Tab>
+
+<Tab title="Description" value="description">
+**Alphabetical sorting by description content**
+- Sorts by bookmark description text
+- Case-insensitive for consistent alphabetical ordering
+</Tab>
+
+<Tab title="Tags" value="tags">
+**Sorting by tag content**
+- Concatenated tags sorted alphabetically
+- Multiple tags are combined with comma separators
+</Tab>
+
+<Tab title="Media File Name" value="media-file">
+**Sort by extracted filename**
+- Uses cleaned filename with extension removed
+- Ideal for organizing by source media file
+</Tab>
+</Tabs>
+
+## Single-Sort Mode
+
+The default sorting mode provides a straightforward interface for basic sorting needs.
+
+### Features
+- **Enhanced dropdown** with all 6 sorting options
+- **Direction indicators**: ↑ Ascending, ↓ Descending  
+- **Quick toggle** between ascending and descending order
+- **Multi-sort activation** via "⚡ Multi" button
+
+<Callout type="info">
+  Single-sort mode is perfect for quick, simple sorting tasks. Use the direction toggle to reverse the sort order instantly.
+</Callout>
+
+## Multi-Sort Mode
+
+For advanced organization needs, multi-sort mode allows up to 3 simultaneous sort criteria with priority-based fallback.
+
+### Key Features
+
+1. **Priority-based ordering** with numbered indicators
+2. **Up to 3 criteria** for complex sorting scenarios
+3. **Individual field and direction** selectors per criterion
+4. **Easy management** with add/remove controls
+5. **Smooth UI transitions** for better user experience
+
+### How Multi-Sort Works
+
+Multi-criteria sorting uses a priority-based comparison algorithm:
+
+```
+1. Sort criteria by priority (1 = highest priority)
+2. For each criterion in priority order:
+   a. Apply field-specific comparison
+   b. If items are not equal, use this result
+   c. If items are equal, continue to next criterion
+3. If all criteria result in equality, maintain original order
+```
+
+### Visual Design
+
+- **Color-coded priority badges** with #4a90e2 blue theme
+- **Numbered indicators** (1, 2, 3) show sort priority clearly  
+- **Remove buttons** (✕) for individual criteria
+- **Add button** for additional criteria (up to limit)
+- **Compact variations** for sidebar and overlay views
+
+## User Interface Integration
+
+### Window View (Full-Featured)
+- Complete multi-sort interface with all controls
+- Visual priority indicators and management tools
+- Full add/remove/modify functionality
+- Detailed sort preference settings
+
+### Sidebar View (Compact)
+- Streamlined multi-sort controls optimized for narrow space
+- Essential functionality preserved in compact layout
+- Responsive design for smaller screens
+- Quick access to most-used sort options
+
+### Overlay View (Minimal)
+- Basic multi-sort for quick access during video playback
+- Context-aware defaults based on current media
+- Compact dropdown interface
+- Essential controls only for focused experience
+
+## Persistent Preferences
+
+Sort preferences are automatically saved and restored for each UI view:
+
+### Per-View Settings
+- **Overlay preferences** saved separately from sidebar/window
+- **Automatic persistence** using IINA's preference system
+- **Preference restoration** on plugin reload
+- **Independent settings** for different use contexts
+
+### What Gets Saved
+- Current sort criteria and their priority order
+- Ascending/descending direction for each criterion
+- Multi-sort mode enabled/disabled state
+- Recently used sort combinations
+
+<Callout type="tip">
+  **Pro Tip**: Your sort preferences are saved per UI view, so you can have different sorting setups for overlay (quick access) vs. window (detailed management).
+</Callout>
+
+## Practical Examples
+
+### Common Sorting Scenarios
+
+<Tabs>
+<Tab title="Chronological Review" value="chronological">
+**Use Case**: Review bookmarks in the order they appear in videos
+
+**Setup**:
+- Primary: Timestamp (Ascending)
+- Secondary: Creation Date (Ascending)
+
+**Result**: Bookmarks sorted by when they occur in media, with creation date as tiebreaker
+</Tab>
+
+<Tab title="Project Organization" value="project">
+**Use Case**: Organize work-related bookmarks by project and importance
+
+**Setup**:
+- Primary: Tags (Ascending) 
+- Secondary: Title (Ascending)
+- Tertiary: Creation Date (Descending)
+
+**Result**: Grouped by tags, then alphabetical by title, with newest first for same titles
+</Tab>
+
+<Tab title="Media Library" value="media-library">
+**Use Case**: Organize by source files and content
+
+**Setup**:
+- Primary: Media File Name (Ascending)
+- Secondary: Timestamp (Ascending)
+
+**Result**: All bookmarks from same file grouped together, in chronological order within each file
+</Tab>
+</Tabs>
+
+## Performance Optimization
+
+The sorting system is designed for efficiency even with large bookmark collections:
+
+### Algorithm Optimizations
+- **Efficient comparison**: Priority-based algorithm minimizes unnecessary comparisons
+- **Filename caching**: Extracted filenames are cached to avoid repeated processing
+- **Responsive UI**: Minimal reflow during sort operations
+- **Smart defaults**: Intelligent fallback behavior for missing data
+
+### Performance Characteristics
+- **Fast sorting**: Optimized for collections of 100+ bookmarks
+- **Smooth UI**: No blocking operations during sort changes
+- **Memory efficient**: Minimal memory overhead for sort operations
+- **Responsive feedback**: Immediate visual updates when changing sort criteria
+
+## Advanced Features
+
+### Filename Processing
+
+When sorting by media file name, the system intelligently processes filenames:
+
+1. **Extension removal**: .mp4, .mkv, etc. are stripped
+2. **Separator replacement**: Dots, underscores, dashes become spaces
+3. **Quality indicator removal**: 720p, 1080p, 4K, etc. are removed
+4. **Source indicator cleanup**: BluRay, DVDRip, WEB-DL, etc. are stripped
+5. **Codec information removal**: x264, x265, H264, etc. are removed
+6. **Year removal**: Years in parentheses are stripped
+7. **Proper capitalization**: Words are capitalized appropriately
+
+### Example Transformations
+
+| Original Filename | Processed Name |
+|-------------------|----------------|
+| `The.Great.Movie.2023.1080p.BluRay.x264.mp4` | "The Great Movie" |
+| `TV.Show.S01E01.720p.WEB-DL.mkv` | "TV Show S01E01" |
+| `documentary_film(2024).mp4` | "Documentary Film" |
+
+## Troubleshooting
+
+### Common Issues
+
+| Issue | Solution |
+|-------|---------|
+| Sort not working | Check that bookmarks have the data being sorted by |
+| Slow performance | Reduce bookmark collection size or use simpler sort criteria |
+| Preferences not saving | Verify IINA preferences are working correctly |
+| UI elements overlapping | Try refreshing the interface or switching sort modes |
+
+### Debug Information
+
+For troubleshooting sort issues, enable debug mode:
+
+```javascript
+// Enable debug logging for sort operations
+localStorage.setItem('bookmark-sort-debug', 'true')
+```
+
+This will log detailed information about sort operations, performance metrics, and preference handling.
+
+## Implementation Details
+
+### Core Algorithm
+
+The multi-criteria sorting uses a sophisticated comparison function:
+
+```typescript
+function compareBookmarks(a: Bookmark, b: Bookmark, criteria: SortCriterion[]): number {
+  for (const criterion of criteria.sort((a, b) => a.priority - b.priority)) {
+    const result = compareByCriterion(a, b, criterion);
+    if (result !== 0) {
+      return criterion.direction === 'desc' ? -result : result;
+    }
+  }
+  return 0; // Equal on all criteria
+}
+```
+
+### Field-Specific Comparisons
+
+Each sorting field uses optimized comparison logic:
+
+- **Title/Description**: `localeCompare()` for proper Unicode and locale handling
+- **Timestamp/Creation Date**: Numeric comparison for precise ordering
+- **Tags**: Concatenated string comparison with consistent separator handling
+- **Media File Name**: Processed filename comparison with intelligent cleanup
+
+<Callout type="note">
+  The sorting system is designed to be extensible. Future versions may include additional sorting fields and custom sort expressions.
+</Callout>
+
+## Future Enhancements
+
+Planned improvements for upcoming releases:
+
+- **Drag-and-drop priority reordering**: Visual priority management
+- **Custom sort orders**: User-defined sort templates and presets
+- **Sort performance indicators**: Visual feedback for sort complexity
+- **Additional sort fields**: Duration, file size, path depth
+- **Advanced sort expressions**: Formula-based sorting with custom logic
+- **Sort presets**: Save and share common sort configurations
+
+---
+
+For technical questions about the sorting implementation, please [open an issue](https://github.com/wyattowalsh/iina-plugin-bookmarks/issues) on the project repository. 
