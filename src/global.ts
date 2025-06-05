@@ -1,10 +1,12 @@
-// This file will be loaded in the IINA environment where 'iina' global is available
-// We use type assertions to avoid build-time import issues
-
+// Global declarations for IINA environment
 declare global {
   const iina: any;
 }
 
+// Only run when in IINA environment
 if (typeof iina !== 'undefined') {
-  iina.console.log("Plugin is running");
+  const { console } = iina;
+  console.log("Plugin is running");
+} else {
+  console.log("Plugin: Not running in IINA environment");
 } 
