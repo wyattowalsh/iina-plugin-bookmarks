@@ -50,7 +50,7 @@ if (typeof iina !== 'undefined') {
   // Initialize the bookmark manager with IINA runtime dependencies
   new BookmarkManager(iinaRuntimeDeps);
   
-  console.log("IINA Bookmarks Plugin with Comprehensive Filtering initialized successfully!");
+  console.log("IINA Bookmarks Plugin with Multi-Criteria Sorting and Comprehensive Filtering initialized successfully!");
 } else {
   // Build-time or non-IINA environment
   console.log("IINA Bookmarks Plugin: Not running in IINA environment");
