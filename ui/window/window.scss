@@ -413,16 +413,24 @@
 
 .dialog-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   padding: 20px 24px 16px;
   border-bottom: 1px solid #e0e0e0;
+  position: relative;
 
   h3 {
-    margin: 0;
+    margin: 0 0 4px 0;
     font-size: 18px;
     font-weight: 600;
     color: #333;
+  }
+
+  .dialog-subtitle {
+    margin: 0;
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
   }
 
   .close-btn {
@@ -439,6 +447,9 @@
     justify-content: center;
     border-radius: 50%;
     transition: all 0.2s ease;
+    position: absolute;
+    top: 20px;
+    right: 24px;
 
     &:hover:not(:disabled) {
       background: #f5f5f5;
@@ -481,6 +492,19 @@
       color: #333;
       margin-bottom: 8px;
       font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .field-hint {
+        font-size: 11px;
+        font-weight: 400;
+        color: #007aff;
+        background: rgba(0, 122, 255, 0.1);
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-style: normal;
+      }
     }
 
     input, textarea {

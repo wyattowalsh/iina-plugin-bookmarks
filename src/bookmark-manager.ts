@@ -376,15 +376,22 @@ export class BookmarkManager {
   private generateBookmarkMetadata(filepath: string, mediaTitle: string, timestamp: number, userTitle?: string, userDescription?: string, userTags?: string[]) {
     const extension = filepath.split('.').pop()?.toLowerCase() || '';
     const mediaType = this.getMediaType(extension);
-    const autoTags = this.generateAutoTags(filepath, extension, mediaTitle, timestamp);
     
-    // Merge user tags with auto tags, removing duplicates
-    const allTags = [...new Set([...(userTags || []), ...autoTags])];
+    // Determine final tags: if user provided tags, use only those; otherwise use auto-generated
+    let finalTags: string[] | undefined;
+    if (userTags !== undefined) {
+      // User explicitly provided tags (even if empty array) - use exactly what they provided
+      finalTags = userTags.length > 0 ? userTags : undefined;
+    } else {
+      // No user tags provided - generate auto tags
+      const autoTags = this.generateAutoTags(filepath, extension, mediaTitle, timestamp);
+      finalTags = autoTags.length > 0 ? autoTags : undefined;
+    }
     
     return {
       title: userTitle || `${mediaTitle} - ${this.formatTime(timestamp)}`,
       description: userDescription || `Bookmark at ${this.formatTime(timestamp)} in ${mediaType}`,
-      tags: allTags.length > 0 ? allTags : undefined
+      tags: finalTags
     };
   }
 
