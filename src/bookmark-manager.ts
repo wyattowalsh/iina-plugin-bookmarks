@@ -16,6 +16,31 @@ interface UIMessage {
   sourceUI?: 'sidebar' | 'overlay' | 'window';
 }
 
+interface ExportOptions {
+  format: 'json' | 'csv';
+  includeMetadata: boolean;
+  compressOutput?: boolean;
+  filePath?: string;
+  filter?: {
+    tags?: string[];
+    dateRange?: { start: string; end: string };
+    mediaType?: string;
+  };
+}
+
+interface CSVOptions extends ExportOptions {
+  selectedFields: string[];
+  delimiter: ',' | ';' | '\t';
+  includeHeaders: boolean;
+}
+
+interface ExportResult {
+  success: boolean;
+  filePath?: string;
+  recordCount: number;
+  error?: string;
+}
+
 interface IINADependencies {
   console: {
     log: (message: string) => void;
@@ -186,6 +211,9 @@ export class BookmarkManager {
                 responseTarget.postMessage(JSON.stringify({ type: "BOOKMARK_DEFAULTS", data: defaults }));
               })
               .catch(error => this.deps.console.error("Failed to get bookmark defaults:", error.message));
+            break;
+          case "EXPORT_BOOKMARKS":
+            this.handleExportBookmarks(message.payload, uiSource);
             break;
           default:
             this.deps.console.warn(`[${uiSource}] Unknown message type:`, message.type);
@@ -522,5 +550,214 @@ export class BookmarkManager {
     } catch (error: any) {
       this.deps.console.error("Error saving sort preferences:", error.message);
     }
+  }
+
+  // Export functionality
+  public async handleExportBookmarks(options: ExportOptions, uiSource: 'sidebar' | 'overlay' | 'window'): Promise<void> {
+    try {
+      this.deps.console.log(`Starting export with options:`, options);
+      
+      // Get bookmarks to export (apply filters if specified)
+      let bookmarksToExport = this.getFilteredBookmarksForExport(options);
+      
+      // Generate export data
+      const exportResult = await this.exportBookmarks(bookmarksToExport, options);
+      
+      // Send result back to UI
+      const responseTarget = uiSource === 'overlay' ? this.deps.overlay : 
+                           (uiSource === 'sidebar' ? this.deps.sidebar : this.deps.standaloneWindow);
+      
+      responseTarget.postMessage(JSON.stringify({ 
+        type: "EXPORT_RESULT", 
+        data: exportResult 
+      }));
+      
+      this.deps.console.log(`Export completed: ${exportResult.recordCount} records exported`);
+    } catch (error: any) {
+      this.deps.console.error(`Export failed: ${error.message}`);
+      
+      const responseTarget = uiSource === 'overlay' ? this.deps.overlay : 
+                           (uiSource === 'sidebar' ? this.deps.sidebar : this.deps.standaloneWindow);
+      
+      responseTarget.postMessage(JSON.stringify({ 
+        type: "EXPORT_RESULT", 
+        data: { success: false, recordCount: 0, error: error.message } 
+      }));
+    }
+  }
+
+  private getFilteredBookmarksForExport(options: ExportOptions): BookmarkData[] {
+    let bookmarks = [...this.bookmarks];
+    
+    if (options.filter) {
+      // Filter by tags
+      if (options.filter.tags && options.filter.tags.length > 0) {
+        bookmarks = bookmarks.filter(bookmark => 
+          bookmark.tags && bookmark.tags.some(tag => 
+            options.filter!.tags!.includes(tag)
+          )
+        );
+      }
+      
+      // Filter by date range
+      if (options.filter.dateRange) {
+        const startDate = new Date(options.filter.dateRange.start);
+        const endDate = new Date(options.filter.dateRange.end);
+        
+        bookmarks = bookmarks.filter(bookmark => {
+          const bookmarkDate = new Date(bookmark.createdAt);
+          return bookmarkDate >= startDate && bookmarkDate <= endDate;
+        });
+      }
+      
+      // Filter by media type
+      if (options.filter.mediaType) {
+        bookmarks = bookmarks.filter(bookmark => {
+          const extension = bookmark.filepath.split('.').pop()?.toLowerCase() || '';
+          const mediaType = this.getMediaType(extension);
+          return mediaType.toLowerCase().includes(options.filter!.mediaType!.toLowerCase());
+        });
+      }
+    }
+    
+    return bookmarks;
+  }
+
+  private async exportBookmarks(bookmarks: BookmarkData[], options: ExportOptions): Promise<ExportResult> {
+    if (options.format === 'json') {
+      return this.exportBookmarksToJSON(bookmarks, options);
+    } else if (options.format === 'csv') {
+      return this.exportBookmarksToCSV(bookmarks, options as CSVOptions);
+    } else {
+      throw new Error(`Unsupported export format: ${options.format}`);
+    }
+  }
+
+  private exportBookmarksToJSON(bookmarks: BookmarkData[], options: ExportOptions): ExportResult {
+    try {
+      const exportData = {
+        metadata: options.includeMetadata ? {
+          exportedAt: new Date().toISOString(),
+          totalRecords: bookmarks.length,
+          exportOptions: options,
+          version: "1.0.0"
+        } : undefined,
+        bookmarks: bookmarks
+      };
+      
+      const jsonString = JSON.stringify(exportData, null, 2);
+      
+      // Generate filename if not provided
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = options.filePath || `bookmarks-export-${timestamp}.json`;
+      
+      // In a real IINA environment, we'd use file APIs to save
+      // For now, we'll simulate success and return the data
+      return {
+        success: true,
+        filePath: fileName,
+        recordCount: bookmarks.length,
+        data: jsonString // Include data for testing/download in UI
+      } as ExportResult & { data: string };
+      
+    } catch (error: any) {
+      return {
+        success: false,
+        recordCount: 0,
+        error: `JSON export failed: ${error.message}`
+      };
+    }
+  }
+
+  private exportBookmarksToCSV(bookmarks: BookmarkData[], options: CSVOptions): ExportResult {
+    try {
+      const delimiter = options.delimiter || ',';
+      const fields = options.selectedFields.length > 0 ? options.selectedFields : 
+                    ['id', 'title', 'timestamp', 'filepath', 'description', 'createdAt', 'tags'];
+      
+      let csvContent = '';
+      
+      // Add headers if requested
+      if (options.includeHeaders) {
+        csvContent += fields.join(delimiter) + '\n';
+      }
+      
+      // Add data rows
+      for (const bookmark of bookmarks) {
+        const row = fields.map(field => {
+          let value = (bookmark as any)[field];
+          
+          // Special handling for different field types
+          if (field === 'tags' && Array.isArray(value)) {
+            value = value.join(';'); // Use semicolon to separate tags
+          } else if (field === 'timestamp') {
+            value = `${value} (${this.formatTime(value)})`;
+          } else if (value === undefined || value === null) {
+            value = '';
+          }
+          
+          // Escape CSV values (wrap in quotes if contains delimiter or quotes)
+          const stringValue = String(value);
+          if (stringValue.includes(delimiter) || stringValue.includes('"') || stringValue.includes('\n')) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          }
+          
+          return stringValue;
+        });
+        
+        csvContent += row.join(delimiter) + '\n';
+      }
+      
+      // Generate filename if not provided
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = options.filePath || `bookmarks-export-${timestamp}.csv`;
+      
+      return {
+        success: true,
+        filePath: fileName,
+        recordCount: bookmarks.length,
+        data: csvContent // Include data for testing/download in UI
+      } as ExportResult & { data: string };
+      
+    } catch (error: any) {
+      return {
+        success: false,
+        recordCount: 0,
+        error: `CSV export failed: ${error.message}`
+      };
+    }
+  }
+
+  public validateExportData(bookmarks: BookmarkData[]): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    for (let i = 0; i < bookmarks.length; i++) {
+      const bookmark = bookmarks[i];
+      
+      if (!bookmark.id) {
+        errors.push(`Bookmark at index ${i} missing required field: id`);
+      }
+      
+      if (!bookmark.title) {
+        errors.push(`Bookmark at index ${i} missing required field: title`);
+      }
+      
+      if (typeof bookmark.timestamp !== 'number') {
+        errors.push(`Bookmark at index ${i} invalid timestamp: ${bookmark.timestamp}`);
+      }
+      
+      if (!bookmark.filepath) {
+        errors.push(`Bookmark at index ${i} missing required field: filepath`);
+      }
+      
+      if (!bookmark.createdAt) {
+        errors.push(`Bookmark at index ${i} missing required field: createdAt`);
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   }
 } 

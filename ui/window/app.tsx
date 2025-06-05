@@ -5,6 +5,7 @@ import FilterPresets from "../components/FilterPresets";
 import TextHighlighter from "../components/TextHighlighter";
 import TagInput from "../components/TagInput";
 import AddBookmarkDialog from "../components/AddBookmarkDialog";
+import ExportDialog from "../components/ExportDialog";
 import useAdvancedBookmarkFilters from "../hooks/useAdvancedBookmarkFilters";
 import useFilterHistory from "../hooks/useFilterHistory";
 
@@ -45,6 +46,7 @@ const App: React.FC = () => {
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   const appWindow = window as unknown as AppWindow;
 
@@ -165,6 +167,7 @@ const App: React.FC = () => {
         <h1>Manage All Bookmarks</h1>
         <div className="header-actions">
           <button onClick={handleAddBookmark} className="add-bookmark-btn">Add Bookmark to Current Video</button>
+          <button onClick={() => setShowExportDialog(true)} className="export-btn">Export Bookmarks</button>
         </div>
       </div>
 
@@ -172,6 +175,13 @@ const App: React.FC = () => {
         isOpen={showAddDialog}
         onClose={() => setShowAddDialog(false)}
         onSave={handleSaveBookmark}
+        availableTags={availableTags}
+        postMessage={appWindow.iina?.postMessage}
+      />
+
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
         availableTags={availableTags}
         postMessage={appWindow.iina?.postMessage}
       />
