@@ -111,6 +111,9 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
       <div className="dialog-content add-bookmark-dialog">
         <div className="dialog-header">
           <h3>Add New Bookmark</h3>
+          <p className="dialog-subtitle">
+            Values are auto-populated but can be edited before saving
+          </p>
           <button onClick={handleClose} className="close-btn" disabled={isLoading}>
             &times;
           </button>
@@ -125,7 +128,10 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
           ) : (
             <>
               <div className="form-field">
-                <label htmlFor="bookmark-title">Title</label>
+                <label htmlFor="bookmark-title">
+                  Title
+                  <span className="field-hint">✏️ Editable</span>
+                </label>
                 <input
                   id="bookmark-title"
                   type="text"
@@ -154,7 +160,10 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
               </div>
 
               <div className="form-field">
-                <label htmlFor="bookmark-description">Description</label>
+                <label htmlFor="bookmark-description">
+                  Description
+                  <span className="field-hint">✏️ Editable</span>
+                </label>
                 <textarea
                   id="bookmark-description"
                   value={description}
@@ -166,7 +175,10 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
               </div>
 
               <div className="form-field">
-                <label>Tags</label>
+                <label>
+                  Tags
+                  <span className="field-hint">✏️ Editable</span>
+                </label>
                 <TagInput
                   tags={tags}
                   onTagsChange={setTags}
