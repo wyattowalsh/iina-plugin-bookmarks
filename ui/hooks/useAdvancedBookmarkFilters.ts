@@ -53,7 +53,7 @@ export const useAdvancedBookmarkFilters = ({
     }
 
     // Apply sorting
-    result = applySorting(result, filters.sortBy, filters.sortDirection);
+    result = applySorting(result, filters.sortBy, filters.sortDirection, filters.sortCriteria, filters.enableMultiSort);
 
     return result;
   }, [bookmarks, filters, parsedQuery]);
@@ -249,28 +249,89 @@ function applyDateRangeFilter(
 function applySorting(
   bookmarks: BookmarkData[], 
   sortBy: FilterState['sortBy'], 
-  sortDirection: FilterState['sortDirection']
+  sortDirection: FilterState['sortDirection'],
+  sortCriteria?: FilterState['sortCriteria'],
+  enableMultiSort?: boolean
 ): BookmarkData[] {
   const sorted = [...bookmarks].sort((a, b) => {
-    let comparison = 0;
-
-    switch (sortBy) {
-      case 'title':
-        comparison = a.title.localeCompare(b.title);
-        break;
-      case 'timestamp':
-        comparison = a.timestamp - b.timestamp;
-        break;
-      case 'createdAt':
-      default:
-        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        break;
+    // Use multi-criteria sorting if enabled and criteria are provided
+    if (enableMultiSort && sortCriteria && sortCriteria.length > 0) {
+      return applyMultiCriteriaSorting(a, b, sortCriteria);
     }
-
-    return sortDirection === 'desc' ? -comparison : comparison;
+    
+    // Fall back to single-criteria sorting
+    return applySingleCriteriaSorting(a, b, sortBy, sortDirection);
   });
 
   return sorted;
+}
+
+// Helper function for single-criteria sorting
+function applySingleCriteriaSorting(
+  a: BookmarkData, 
+  b: BookmarkData, 
+  sortBy: FilterState['sortBy'], 
+  sortDirection: FilterState['sortDirection']
+): number {
+  let comparison = 0;
+
+  switch (sortBy) {
+    case 'title':
+      comparison = a.title.localeCompare(b.title);
+      break;
+    case 'timestamp':
+      comparison = a.timestamp - b.timestamp;
+      break;
+    case 'description':
+      const aDesc = (a.description || '').toLowerCase();
+      const bDesc = (b.description || '').toLowerCase();
+      comparison = aDesc.localeCompare(bDesc);
+      break;
+    case 'tags':
+      const aTags = (a.tags || []).join(', ').toLowerCase();
+      const bTags = (b.tags || []).join(', ').toLowerCase();
+      comparison = aTags.localeCompare(bTags);
+      break;
+    case 'mediaFileName':
+      const aFileName = extractFileName(a.filepath);
+      const bFileName = extractFileName(b.filepath);
+      comparison = aFileName.localeCompare(bFileName);
+      break;
+    case 'createdAt':
+    default:
+      comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      break;
+  }
+
+  return sortDirection === 'desc' ? -comparison : comparison;
+}
+
+// Helper function for multi-criteria sorting
+function applyMultiCriteriaSorting(
+  a: BookmarkData, 
+  b: BookmarkData, 
+  sortCriteria: FilterState['sortCriteria']
+): number {
+  // Sort criteria by priority (lower number = higher priority)
+  const sortedCriteria = [...sortCriteria].sort((x, y) => x.priority - y.priority);
+  
+  for (const criterion of sortedCriteria) {
+    const comparison = applySingleCriteriaSorting(a, b, criterion.field, criterion.direction);
+    if (comparison !== 0) {
+      return comparison; // If this criterion produces a difference, use it
+    }
+    // If comparison is 0, continue to next criterion
+  }
+  
+  return 0; // All criteria resulted in equality
+}
+
+// Helper function to extract filename from filepath
+function extractFileName(filepath: string): string {
+  const parts = filepath.split('/');
+  const filename = parts[parts.length - 1] || '';
+  // Remove file extension for cleaner sorting
+  return filename.replace(/\.[^/.]+$/, '').toLowerCase();
 }
 
 export default useAdvancedBookmarkFilters; 

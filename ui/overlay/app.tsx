@@ -11,6 +11,7 @@ interface BookmarkData {
   filepath: string;
   description?: string;
   createdAt: string;
+  tags?: string[];
 }
 
 interface AppWindow extends Window {
@@ -157,6 +158,13 @@ const App: React.FC = () => {
                 caseSensitive={false}
               />
             </span>
+            {bookmark.tags && bookmark.tags.length > 0 && (
+              <div className="bookmark-tags">
+                {bookmark.tags.map(tag => (
+                  <span key={tag} className="bookmark-tag">{tag}</span>
+                ))}
+              </div>
+            )}
             <span className="bookmark-time">{new Date((bookmark.timestamp || 0) * 1000).toISOString().substr(11, 8)}</span>
           </li>
         ))}

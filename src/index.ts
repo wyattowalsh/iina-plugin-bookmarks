@@ -30,9 +30,11 @@ interface UIMessage {
 class BookmarkManager {
   private bookmarks: BookmarkData[] = [];
   private readonly STORAGE_KEY = "bookmarks";
+  private readonly SORT_PREFERENCES_KEY = "sortPreferences";
 
   constructor() {
     this.loadBookmarks();
+    this.loadSortPreferences();
     this.setupEventListeners();
     this.setupWebUI();
     this.setupUIMessageListeners();
@@ -105,6 +107,11 @@ class BookmarkManager {
             const bookmarksForUI = this.getBookmarks(core.status.path || undefined); // Send bookmarks for current file
             targetUI.postMessage(JSON.stringify({ type: "BOOKMARKS_UPDATED", data: bookmarksForUI }));
             console.log(`Sent initial bookmarks to ${uiSource} for path: ${core.status.path}`);
+            break;
+          case "SAVE_SORT_PREFERENCES":
+            if (message.payload?.preferences) {
+              this.saveSortPreferences(message.payload.preferences);
+            }
             break;
           default:
             console.warn(`[${uiSource}] Unknown message type:`, message.type);
@@ -201,21 +208,171 @@ class BookmarkManager {
       return;
     }
 
-    const bookmarkTitle = title || `Bookmark at ${this.formatTime(currentTime || 0)} (${mediaTitle})`;
+    // Enhanced metadata auto-population
+    const metadata = this.generateBookmarkMetadata(currentFile, mediaTitle, currentTime || 0, title, description, tags);
 
     const bookmark: BookmarkData = {
       id: Date.now().toString(),
-      title: bookmarkTitle,
+      title: metadata.title,
       timestamp: currentTime || 0,
       filepath: currentFile,
-      description: description || `Recorded on ${new Date().toLocaleDateString()}`,
+      description: metadata.description,
       createdAt: new Date().toISOString(),
-      tags: tags || [],
+      tags: metadata.tags,
     };
     this.bookmarks.push(bookmark);
     this.saveBookmarks(); // This will call refreshUIs()
     console.log("Bookmark added:", bookmark.title);
     iina.postMessage("showNotification", { title: "Bookmark Added", message: bookmark.title });
+  }
+
+  private generateBookmarkMetadata(filepath: string, mediaTitle: string, timestamp: number, userTitle?: string, userDescription?: string, userTags?: string[]) {
+    // Extract filename and extension for analysis
+    const filename = filepath.split('/').pop() || 'unknown';
+    const fileExtension = filename.split('.').pop()?.toLowerCase() || '';
+    const filenameWithoutExt = filename.replace(/\.[^/.]+$/, '');
+    
+    // Generate intelligent title
+    let autoTitle = userTitle;
+    if (!autoTitle) {
+      // Try to extract meaningful title from media title or filename
+      if (mediaTitle && mediaTitle !== "Unknown Media" && !mediaTitle.includes(filename)) {
+        autoTitle = `${mediaTitle} - ${this.formatTime(timestamp)}`;
+      } else {
+        // Clean up filename for better title
+        const cleanTitle = filenameWithoutExt
+          .replace(/[._-]/g, ' ')
+          .replace(/\b\w/g, l => l.toUpperCase())
+          .trim();
+        autoTitle = `${cleanTitle} - ${this.formatTime(timestamp)}`;
+      }
+    }
+
+    // Generate intelligent description
+    let autoDescription = userDescription;
+    if (!autoDescription) {
+      const fileType = this.getMediaType(fileExtension);
+      const timeOfDay = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const date = new Date().toLocaleDateString();
+      
+      autoDescription = `${fileType} bookmark created at ${timeOfDay} on ${date}`;
+      
+      // Add context based on timestamp
+      if (timestamp < 300) { // First 5 minutes
+        autoDescription += " (Opening scene)";
+      } else if (timestamp > 0) {
+        const minutes = Math.floor(timestamp / 60);
+        autoDescription += ` (${minutes} minutes in)`;
+      }
+    }
+
+    // Generate intelligent tags
+    let autoTags = userTags || [];
+    if (!userTags || userTags.length === 0) {
+      autoTags = this.generateAutoTags(filepath, fileExtension, mediaTitle, timestamp);
+    }
+
+    return {
+      title: autoTitle,
+      description: autoDescription,
+      tags: autoTags
+    };
+  }
+
+  private getMediaType(extension: string): string {
+    const videoExtensions = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v'];
+    const audioExtensions = ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'wma'];
+    const documentaryKeywords = ['documentary', 'doc', 'nature', 'history', 'science'];
+    
+    if (videoExtensions.includes(extension)) {
+      return 'Video';
+    } else if (audioExtensions.includes(extension)) {
+      return 'Audio';
+    }
+    return 'Media';
+  }
+
+  private generateAutoTags(filepath: string, extension: string, mediaTitle: string, timestamp: number): string[] {
+    const tags: string[] = [];
+    const pathLower = filepath.toLowerCase();
+    const titleLower = mediaTitle.toLowerCase();
+    
+    // Media type tags
+    const videoExtensions = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v'];
+    const audioExtensions = ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'wma'];
+    
+    if (videoExtensions.includes(extension)) {
+      tags.push('video');
+    } else if (audioExtensions.includes(extension)) {
+      tags.push('audio');
+    }
+
+    // Content type detection from path
+    if (pathLower.includes('movie') || pathLower.includes('film')) {
+      tags.push('movie');
+    }
+    if (pathLower.includes('tv') || pathLower.includes('series') || pathLower.includes('episode')) {
+      tags.push('tv-show');
+    }
+    if (pathLower.includes('documentary') || pathLower.includes('doc')) {
+      tags.push('documentary');
+    }
+    if (pathLower.includes('music') || pathLower.includes('song') || pathLower.includes('album')) {
+      tags.push('music');
+    }
+    if (pathLower.includes('tutorial') || pathLower.includes('training') || pathLower.includes('course')) {
+      tags.push('educational');
+    }
+    if (pathLower.includes('work') || pathLower.includes('meeting') || pathLower.includes('presentation')) {
+      tags.push('work');
+    }
+
+    // Genre detection from title and path
+    const genreKeywords = {
+      'action': ['action', 'fight', 'battle', 'war', 'combat'],
+      'comedy': ['comedy', 'funny', 'humor', 'laugh', 'comic'],
+      'drama': ['drama', 'dramatic', 'emotional'],
+      'horror': ['horror', 'scary', 'fear', 'terror', 'zombie'],
+      'sci-fi': ['sci-fi', 'science fiction', 'space', 'alien', 'future'],
+      'thriller': ['thriller', 'suspense', 'mystery', 'crime'],
+      'romance': ['romance', 'love', 'romantic', 'dating'],
+      'adventure': ['adventure', 'quest', 'journey', 'explore'],
+      'fantasy': ['fantasy', 'magic', 'wizard', 'dragon', 'medieval'],
+      'animation': ['animation', 'animated', 'cartoon', 'anime']
+    };
+
+    for (const [genre, keywords] of Object.entries(genreKeywords)) {
+      if (keywords.some(keyword => titleLower.includes(keyword) || pathLower.includes(keyword))) {
+        tags.push(genre);
+      }
+    }
+
+    // Temporal tags based on timestamp
+    if (timestamp < 300) { // First 5 minutes
+      tags.push('opening');
+    } else if (timestamp < 600) { // First 10 minutes
+      tags.push('beginning');
+    }
+
+    // Quality/resolution detection from filename
+    if (pathLower.includes('4k') || pathLower.includes('2160p')) {
+      tags.push('4k');
+    } else if (pathLower.includes('1080p') || pathLower.includes('hd')) {
+      tags.push('hd');
+    } else if (pathLower.includes('720p')) {
+      tags.push('720p');
+    }
+
+    // Language detection
+    if (pathLower.includes('english') || pathLower.includes('en')) {
+      tags.push('english');
+    }
+    if (pathLower.includes('subtitle') || pathLower.includes('sub')) {
+      tags.push('subtitled');
+    }
+
+    // Remove duplicates and limit to reasonable number
+    return [...new Set(tags)].slice(0, 5);
   }
 
   public removeBookmark(id: string): void {
@@ -278,6 +435,29 @@ class BookmarkManager {
     const date = new Date(0);
     date.setSeconds(seconds);
     return date.toISOString().substr(11, 8);
+  }
+
+  private loadSortPreferences(): void {
+    try {
+      const preferencesData = iina.core.preference.get(this.SORT_PREFERENCES_KEY);
+      if (preferencesData) {
+        const preferences = JSON.parse(preferencesData);
+        console.log("Sort preferences loaded:", preferences);
+        // Send preferences to UIs
+        this.refreshUIs();
+      }
+    } catch (error) {
+      console.log("No existing sort preferences or failed to load:", error);
+    }
+  }
+
+  private saveSortPreferences(preferences: any): void {
+    try {
+      iina.core.preference.set(this.SORT_PREFERENCES_KEY, JSON.stringify(preferences));
+      console.log("Sort preferences saved:", preferences);
+    } catch (error) {
+      console.error("Failed to save sort preferences:", error);
+    }
   }
 }
 

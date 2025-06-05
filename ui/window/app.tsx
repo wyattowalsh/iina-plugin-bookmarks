@@ -3,6 +3,7 @@ import FilterComponent, { FilterState } from "../components/FilterComponent";
 import AdvancedSearch, { ParsedSearchQuery } from "../components/AdvancedSearch";
 import FilterPresets from "../components/FilterPresets";
 import TextHighlighter from "../components/TextHighlighter";
+import TagInput from "../components/TagInput";
 import useAdvancedBookmarkFilters from "../hooks/useAdvancedBookmarkFilters";
 import useFilterHistory from "../hooks/useFilterHistory";
 
@@ -30,6 +31,7 @@ const App: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: '',
@@ -115,6 +117,7 @@ const App: React.FC = () => {
     setSelectedBookmark(bookmark);
     setEditTitle(bookmark.title);
     setEditDescription(bookmark.description || "");
+    setEditTags(bookmark.tags || []);
     setIsEditing(true);
   };
 
@@ -122,11 +125,11 @@ const App: React.FC = () => {
     if (selectedBookmark) {
       appWindow.iina?.postMessage?.("UPDATE_BOOKMARK", {
         id: selectedBookmark.id,
-        data: { title: editTitle, description: editDescription }
+        data: { title: editTitle, description: editDescription, tags: editTags }
       });
       setIsEditing(false);
-      setSelectedBookmark(prev => prev ? {...prev, title: editTitle, description: editDescription} : null);
-      setBookmarks(prevBks => prevBks.map(b => b.id === selectedBookmark.id ? {...b, title: editTitle, description: editDescription} : b));
+      setSelectedBookmark(prev => prev ? {...prev, title: editTitle, description: editDescription, tags: editTags} : null);
+      setBookmarks(prevBks => prevBks.map(b => b.id === selectedBookmark.id ? {...b, title: editTitle, description: editDescription, tags: editTags} : b));
     }
   };
 
@@ -247,6 +250,7 @@ const App: React.FC = () => {
                 <h3>Edit Bookmark</h3>
                 <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" />
                 <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Description"></textarea>
+                                  <TagInput tags={editTags} onTagsChange={setEditTags} availableTags={availableTags} />
                 <div className="edit-actions">
                     <button onClick={handleSaveEdit} className="save-btn">Save Changes</button>
                     <button onClick={() => setIsEditing(false)} className="cancel-btn">Cancel</button>

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { FilterState } from '../components/FilterComponent';
 
 /**
  * Custom hook for persisting state in localStorage
@@ -38,5 +39,23 @@ export function usePersistentFilterState<T>(viewId: string, defaultFilters: T): 
   const storageKey = `iina-bookmarks-filters-${viewId}`;
   return usePersistentState(storageKey, defaultFilters);
 }
+
+// Add sort preferences persistence
+export const usePersistentSortPreferences = (viewId: string) => {
+  const [sortPreferences, setSortPreferences] = useState<Partial<FilterState>>({});
+
+  const saveSortPreferences = useCallback((preferences: Partial<FilterState>) => {
+    setSortPreferences(preferences);
+    // Send to plugin for persistence
+    const appWindow = window as any;
+    if (appWindow.iina?.postMessage) {
+      appWindow.iina.postMessage("SAVE_SORT_PREFERENCES", { 
+        preferences: { viewId, ...preferences }
+      });
+    }
+  }, [viewId]);
+
+  return { sortPreferences, saveSortPreferences };
+};
 
 export default usePersistentState; 

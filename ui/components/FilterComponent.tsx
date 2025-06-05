@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import useDebounce from "../hooks/useDebounce";
-import { usePersistentFilterState } from "../hooks/usePersistentState";
+import { usePersistentFilterState, usePersistentSortPreferences } from "../hooks/usePersistentState";
 
 export interface FilterState {
   searchTerm: string;
@@ -9,9 +9,15 @@ export interface FilterState {
     end: string;
   };
   tags: string[];
-  sortBy: 'timestamp' | 'title' | 'createdAt';
+  sortBy: 'timestamp' | 'title' | 'createdAt' | 'description' | 'tags' | 'mediaFileName';
   sortDirection: 'asc' | 'desc';
   fileFilter: string;
+  sortCriteria: Array<{
+    field: 'timestamp' | 'title' | 'createdAt' | 'description' | 'tags' | 'mediaFileName';
+    direction: 'asc' | 'desc';
+    priority: number;
+  }>;
+  enableMultiSort: boolean;
 }
 
 interface FilterComponentProps {
@@ -31,7 +37,9 @@ const defaultFilters: FilterState = {
   tags: [],
   sortBy: 'createdAt',
   sortDirection: 'desc',
-  fileFilter: ''
+  fileFilter: '',
+  sortCriteria: [],
+  enableMultiSort: false
 };
 
 export const FilterComponent: React.FC<FilterComponentProps> = ({
@@ -48,6 +56,9 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
   const baseFilters = { ...defaultFilters, ...initialFilters };
   const [persistentFilters, setPersistentFilters] = usePersistentFilterState(viewId, baseFilters);
   
+  // Use persistent sort preferences
+  const { saveSortPreferences } = usePersistentSortPreferences(viewId);
+  
   // For non-persistent state like UI interactions
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(showAdvanced);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
@@ -60,7 +71,18 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
     const updatedFilters = { ...persistentFilters, ...newFilters };
     setPersistentFilters(updatedFilters);
     onFilterChange(updatedFilters);
-  }, [persistentFilters, onFilterChange, setPersistentFilters]);
+    
+    // Save sort preferences when sort-related fields change
+    if ('sortBy' in newFilters || 'sortDirection' in newFilters || 
+        'sortCriteria' in newFilters || 'enableMultiSort' in newFilters) {
+      saveSortPreferences({
+        sortBy: updatedFilters.sortBy,
+        sortDirection: updatedFilters.sortDirection,
+        sortCriteria: updatedFilters.sortCriteria,
+        enableMultiSort: updatedFilters.enableMultiSort
+      });
+    }
+  }, [persistentFilters, onFilterChange, setPersistentFilters, saveSortPreferences]);
 
   // Update filters when debounced search term changes
   React.useEffect(() => {
@@ -120,6 +142,24 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
 
   const currentSortValue = `${persistentFilters.sortBy}-${persistentFilters.sortDirection}`;
 
+  const handleSortCriterionChange = useCallback((index: number, field: string, value: string) => {
+    const updatedCriteria = [...persistentFilters.sortCriteria];
+    if (field === 'field' || field === 'direction') {
+      (updatedCriteria[index] as any)[field] = value;
+    }
+    updateFilters({ sortCriteria: updatedCriteria });
+  }, [persistentFilters.sortCriteria, updateFilters]);
+
+  const removeSortCriterion = useCallback((index: number) => {
+    const updatedCriteria = persistentFilters.sortCriteria.filter((_, i) => i !== index);
+    updateFilters({ sortCriteria: updatedCriteria });
+  }, [persistentFilters.sortCriteria, updateFilters]);
+
+  const addSortCriterion = useCallback(() => {
+    const updatedCriteria = [...persistentFilters.sortCriteria, { field: persistentFilters.sortBy, direction: persistentFilters.sortDirection, priority: persistentFilters.sortCriteria.length + 1 }];
+    updateFilters({ sortCriteria: updatedCriteria });
+  }, [persistentFilters.sortBy, persistentFilters.sortDirection, persistentFilters.sortCriteria, updateFilters]);
+
   return (
     <div className={`filter-container ${compact ? 'compact' : ''}`}>
       {/* Primary Filter Row */}
@@ -135,18 +175,91 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
         </div>
 
         <div className="filter-group">
-          <select
-            className={`filter-select ${compact ? 'compact' : ''}`}
-            value={currentSortValue}
-            onChange={handleSortChange}
-          >
-            <option value="createdAt-desc">Latest First</option>
-            <option value="createdAt-asc">Oldest First</option>
-            <option value="title-asc">Title A-Z</option>
-            <option value="title-desc">Title Z-A</option>
-            <option value="timestamp-asc">Time (Start)</option>
-            <option value="timestamp-desc">Time (End)</option>
-          </select>
+          {persistentFilters.enableMultiSort ? (
+            <div className="multi-sort-container">
+              <div className="multi-sort-header">
+                <span>Multi-Sort</span>
+                <button 
+                  onClick={() => updateFilters({ enableMultiSort: false, sortCriteria: [] })}
+                  className="disable-multi-sort"
+                  title="Disable multi-criteria sorting"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="multi-sort-criteria">
+                {persistentFilters.sortCriteria.map((criterion, index) => (
+                  <div key={index} className="sort-criterion">
+                    <span className="criterion-priority">{index + 1}</span>
+                    <select
+                      value={criterion.field}
+                      onChange={(e) => handleSortCriterionChange(index, 'field', e.target.value)}
+                      className="criterion-field"
+                    >
+                      <option value="createdAt">Date Created</option>
+                      <option value="title">Title</option>
+                      <option value="timestamp">Timestamp</option>
+                      <option value="description">Description</option>
+                      <option value="tags">Tags</option>
+                      <option value="mediaFileName">File Name</option>
+                    </select>
+                    <select
+                      value={criterion.direction}
+                      onChange={(e) => handleSortCriterionChange(index, 'direction', e.target.value)}
+                      className="criterion-direction"
+                    >
+                      <option value="asc">↑ Asc</option>
+                      <option value="desc">↓ Desc</option>
+                    </select>
+                    <button
+                      onClick={() => removeSortCriterion(index)}
+                      className="remove-criterion"
+                      title="Remove this sort criterion"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {persistentFilters.sortCriteria.length < 3 && (
+                  <button
+                    onClick={addSortCriterion}
+                    className="add-criterion"
+                    title="Add another sort criterion"
+                  >
+                    + Add Sort
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="single-sort-container">
+              <select
+                className={`filter-select ${compact ? 'compact' : ''}`}
+                value={currentSortValue}
+                onChange={handleSortChange}
+              >
+                <option value="createdAt-desc">Latest First</option>
+                <option value="createdAt-asc">Oldest First</option>
+                <option value="title-asc">Title A-Z</option>
+                <option value="title-desc">Title Z-A</option>
+                <option value="timestamp-asc">Time (Start)</option>
+                <option value="timestamp-desc">Time (End)</option>
+                <option value="description-asc">Description A-Z</option>
+                <option value="description-desc">Description Z-A</option>
+                <option value="tags-asc">Tags A-Z</option>
+                <option value="tags-desc">Tags Z-A</option>
+                <option value="mediaFileName-asc">File Name A-Z</option>
+                <option value="mediaFileName-desc">File Name Z-A</option>
+              </select>
+              <button
+                onClick={() => updateFilters({ enableMultiSort: true, sortCriteria: [{ field: persistentFilters.sortBy, direction: persistentFilters.sortDirection, priority: 1 }] })}
+                className="enable-multi-sort"
+                title="Enable multi-criteria sorting"
+              >
+                ⚡ Multi
+              </button>
+            </div>
+          )}
         </div>
 
         {availableFiles.length > 0 && (
