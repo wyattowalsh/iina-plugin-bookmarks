@@ -1,10 +1,4 @@
 {
   "title": "Features",
-  "pages": [
-    "media-detection",
-    "bookmark-management", 
-    "filtering",
-    "sorting",
-    "data-management"
-  ]
-} 
+  "pages": ["media-detection", "bookmark-management", "filtering", "sorting", "data-management"]
+}

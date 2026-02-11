@@ -1,8 +1,4 @@
 {
   "title": "Development",
-  "pages": [
-    "architecture",
-    "contributing",
-    "implementation-notes"
-  ]
-} 
+  "pages": ["architecture", "contributing", "implementation-notes"]
+}

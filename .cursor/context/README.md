@@ -16,7 +16,7 @@ npx repomix \
 ## iina Plugin Definition (https://github.com/iina/iina-plugin-definition)
 
 ```zsh
-npx repomix \                                                                                 1 ✘  3s  04:08:42 PM 
+npx repomix \                                                                                 1 ✘  3s  04:08:42 PM
   --remote https://github.com/iina/iina-plugin-definition \
   -o iina-plugin-definition-docs.md.txt \
   --style markdown \

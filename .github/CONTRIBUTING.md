@@ -43,6 +43,7 @@ In general, we follow the "fork-and-pull" Git workflow:
 - **Documentation**: Update any relevant documentation, including the [README.md](https://github.com/wyattowalsh/iina-plugin-bookmarks/blob/main/README.md) if necessary, to reflect your changes.
 
 Common commit types include:
+
 - `feat`: A new feature
 - `fix`: A bug fix
 - `docs`: Documentation only changes
@@ -56,7 +57,7 @@ Common commit types include:
 
 You can connect with the community and developers in the following ways:
 
--   [**GitHub Issues**](https://github.com/wyattowalsh/iina-plugin-bookmarks/issues): For bugs and feature requests.
--   [**GitHub Discussions**](https://github.com/wyattowalsh/iina-plugin-bookmarks/discussions): For general questions and discussions (if enabled).
+- [**GitHub Issues**](https://github.com/wyattowalsh/iina-plugin-bookmarks/issues): For bugs and feature requests.
+- [**GitHub Discussions**](https://github.com/wyattowalsh/iina-plugin-bookmarks/discussions): For general questions and discussions (if enabled).
 
-Thank you for your contribution! 
+Thank you for your contribution!

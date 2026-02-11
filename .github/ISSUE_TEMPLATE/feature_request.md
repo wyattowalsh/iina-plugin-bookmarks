@@ -1,10 +1,9 @@
 ---
 name: Feature Request
 about: Suggest an idea for this project
-title: "[FEAT] - "
+title: '[FEAT] - '
 labels: enhancement, needs-discussion
 assignees: ''
-
 ---
 
 **Is your feature request related to a problem? Please describe.**
@@ -26,4 +25,5 @@ What kind of impact will this feature have? (e.g. Nice-to-have, QoL improvement,
 (Yes/No/Maybe - if Yes, please outline a plan or approach)
 
 ---
-*Before submitting, please [search existing issues](https://github.com/wyattowalsh/iina-plugin-bookmarks/issues) to ensure a similar feature hasn't already been requested.* 
+
+_Before submitting, please [search existing issues](https://github.com/wyattowalsh/iina-plugin-bookmarks/issues) to ensure a similar feature hasn't already been requested._
