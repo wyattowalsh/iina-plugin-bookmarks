@@ -1,16 +1,7 @@
 import { useMemo } from 'react';
 import { FilterState } from '../components/FilterComponent';
 import { ParsedSearchQuery } from '../components/AdvancedSearch';
-
-interface BookmarkData {
-  id: string;
-  title: string;
-  timestamp: number;
-  filepath: string;
-  description?: string;
-  createdAt: string;
-  tags?: string[];
-}
+import { BookmarkData } from '../types';
 
 interface UseAdvancedBookmarkFiltersProps {
   bookmarks: BookmarkData[];

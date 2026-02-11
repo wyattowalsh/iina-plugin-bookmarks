@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import TagInput from "./TagInput";
+import React, { useState, useEffect } from 'react';
+import TagInput from './TagInput';
 
 interface BookmarkDefaults {
   title: string;
@@ -22,10 +22,10 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
   onClose,
   onSave,
   availableTags,
-  postMessage
+  postMessage,
 }) => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [timestamp, setTimestamp] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +35,7 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
     if (isOpen && postMessage) {
       setLoadingDefaults(true);
       // Request default values from the plugin
-      postMessage("REQUEST_BOOKMARK_DEFAULTS");
+      postMessage('REQUEST_BOOKMARK_DEFAULTS');
     }
   }, [isOpen, postMessage]);
 
@@ -50,10 +50,10 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
         }
       }
 
-      if (messageData?.type === "BOOKMARK_DEFAULTS" && messageData.data) {
+      if (messageData?.type === 'BOOKMARK_DEFAULTS' && messageData.data) {
         const defaults: BookmarkDefaults = messageData.data;
-        setTitle(defaults.title || "");
-        setDescription(defaults.description || "");
+        setTitle(defaults.title || '');
+        setDescription(defaults.description || '');
         setTags(defaults.tags || []);
         setTimestamp(defaults.timestamp || 0);
         setLoadingDefaults(false);
@@ -61,8 +61,8 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
     };
 
     if (isOpen) {
-      window.addEventListener("message", handleMessage);
-      return () => window.removeEventListener("message", handleMessage);
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
     }
   }, [isOpen]);
 
@@ -70,25 +70,25 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
-    return h > 0 
-      ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` 
+    return h > 0
+      ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
       : `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   const handleSave = async () => {
     if (!title.trim()) return;
-    
+
     setIsLoading(true);
     try {
       onSave(title.trim(), description.trim(), tags, timestamp);
       onClose();
       // Reset form
-      setTitle("");
-      setDescription("");
+      setTitle('');
+      setDescription('');
       setTags([]);
       setTimestamp(0);
     } catch (error) {
-      console.error("Error saving bookmark:", error);
+      console.error('Error saving bookmark:', error);
     } finally {
       setIsLoading(false);
     }
@@ -97,8 +97,8 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
   const handleClose = () => {
     onClose();
     // Reset form when closing
-    setTitle("");
-    setDescription("");
+    setTitle('');
+    setDescription('');
     setTags([]);
     setTimestamp(0);
     setLoadingDefaults(false);
@@ -153,9 +153,7 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
                     readOnly
                     disabled={isLoading}
                   />
-                  <span className="timestamp-note">
-                    {timestamp}s
-                  </span>
+                  <span className="timestamp-note">{timestamp}s</span>
                 </div>
               </div>
 
@@ -196,13 +194,9 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
             className="save-btn"
             disabled={!title.trim() || isLoading || loadingDefaults}
           >
-            {isLoading ? "Saving..." : "Save Bookmark"}
+            {isLoading ? 'Saving...' : 'Save Bookmark'}
           </button>
-          <button
-            onClick={handleClose}
-            className="cancel-btn"
-            disabled={isLoading}
-          >
+          <button onClick={handleClose} className="cancel-btn" disabled={isLoading}>
             Cancel
           </button>
         </div>
@@ -211,4 +205,4 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
   );
 };
 
-export default AddBookmarkDialog; 
+export default AddBookmarkDialog;

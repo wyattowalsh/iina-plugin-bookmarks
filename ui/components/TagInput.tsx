@@ -13,58 +13,72 @@ interface TagInputProps {
 export const TagInput: React.FC<TagInputProps> = ({
   tags,
   onTagsChange,
-  placeholder = "Add tags...",
+  placeholder = 'Add tags...',
   availableTags = [],
   maxTags = 10,
   disabled = false,
-  className = ""
+  className = '',
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filteredSuggestions = availableTags.filter(tag => 
-    !tags.includes(tag) && 
-    tag.toLowerCase().includes(inputValue.toLowerCase())
+  const filteredSuggestions = availableTags.filter(
+    (tag) => !tags.includes(tag) && tag.toLowerCase().includes(inputValue.toLowerCase()),
   );
 
-  const addTag = useCallback((tag: string) => {
-    const trimmedTag = tag.trim();
-    if (trimmedTag && !tags.includes(trimmedTag) && tags.length < maxTags) {
-      onTagsChange([...tags, trimmedTag]);
-      setInputValue('');
-      setShowSuggestions(false);
-    }
-  }, [tags, onTagsChange, maxTags]);
-
-  const removeTag = useCallback((tagToRemove: string) => {
-    onTagsChange(tags.filter(tag => tag !== tagToRemove));
-  }, [tags, onTagsChange]);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInputValue(value);
-    setShowSuggestions(value.length > 0 && filteredSuggestions.length > 0);
-  }, [filteredSuggestions.length]);
-
-  const handleInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      if (inputValue.trim()) {
-        addTag(inputValue);
+  const addTag = useCallback(
+    (tag: string) => {
+      const trimmedTag = tag.trim();
+      if (trimmedTag && !tags.includes(trimmedTag) && tags.length < maxTags) {
+        onTagsChange([...tags, trimmedTag]);
+        setInputValue('');
+        setShowSuggestions(false);
       }
-    } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
-      removeTag(tags[tags.length - 1]);
-    } else if (e.key === 'Escape') {
-      setShowSuggestions(false);
-      setInputValue('');
-    }
-  }, [inputValue, addTag, removeTag, tags]);
+    },
+    [tags, onTagsChange, maxTags],
+  );
 
-  const handleSuggestionClick = useCallback((suggestion: string) => {
-    addTag(suggestion);
-    inputRef.current?.focus();
-  }, [addTag]);
+  const removeTag = useCallback(
+    (tagToRemove: string) => {
+      onTagsChange(tags.filter((tag) => tag !== tagToRemove));
+    },
+    [tags, onTagsChange],
+  );
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setInputValue(value);
+      setShowSuggestions(value.length > 0 && filteredSuggestions.length > 0);
+    },
+    [filteredSuggestions.length],
+  );
+
+  const handleInputKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        if (inputValue.trim()) {
+          addTag(inputValue);
+        }
+      } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
+        removeTag(tags[tags.length - 1]);
+      } else if (e.key === 'Escape') {
+        setShowSuggestions(false);
+        setInputValue('');
+      }
+    },
+    [inputValue, addTag, removeTag, tags],
+  );
+
+  const handleSuggestionClick = useCallback(
+    (suggestion: string) => {
+      addTag(suggestion);
+      inputRef.current?.focus();
+    },
+    [addTag],
+  );
 
   const handleInputFocus = useCallback(() => {
     if (inputValue && filteredSuggestions.length > 0) {
@@ -80,7 +94,7 @@ export const TagInput: React.FC<TagInputProps> = ({
   return (
     <div className={`tag-input-container ${className}`}>
       <div className="tag-input-field">
-        {tags.map(tag => (
+        {tags.map((tag) => (
           <span key={tag} className="tag-chip">
             <span className="tag-text">{tag}</span>
             {!disabled && (
@@ -109,10 +123,10 @@ export const TagInput: React.FC<TagInputProps> = ({
           />
         )}
       </div>
-      
+
       {showSuggestions && filteredSuggestions.length > 0 && (
         <div className="tag-suggestions">
-          {filteredSuggestions.slice(0, 5).map(suggestion => (
+          {filteredSuggestions.slice(0, 5).map((suggestion) => (
             <button
               key={suggestion}
               type="button"
@@ -124,14 +138,12 @@ export const TagInput: React.FC<TagInputProps> = ({
           ))}
         </div>
       )}
-      
+
       {tags.length >= maxTags && (
-        <div className="tag-limit-message">
-          Maximum {maxTags} tags allowed
-        </div>
+        <div className="tag-limit-message">Maximum {maxTags} tags allowed</div>
       )}
     </div>
   );
 };
 
-export default TagInput; 
+export default TagInput;

@@ -35,7 +35,10 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, (value:
  * @param viewId - unique identifier for the view (e.g., 'sidebar', 'main', 'popup')
  * @param defaultFilters - default filter state
  */
-export function usePersistentFilterState<T>(viewId: string, defaultFilters: T): [T, (filters: T) => void] {
+export function usePersistentFilterState<T>(
+  viewId: string,
+  defaultFilters: T,
+): [T, (filters: T) => void] {
   const storageKey = `iina-bookmarks-filters-${viewId}`;
   return usePersistentState(storageKey, defaultFilters);
 }
@@ -44,18 +47,21 @@ export function usePersistentFilterState<T>(viewId: string, defaultFilters: T): 
 export const usePersistentSortPreferences = (viewId: string) => {
   const [sortPreferences, setSortPreferences] = useState<Partial<FilterState>>({});
 
-  const saveSortPreferences = useCallback((preferences: Partial<FilterState>) => {
-    setSortPreferences(preferences);
-    // Send to plugin for persistence
-    const appWindow = window as any;
-    if (appWindow.iina?.postMessage) {
-      appWindow.iina.postMessage("SAVE_SORT_PREFERENCES", { 
-        preferences: { viewId, ...preferences }
-      });
-    }
-  }, [viewId]);
+  const saveSortPreferences = useCallback(
+    (preferences: Partial<FilterState>) => {
+      setSortPreferences(preferences);
+      // Send to plugin for persistence
+      const appWindow = window as any;
+      if (appWindow.iina?.postMessage) {
+        appWindow.iina.postMessage('SAVE_SORT_PREFERENCES', {
+          preferences: { viewId, ...preferences },
+        });
+      }
+    },
+    [viewId],
+  );
 
   return { sortPreferences, saveSortPreferences };
 };
 
-export default usePersistentState; 
+export default usePersistentState;

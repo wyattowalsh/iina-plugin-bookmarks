@@ -7,7 +7,7 @@
   border-radius: 8px;
   padding: 16px;
   color: white;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   min-width: 280px;
   max-width: 400px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -57,7 +57,7 @@
       gap: 4px;
       align-items: center;
     }
-    
+
     .overlay-search-input {
       flex: 1;
       padding: 8px 12px;
@@ -67,11 +67,11 @@
       color: white;
       font-size: 14px;
       transition: all 0.2s ease;
-      
+
       &::placeholder {
         color: rgba(255, 255, 255, 0.6);
       }
-      
+
       &:focus {
         outline: none;
         background: rgba(255, 255, 255, 0.15);
@@ -126,7 +126,7 @@
     list-style: none;
     padding: 0;
     margin: 0;
-    
+
     .bookmark-item {
       display: flex;
       align-items: center;
@@ -143,7 +143,7 @@
       }
 
       .bookmark-time {
-        font-family: "SF Mono", Monaco, monospace;
+        font-family: 'SF Mono', Monaco, monospace;
         font-size: 12px;
         color: #00d4ff;
         min-width: 60px;
@@ -160,7 +160,7 @@
         white-space: nowrap;
         font-weight: 500;
       }
-      
+
       .bookmark-description {
         font-size: 13px;
         color: rgba(255, 255, 255, 0.9);
@@ -187,4 +187,4 @@
     transform: translateX(0);
     opacity: 1;
   }
-} 
+}

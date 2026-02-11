@@ -27,12 +27,12 @@ const DEFAULT_PRESETS: FilterPreset[] = [
     filters: {
       dateRange: {
         start: new Date().toISOString().split('T')[0],
-        end: ''
+        end: '',
       },
       sortBy: 'createdAt',
-      sortDirection: 'desc'
+      sortDirection: 'desc',
     },
-    icon: '🕒'
+    icon: '🕒',
   },
   {
     id: 'this-week',
@@ -41,12 +41,12 @@ const DEFAULT_PRESETS: FilterPreset[] = [
     filters: {
       dateRange: {
         start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        end: ''
+        end: '',
       },
       sortBy: 'createdAt',
-      sortDirection: 'desc'
+      sortDirection: 'desc',
     },
-    icon: '📅'
+    icon: '📅',
   },
   {
     id: 'untagged',
@@ -56,9 +56,9 @@ const DEFAULT_PRESETS: FilterPreset[] = [
       searchTerm: '',
       tags: [],
       sortBy: 'createdAt',
-      sortDirection: 'desc'
+      sortDirection: 'desc',
     },
-    icon: '🏷️'
+    icon: '🏷️',
   },
   {
     id: 'favorites',
@@ -67,9 +67,9 @@ const DEFAULT_PRESETS: FilterPreset[] = [
     filters: {
       tags: ['favorite'],
       sortBy: 'createdAt',
-      sortDirection: 'desc'
+      sortDirection: 'desc',
     },
-    icon: '⭐'
+    icon: '⭐',
   },
   {
     id: 'no-description',
@@ -78,10 +78,10 @@ const DEFAULT_PRESETS: FilterPreset[] = [
     filters: {
       searchTerm: '',
       sortBy: 'createdAt',
-      sortDirection: 'desc'
+      sortDirection: 'desc',
     },
-    icon: '📝'
-  }
+    icon: '📝',
+  },
 ];
 
 export const FilterPresets: React.FC<FilterPresetsProps> = ({
@@ -91,7 +91,7 @@ export const FilterPresets: React.FC<FilterPresetsProps> = ({
   customPresets = [],
   recentSearches = [],
   onClearHistory,
-  className = ''
+  className = '',
 }) => {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
@@ -100,9 +100,12 @@ export const FilterPresets: React.FC<FilterPresetsProps> = ({
 
   const allPresets = [...DEFAULT_PRESETS, ...customPresets];
 
-  const handleApplyPreset = useCallback((preset: FilterPreset) => {
-    onApplyPreset(preset.filters);
-  }, [onApplyPreset]);
+  const handleApplyPreset = useCallback(
+    (preset: FilterPreset) => {
+      onApplyPreset(preset.filters);
+    },
+    [onApplyPreset],
+  );
 
   const handleSavePreset = useCallback(() => {
     if (newPresetName.trim()) {
@@ -113,64 +116,88 @@ export const FilterPresets: React.FC<FilterPresetsProps> = ({
     }
   }, [newPresetName, newPresetDescription, onSaveCurrentAsPreset]);
 
-  const isActivePreset = useCallback((preset: FilterPreset): boolean => {
-    const presetFilters = preset.filters;
-    
-    // Check if current filters match preset filters
-    if (presetFilters.searchTerm !== undefined && presetFilters.searchTerm !== currentFilters.searchTerm) {
-      return false;
-    }
-    
-    if (presetFilters.sortBy && presetFilters.sortBy !== currentFilters.sortBy) {
-      return false;
-    }
-    
-    if (presetFilters.sortDirection && presetFilters.sortDirection !== currentFilters.sortDirection) {
-      return false;
-    }
-    
-    if (presetFilters.tags && JSON.stringify(presetFilters.tags) !== JSON.stringify(currentFilters.tags)) {
-      return false;
-    }
-    
-    if (presetFilters.fileFilter !== undefined && presetFilters.fileFilter !== currentFilters.fileFilter) {
-      return false;
-    }
-    
-    return true;
-  }, [currentFilters]);
+  const isActivePreset = useCallback(
+    (preset: FilterPreset): boolean => {
+      const presetFilters = preset.filters;
+
+      // Check if current filters match preset filters
+      if (
+        presetFilters.searchTerm !== undefined &&
+        presetFilters.searchTerm !== currentFilters.searchTerm
+      ) {
+        return false;
+      }
+
+      if (presetFilters.sortBy && presetFilters.sortBy !== currentFilters.sortBy) {
+        return false;
+      }
+
+      if (
+        presetFilters.sortDirection &&
+        presetFilters.sortDirection !== currentFilters.sortDirection
+      ) {
+        return false;
+      }
+
+      if (
+        presetFilters.tags &&
+        JSON.stringify(presetFilters.tags) !== JSON.stringify(currentFilters.tags)
+      ) {
+        return false;
+      }
+
+      if (
+        presetFilters.fileFilter !== undefined &&
+        presetFilters.fileFilter !== currentFilters.fileFilter
+      ) {
+        return false;
+      }
+
+      return true;
+    },
+    [currentFilters],
+  );
 
   const hasActiveFilters = useCallback((): boolean => {
-    return currentFilters.searchTerm !== '' ||
-           currentFilters.dateRange.start !== '' ||
-           currentFilters.dateRange.end !== '' ||
-           currentFilters.tags.length > 0 ||
-           currentFilters.fileFilter !== '' ||
-           currentFilters.sortBy !== 'createdAt' ||
-           currentFilters.sortDirection !== 'desc';
+    return (
+      currentFilters.searchTerm !== '' ||
+      currentFilters.dateRange.start !== '' ||
+      currentFilters.dateRange.end !== '' ||
+      currentFilters.tags.length > 0 ||
+      currentFilters.fileFilter !== '' ||
+      currentFilters.sortBy !== 'createdAt' ||
+      currentFilters.sortDirection !== 'desc'
+    );
   }, [currentFilters]);
 
-  const applyRecentSearch = useCallback((searchTerm: string) => {
-    onApplyPreset({ searchTerm });
-  }, [onApplyPreset]);
+  const applyRecentSearch = useCallback(
+    (searchTerm: string) => {
+      onApplyPreset({ searchTerm });
+    },
+    [onApplyPreset],
+  );
 
   return (
     <div className={`filter-presets ${className}`}>
       {/* Quick Presets */}
       <div className="presets-section">
-        <div 
+        <button
           className="section-header"
           onClick={() => setExpandedSection(expandedSection === 'presets' ? null : 'presets')}
+          aria-expanded={expandedSection === 'presets'}
+          aria-label={`${expandedSection === 'presets' ? 'Collapse' : 'Expand'} quick filters`}
         >
-          <span className="section-icon">{expandedSection === 'presets' ? '▼' : '▶'}</span>
+          <span className="section-icon" aria-hidden="true">
+            {expandedSection === 'presets' ? '▼' : '▶'}
+          </span>
           <span className="section-title">Quick Filters</span>
           <span className="section-count">({allPresets.length})</span>
-        </div>
-        
+        </button>
+
         {expandedSection === 'presets' && (
           <div className="presets-content">
             <div className="preset-grid">
-              {allPresets.map(preset => (
+              {allPresets.map((preset) => (
                 <button
                   key={preset.id}
                   className={`preset-button ${isActivePreset(preset) ? 'active' : ''}`}
@@ -182,14 +209,11 @@ export const FilterPresets: React.FC<FilterPresetsProps> = ({
                 </button>
               ))}
             </div>
-            
+
             {hasActiveFilters() && (
               <div className="save-preset-section">
                 {!showSaveDialog ? (
-                  <button
-                    className="save-preset-trigger"
-                    onClick={() => setShowSaveDialog(true)}
-                  >
+                  <button className="save-preset-trigger" onClick={() => setShowSaveDialog(true)}>
                     💾 Save Current Filters as Preset
                   </button>
                 ) : (
@@ -209,7 +233,11 @@ export const FilterPresets: React.FC<FilterPresetsProps> = ({
                       className="preset-description-input"
                     />
                     <div className="dialog-actions">
-                      <button onClick={handleSavePreset} className="save-btn" disabled={!newPresetName.trim()}>
+                      <button
+                        onClick={handleSavePreset}
+                        className="save-btn"
+                        disabled={!newPresetName.trim()}
+                      >
                         Save
                       </button>
                       <button onClick={() => setShowSaveDialog(false)} className="cancel-btn">
@@ -227,15 +255,19 @@ export const FilterPresets: React.FC<FilterPresetsProps> = ({
       {/* Recent Searches */}
       {recentSearches.length > 0 && (
         <div className="history-section">
-          <div 
+          <button
             className="section-header"
             onClick={() => setExpandedSection(expandedSection === 'history' ? null : 'history')}
+            aria-expanded={expandedSection === 'history'}
+            aria-label={`${expandedSection === 'history' ? 'Collapse' : 'Expand'} recent searches`}
           >
-            <span className="section-icon">{expandedSection === 'history' ? '▼' : '▶'}</span>
+            <span className="section-icon" aria-hidden="true">
+              {expandedSection === 'history' ? '▼' : '▶'}
+            </span>
             <span className="section-title">Recent Searches</span>
             <span className="section-count">({recentSearches.length})</span>
-          </div>
-          
+          </button>
+
           {expandedSection === 'history' && (
             <div className="history-content">
               <div className="history-list">
@@ -251,7 +283,7 @@ export const FilterPresets: React.FC<FilterPresetsProps> = ({
                   </button>
                 ))}
               </div>
-              
+
               {onClearHistory && (
                 <button className="clear-history-btn" onClick={onClearHistory}>
                   🗑️ Clear History
@@ -265,4 +297,4 @@ export const FilterPresets: React.FC<FilterPresetsProps> = ({
   );
 };
 
-export default FilterPresets; 
+export default FilterPresets;

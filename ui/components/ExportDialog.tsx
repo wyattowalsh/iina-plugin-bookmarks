@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 
 interface ExportOptions {
   format: 'json' | 'csv';
@@ -29,20 +29,26 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   isOpen,
   onClose,
   availableTags,
-  postMessage
+  postMessage,
 }) => {
   const [format, setFormat] = useState<'json' | 'csv'>('json');
   const [includeMetadata, setIncludeMetadata] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportResult, setExportResult] = useState<any>(null);
-  
+
   // CSV specific options
   const [selectedFields, setSelectedFields] = useState<string[]>([
-    'id', 'title', 'timestamp', 'filepath', 'description', 'createdAt', 'tags'
+    'id',
+    'title',
+    'timestamp',
+    'filepath',
+    'description',
+    'createdAt',
+    'tags',
   ]);
   const [delimiter, setDelimiter] = useState<',' | ';' | '\t'>(',');
   const [includeHeaders, setIncludeHeaders] = useState(true);
-  
+
   // Filtering options
   const [useFilters, setUseFilters] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -50,7 +56,13 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   const [mediaType, setMediaType] = useState('');
 
   const availableFields = [
-    'id', 'title', 'timestamp', 'filepath', 'description', 'createdAt', 'tags'
+    'id',
+    'title',
+    'timestamp',
+    'filepath',
+    'description',
+    'createdAt',
+    'tags',
   ];
 
   const mediaTypes = ['Video', 'Audio', 'Movie', 'TV Show', 'Documentary'];
@@ -61,7 +73,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
       if (event.data.type === 'EXPORT_RESULT') {
         setIsExporting(false);
         setExportResult(event.data.data);
-        
+
         // If successful and data is included, trigger download
         if (event.data.data.success && event.data.data.data) {
           downloadFile(event.data.data.data, event.data.data.filePath || 'export.txt');
@@ -74,8 +86,8 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   }, []);
 
   const downloadFile = (content: string, filename: string) => {
-    const blob = new Blob([content], { 
-      type: format === 'json' ? 'application/json' : 'text/csv' 
+    const blob = new Blob([content], {
+      type: format === 'json' ? 'application/json' : 'text/csv',
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -88,24 +100,20 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   };
 
   const handleFieldToggle = (field: string) => {
-    setSelectedFields(prev => 
-      prev.includes(field) 
-        ? prev.filter(f => f !== field)
-        : [...prev, field]
+    setSelectedFields((prev) =>
+      prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field],
     );
   };
 
   const handleTagToggle = (tag: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tag) 
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
     );
   };
 
   const handleExport = () => {
     if (isExporting) return;
-    
+
     setIsExporting(true);
     setExportResult(null);
 
@@ -115,15 +123,15 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
       ...(format === 'csv' && {
         selectedFields,
         delimiter,
-        includeHeaders
+        includeHeaders,
       }),
       ...(useFilters && {
         filter: {
           ...(selectedTags.length > 0 && { tags: selectedTags }),
           ...(dateRange.start && dateRange.end && { dateRange }),
-          ...(mediaType && { mediaType })
-        }
-      })
+          ...(mediaType && { mediaType }),
+        },
+      }),
     };
 
     postMessage?.('EXPORT_BOOKMARKS', exportOptions);
@@ -138,7 +146,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="dialog-overlay"
       role="dialog"
       aria-modal="true"
@@ -151,9 +159,9 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
           <p id="export-dialog-description" className="dialog-subtitle">
             Choose format and options for exporting your bookmarks
           </p>
-          <button 
-            onClick={handleClose} 
-            className="close-btn" 
+          <button
+            onClick={handleClose}
+            className="close-btn"
             disabled={isExporting}
             aria-label="Close export dialog"
             title="Close export dialog"
@@ -187,11 +195,20 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
               )}
             </div>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); handleExport(); }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleExport();
+              }}
+            >
               {/* Format Selection */}
               <div className="form-section">
                 <h4 id="format-section-heading">Export Format</h4>
-                <div className="format-options" role="radiogroup" aria-labelledby="format-section-heading">
+                <div
+                  className="format-options"
+                  role="radiogroup"
+                  aria-labelledby="format-section-heading"
+                >
                   <label className="format-option">
                     <input
                       type="radio"
@@ -204,7 +221,9 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                     />
                     <div className="format-info">
                       <strong>JSON</strong>
-                      <span id="json-format-description">Complete data with metadata, ideal for backup/restore</span>
+                      <span id="json-format-description">
+                        Complete data with metadata, ideal for backup/restore
+                      </span>
                     </div>
                   </label>
                   <label className="format-option">
@@ -228,11 +247,11 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
               {format === 'csv' && (
                 <div className="form-section">
                   <h4>CSV Options</h4>
-                  
+
                   <div className="form-field">
                     <label>Delimiter</label>
-                    <select 
-                      value={delimiter} 
+                    <select
+                      value={delimiter}
                       onChange={(e) => setDelimiter(e.target.value as ',' | ';' | '\t')}
                       disabled={isExporting}
                     >
@@ -257,7 +276,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                   <div className="form-field">
                     <label>Fields to Export</label>
                     <div className="field-checkboxes">
-                      {availableFields.map(field => (
+                      {availableFields.map((field) => (
                         <label key={field} className="field-checkbox">
                           <input
                             type="checkbox"
@@ -311,7 +330,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                       <div className="form-field">
                         <label>Filter by Tags</label>
                         <div className="tag-checkboxes">
-                          {availableTags.map(tag => (
+                          {availableTags.map((tag) => (
                             <label key={tag} className="tag-checkbox">
                               <input
                                 type="checkbox"
@@ -333,7 +352,9 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                         <input
                           type="date"
                           value={dateRange.start}
-                          onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                          onChange={(e) =>
+                            setDateRange((prev) => ({ ...prev, start: e.target.value }))
+                          }
                           disabled={isExporting}
                           placeholder="Start date"
                         />
@@ -341,7 +362,9 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                         <input
                           type="date"
                           value={dateRange.end}
-                          onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                          onChange={(e) =>
+                            setDateRange((prev) => ({ ...prev, end: e.target.value }))
+                          }
                           disabled={isExporting}
                           placeholder="End date"
                         />
@@ -351,14 +374,16 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                     {/* Media Type Filter */}
                     <div className="form-field">
                       <label>Media Type</label>
-                      <select 
-                        value={mediaType} 
+                      <select
+                        value={mediaType}
                         onChange={(e) => setMediaType(e.target.value)}
                         disabled={isExporting}
                       >
                         <option value="">All types</option>
-                        {mediaTypes.map(type => (
-                          <option key={type} value={type}>{type}</option>
+                        {mediaTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -367,16 +392,16 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
               </div>
 
               <div className="dialog-actions">
-                <button 
-                  type="button" 
-                  onClick={handleClose} 
+                <button
+                  type="button"
+                  onClick={handleClose}
                   className="btn-secondary"
                   disabled={isExporting}
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="btn-primary"
                   disabled={isExporting || (format === 'csv' && selectedFields.length === 0)}
                 >
@@ -391,4 +416,4 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   );
 };
 
-export default ExportDialog; 
+export default ExportDialog;
