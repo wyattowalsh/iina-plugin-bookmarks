@@ -1,0 +1,7 @@
+dist/
+node_modules/
+pnpm-lock.yaml
+packaging/
+.parcel-cache/
+coverage/
+docs/.next/

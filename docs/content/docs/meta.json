@@ -2,50 +2,11 @@
   "title": "Documentation",
   "pages": [
     "index",
-    {
-      "title": "Core Features",
-      "pages": [
-        "features/media-detection",
-        "features/bookmark-management",
-        "features/filtering",
-        "features/sorting",
-        "features/data-management"
-      ]
-    },
-    {
-      "title": "User Interface",
-      "pages": [
-        "ui/sidebar",
-        "ui/window",
-        "ui/overlay",
-        "ui/preferences"
-      ]
-    },
-    {
-      "title": "API Reference",
-      "pages": [
-        "api/bookmark-manager",
-        "api/interfaces",
-        "api/performance",
-        "api/architecture"
-      ]
-    },
-    {
-      "title": "Advanced Topics",
-      "pages": [
-        "advanced/shortcuts",
-        "advanced/automation",
-        "advanced/troubleshooting"
-      ]
-    },
-    {
-      "title": "Development",
-      "pages": [
-        "development/architecture",
-        "development/contributing",
-        "development/implementation-notes",
-        "development/testing"
-      ]
-    }
+    "---Core Features---",
+    "features",
+    "---API Reference---",
+    "api",
+    "---Development---",
+    "development"
   ]
-} 
+}

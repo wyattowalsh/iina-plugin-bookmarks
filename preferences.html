@@ -137,7 +137,7 @@
   
   <div class="pref-group">
     <div class="pref-group-title">Display Options</div>
-    
+
     <div class="pref-section">
       <label class="pref-label" for="defaultSort">
         Default sort by:
@@ -149,7 +149,7 @@
       </label>
       <div class="pref-description">How bookmarks should be sorted by default</div>
     </div>
-    
+
     <div class="pref-section">
       <label class="pref-label" for="maxBookmarks">
         Maximum bookmarks:
@@ -159,9 +159,44 @@
     </div>
   </div>
 
+  <div class="pref-group">
+    <div class="pref-group-title">Cloud Backup</div>
+
+    <div class="pref-section">
+      <label class="pref-label">
+        <input type="checkbox" id="cloudBackupEnabled">
+        Enable cloud backup
+      </label>
+      <div class="pref-description">Back up bookmarks to a cloud storage provider</div>
+    </div>
+
+    <div class="pref-section">
+      <label class="pref-label" for="cloudProvider">
+        Cloud provider:
+        <select id="cloudProvider">
+          <option value="gdrive">Google Drive</option>
+          <option value="dropbox">Dropbox</option>
+        </select>
+      </label>
+      <div class="pref-description">Which cloud service to use for backup</div>
+    </div>
+  </div>
+
+  <div class="pref-group">
+    <div class="pref-group-title">File Management</div>
+
+    <div class="pref-section">
+      <label class="pref-label">
+        <input type="checkbox" id="autoReconcileFiles" checked>
+        Auto-reconcile moved files
+      </label>
+      <div class="pref-description">Automatically detect and prompt to fix bookmarks pointing to moved files</div>
+    </div>
+  </div>
+
   <script>
     console.log("Bookmarks preferences page loaded");
-    
+
     // Load current preference values if available
     if (window.iina && window.iina.preferences) {
       try {
@@ -169,11 +204,14 @@
         document.getElementById('showTimestamps').checked = window.iina.preferences.get('showTimestamps') !== false;
         document.getElementById('defaultSort').value = window.iina.preferences.get('defaultSortBy') || 'timestamp';
         document.getElementById('maxBookmarks').value = window.iina.preferences.get('maxBookmarks') || 1000;
+        document.getElementById('cloudBackupEnabled').checked = window.iina.preferences.get('cloudBackupEnabled') === true;
+        document.getElementById('cloudProvider').value = window.iina.preferences.get('cloudProvider') || 'gdrive';
+        document.getElementById('autoReconcileFiles').checked = window.iina.preferences.get('autoReconcileFiles') !== false;
       } catch (e) {
         console.log("Could not load preferences:", e);
       }
     }
-    
+
     // Save preferences when changed
     function savePreferences() {
       if (window.iina && window.iina.preferences) {
@@ -182,17 +220,23 @@
           window.iina.preferences.set('showTimestamps', document.getElementById('showTimestamps').checked);
           window.iina.preferences.set('defaultSortBy', document.getElementById('defaultSort').value);
           window.iina.preferences.set('maxBookmarks', parseInt(document.getElementById('maxBookmarks').value));
+          window.iina.preferences.set('cloudBackupEnabled', document.getElementById('cloudBackupEnabled').checked);
+          window.iina.preferences.set('cloudProvider', document.getElementById('cloudProvider').value);
+          window.iina.preferences.set('autoReconcileFiles', document.getElementById('autoReconcileFiles').checked);
         } catch (e) {
           console.log("Could not save preferences:", e);
         }
       }
     }
-    
+
     // Add event listeners
     document.getElementById('autoSave').addEventListener('change', savePreferences);
     document.getElementById('showTimestamps').addEventListener('change', savePreferences);
     document.getElementById('defaultSort').addEventListener('change', savePreferences);
     document.getElementById('maxBookmarks').addEventListener('change', savePreferences);
+    document.getElementById('cloudBackupEnabled').addEventListener('change', savePreferences);
+    document.getElementById('cloudProvider').addEventListener('change', savePreferences);
+    document.getElementById('autoReconcileFiles').addEventListener('change', savePreferences);
   </script>
 </body>
 </html>

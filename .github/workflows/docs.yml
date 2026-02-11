@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: 'docs/package-lock.json'
 
@@ -38,4 +38,4 @@ jobs:
           cd docs
           npm run start &
           sleep 5
-          curl -f http://localhost:3000/docs || exit 1 
+          curl -f http://localhost:3000/docs || exit 1

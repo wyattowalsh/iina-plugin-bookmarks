@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "IINA plugin for user-friendly media bookmark management",
   "main": "src/index-modern.ts",
+  "packageManager": "pnpm@10.11.1",
   "scripts": {
     "serve-window": "parcel serve ui/window/index.html --dist-dir dist/ui/window",
     "serve-sidebar": "parcel serve ui/sidebar/index.html --dist-dir dist/ui/sidebar",
@@ -13,32 +14,55 @@
     "build:modern:dev": "rm -rf dist && parcel build --target modern-entry --target window --target overlay --target sidebar --no-optimize",
     "test": "vitest",
     "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit",
-    "package": "make package"
+    "lint": "eslint 'src/**/*.{ts,tsx}' 'ui/**/*.{ts,tsx}'",
+    "lint:fix": "eslint --fix 'src/**/*.{ts,tsx}' 'ui/**/*.{ts,tsx}'",
+    "format": "prettier --write '**/*.{ts,tsx,scss,json,md}'",
+    "format:check": "prettier --check '**/*.{ts,tsx,scss,json,md}'",
+    "package": "make package",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.scss": [
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@parcel/config-default": "^2.16.0",
-    "@parcel/core": "^2.16.0",
-    "@parcel/transformer-js": "^2.16.0",
-    "@parcel/transformer-sass": "^2.16.0",
-    "@parcel/transformer-typescript-types": "^2.16.0",
+    "@eslint/js": "^9.39.0",
+    "@parcel/config-default": "~2.16.0",
+    "@parcel/core": "~2.16.0",
+    "@parcel/transformer-js": "~2.16.0",
+    "@parcel/transformer-sass": "~2.16.0",
+    "@parcel/transformer-typescript-types": "~2.16.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "@vitest/ui": "^1.6.0",
-    "iina-plugin-definition": "^0.0.7",
+    "@vitest/coverage-v8": "^4.0.0",
+    "@vitest/ui": "^4.0.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "husky": "^9.1.0",
+    "iina-plugin-definition": "^0.99.3",
     "jsdom": "^24.1.0",
-    "prettier": "^2.8.8",
+    "lint-staged": "^16.0.0",
+    "prettier": "^3.5.0",
     "process": "^0.11.10",
-    "ts-loader": "^9.5.4",
-    "typescript": "^5.0.0",
-    "vitest": "^1.6.0",
-    "webpack": "^5.101.3",
-    "webpack-cli": "^6.0.1"
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.24.0",
+    "vitest": "^4.0.0"
   },
   "dependencies": {
-    "parcel": "^2.12.0",
+    "parcel": "~2.16.0",
     "parcel-optimizer-webview": "git+https://github.com/iina/parcel-optimizer-webview.git",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

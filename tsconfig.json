@@ -13,18 +13,8 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules/iina-plugin-definition"
-    ],
     "types": ["iina-plugin-definition"]
   },
-  "include": [
-    "src/**/*",
-    "ui/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
-} 
+  "include": ["src/**/*", "ui/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,155 +1,92 @@
-# IINA Bookmarks Plugin
+# IINA Plugin Bookmarks
 
-A comprehensive bookmark management plugin for IINA video player with cloud backup, file reconciliation, and advanced UI features.
+![CI](https://github.com/wyattowalsh/iina-plugin-bookmarks/actions/workflows/ci.yml/badge.svg)
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 
-## ✨ Features
+A bookmark management plugin for [IINA](https://iina.io) that lets you save, organize, and navigate to specific moments in your media files.
 
-### 🎯 Core Bookmark Management
+## Features
 
-- **Add Bookmarks**: Create bookmarks at any point in your media
-- **Smart Organization**: Tag-based organization with advanced filtering
-- **Quick Navigation**: Jump to any bookmark with a single click
-- **Bulk Operations**: Import/export bookmarks in JSON format
+- **Bookmark Management** -- Create, edit, delete, and jump to bookmarks at any playback position
+- **Tag System** -- Organize bookmarks with tags, auto-tagging, and multi-criteria filtering
+- **Search and Sort** -- Advanced search across titles, descriptions, and tags with multi-criteria sorting
+- **Import / Export** -- JSON and CSV support with duplicate handling and validation
+- **Cloud Backup** -- Optional Google Drive and Dropbox integration for backup and sync
+- **File Reconciliation** -- Detect and resolve bookmarks pointing to moved or renamed files
+- **Multiple Interfaces** -- IINA sidebar tab, standalone management window, and video overlay
+- **Smart Metadata** -- Automatic title detection from media metadata with intelligent fallbacks
 
-### ☁️ Cloud Backup & Sync
+## Prerequisites
 
-- **Google Drive Integration**: Secure backup to your Google Drive
-- **Dropbox Support**: Alternative cloud storage option
-- **Three Sync Modes**:
-  - Upload: Push local bookmarks to cloud
-  - Download: Fetch bookmarks from cloud
-  - Sync: Two-way merge with conflict resolution
-- **Automatic Metadata**: Device info and timestamps for all backups
+- [Node.js](https://nodejs.org) 22+
+- [pnpm](https://pnpm.io)
+- [IINA](https://iina.io) 1.3+ (for running the plugin)
 
-### 📁 File Reconciliation
+## Installation
 
-- **Moved File Detection**: Automatically detect when media files have been moved
-- **Smart Search**: Find similar files based on name patterns
-- **Three Resolution Options**:
-  - Update bookmark path to new location
-  - Remove bookmarks for missing files  
-  - Manual path correction
-- **Bulk Reconciliation**: Handle multiple moved files at once
+1. Download the latest `.iinaplgz` file from [Releases](https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest).
+2. Double-click the file to install it in IINA, or extract it manually:
+   ```bash
+   mkdir -p ~/Library/Application\ Support/com.colliderli.iina/plugins/
+   unzip iina-plugin-bookmarks.iinaplgz -d ~/Library/Application\ Support/com.colliderli.iina/plugins/iina-plugin-bookmarks.iinaplugin
+   ```
+3. Restart IINA.
+4. The **Bookmarks** tab appears in the sidebar. Plugin menu items are available under the Plugin menu.
 
-### 🎨 Advanced UI
+### Development Symlink
 
-- **Sidebar Integration**: Dedicated IINA sidebar tab
-- **Overlay Support**: Quick bookmark access during playback
-- **Standalone Window**: Full-featured bookmark manager
-- **Plugin Menu**: All actions accessible from IINA's plugin menu
-- **Dark Mode**: Seamless integration with IINA's appearance
-
-## 🚀 Installation
-
-1. Download the latest `.iinaplgz` file from releases
-2. Double-click to install in IINA, or manually place in:
-   - `~/Library/Application Support/IINA/plugins/`
-3. Restart IINA
-4. Access bookmarks via the sidebar tab or Plugin menu
-
-## 📖 Usage
-
-### Adding Bookmarks
-
-- **Menu**: Plugin → Add Bookmark
-- **Sidebar**: Click "Add Bookmark" button
-- **Keyboard**: Set custom shortcut in IINA preferences
-
-### Managing Bookmarks
-
-- **Sidebar**: Browse and filter all bookmarks
-- **Search**: Use advanced search with tags and metadata
-- **Edit**: Click any bookmark to modify title, description, or tags
-
-### Cloud Backup
-
-1. Open Plugin → Sync with Cloud
-2. Choose provider (Google Drive or Dropbox)  
-3. Enter API credentials
-4. Select sync mode and click "Sync"
-
-> **Note**: Cloud features require API credentials. See [Cloud Setup Guide](docs/cloud-setup.md) for details.
-
-### File Reconciliation
-
-1. Click "Check Files" in sidebar
-2. Review bookmarks with missing files
-3. Choose resolution:
-   - Search for similar files automatically
-   - Update path manually
-   - Remove bookmark
-
-## 🛠️ Development
-
-### Prerequisites
-
-- Node.js 18+
-- pnpm
-- IINA (for testing)
-
-### Setup
+For development, create a symlink so IINA loads the plugin directly from your working copy:
 
 ```bash
-git clone https://github.com/wyattowalsh/iina-plugin-bookmarks.git
-cd iina-plugin-bookmarks
-pnpm install
+ln -s /path/to/iina-plugin-bookmarks ~/Library/Application\ Support/com.colliderli.iina/plugins/iina-plugin-bookmarks.iinaplugin-dev
 ```
 
-### Build Commands
+## Development
 
 ```bash
-# Development
-make dev          # Start development servers
-make build        # Build TypeScript and UI
-make package      # Create .iinaplgz package
-
-# Testing  
-make test         # Run test suite
-make test-watch   # Run tests in watch mode
-
-# Release
-make release      # Clean, build, test, and package
+pnpm install          # Install dependencies
+make dev              # Start dev servers (sidebar, overlay, window)
+make build            # Build plugin (TypeScript + UI)
+make test             # Run tests
+pnpm test             # Run tests (alternative)
+pnpm run lint         # Run linter
+pnpm run format       # Format code
+pnpm run type-check   # TypeScript type checking
+make package          # Build and package as .iinaplgz
+make release          # Full release pipeline: clean, install, type-check, test, build, package, validate
 ```
 
-### Project Structure
+## Project Structure
 
 ```text
 src/
-├── index.ts                 # Main plugin entry
-├── bookmark-manager.ts      # Core bookmark logic
-├── cloud-storage.ts         # Cloud backup service
-└── types.ts                 # TypeScript definitions
+  index.ts                  Main plugin entry point
+  bookmark-manager.ts       Core bookmark logic
+  cloud-storage.ts          Cloud backup service
+  metadata-detector.ts      Media metadata detection
+  types.ts                  TypeScript type definitions
 
 ui/
-├── sidebar/                 # Sidebar interface
-├── window/                  # Standalone window
-├── overlay/                 # Video overlay
-└── components/              # Shared UI components
+  sidebar/                  IINA sidebar interface
+  window/                   Standalone management window
+  overlay/                  Video overlay
+  components/               Shared React components
 
-tests/                       # Test suite
-packaging/                   # Built plugin packages
+tests/                      Test suite (Vitest)
+docs/                       Documentation site (Fumadocs)
+dist/                       Build output
+packaging/                  Plugin package output
 ```
 
-## 🤝 Contributing
+## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with tests
-4. Submit a pull request
+- Pre-commit hooks (ESLint, Prettier) run automatically on commit via Husky.
+- Branch naming: `feat/description`, `fix/description`, `chore/description`.
+- All PRs should pass CI checks: lint, type-check, test, build.
+- See [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) for the PR checklist.
 
-## 📄 License
+For detailed contributing guidelines, see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
-MIT License - see [LICENSE](LICENSE) for details
+## License
 
-## 🙏 Acknowledgements
-
-- IINA team for the excellent media player and plugin architecture
-- Contributors and beta testers
-- Open source libraries used in this project
-
-## 📚 Documentation
-
-- [API Reference](docs/api.md)  
-- [Cloud Setup Guide](docs/cloud-setup.md)
-- [Development Guide](docs/development.md)
-- [Changelog](CHANGELOG.md)
+[ISC](LICENSE)

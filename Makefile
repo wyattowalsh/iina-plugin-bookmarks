@@ -123,7 +123,7 @@ dev:
 .PHONY: test
 test:
 	@echo "$(BLUE)Running tests...$(RESET)"
-	$(NPM) run test --run
+	$(NPM) run test -- --run
 
 # Run tests in watch mode
 .PHONY: test-watch
@@ -157,8 +157,7 @@ validate:
 		console.log('Info.json valid');"
 	
 	@echo "$(CYAN)  → Checking build artifacts...$(RESET)"
-	@test -f $(BUILD_DIR)/index.js || (echo "$(RED)✗ Main entry file missing$(RESET)" && exit 1)
-	@test -f $(BUILD_DIR)/global.js || (echo "$(RED)✗ Global entry file missing$(RESET)" && exit 1)
+	@test -f $(BUILD_DIR)/index-modern.js || test -f $(BUILD_DIR)/index.js || (echo "$(RED)✗ Main entry file missing (expected index-modern.js or index.js)$(RESET)" && exit 1)
 	@test -d $(BUILD_DIR)/ui || (echo "$(RED)✗ UI build directory missing$(RESET)" && exit 1)
 	
 	@echo "$(GREEN)✓ Plugin structure validation passed$(RESET)"

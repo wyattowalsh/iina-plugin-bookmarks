@@ -6,6 +6,7 @@
   "optimizers": {
     "dist/ui/**/*.{html,css,js}": ["parcel-optimizer-webview", "..."],
     "dist/index.js": [],
+    "dist/index-modern.js": [],
     "dist/global.js": []
   }
 }
