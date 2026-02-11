@@ -8,16 +8,14 @@
     "serve-window": "parcel serve ui/window/index.html --dist-dir dist/ui/window",
     "serve-sidebar": "parcel serve ui/sidebar/index.html --dist-dir dist/ui/sidebar",
     "serve-overlay": "parcel serve ui/overlay/index.html --dist-dir dist/ui/overlay",
-    "build": "rm -rf dist && parcel build --target entry --target window --target overlay --target sidebar",
-    "build:dev": "rm -rf dist && parcel build --target entry --target window --target overlay --target sidebar --no-optimize",
-    "build:modern": "rm -rf dist && parcel build --target modern-entry --target window --target overlay --target sidebar",
-    "build:modern:dev": "rm -rf dist && parcel build --target modern-entry --target window --target overlay --target sidebar --no-optimize",
+    "build": "rm -rf dist && tsc --project tsconfig.build.json && parcel build --target window --target overlay --target sidebar",
+    "build:dev": "rm -rf dist && tsc --project tsconfig.build.json && parcel build --target window --target overlay --target sidebar --no-optimize",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit",
-    "lint": "eslint 'src/**/*.{ts,tsx}' 'ui/**/*.{ts,tsx}'",
-    "lint:fix": "eslint --fix 'src/**/*.{ts,tsx}' 'ui/**/*.{ts,tsx}'",
+    "lint": "eslint 'src/**/*.{ts,tsx}' 'ui/**/*.{ts,tsx}' 'tests/**/*.{ts,tsx}'",
+    "lint:fix": "eslint --fix 'src/**/*.{ts,tsx}' 'ui/**/*.{ts,tsx}' 'tests/**/*.{ts,tsx}'",
     "format": "prettier --write '**/*.{ts,tsx,scss,json,md}'",
     "format:check": "prettier --check '**/*.{ts,tsx,scss,json,md}'",
     "package": "make package",
@@ -34,6 +32,9 @@
     "*.{json,md}": [
       "prettier --write"
     ]
+  },
+  "engines": {
+    "node": ">=22"
   },
   "author": "",
   "license": "ISC",
@@ -59,32 +60,17 @@
     "process": "^0.11.10",
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.24.0",
+    "parcel": "~2.16.0",
+    "parcel-optimizer-webview": "git+https://github.com/iina/parcel-optimizer-webview.git",
     "vitest": "^4.0.0"
   },
   "dependencies": {
-    "parcel": "~2.16.0",
-    "parcel-optimizer-webview": "git+https://github.com/iina/parcel-optimizer-webview.git",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "browserslist": "safari >= 14",
   "targets": {
     "main": false,
-    "entry": {
-      "distDir": "./dist/",
-      "source": "src/index.ts",
-      "isLibrary": false
-    },
-    "modern-entry": {
-      "distDir": "./dist/",
-      "source": "src/index-modern.ts",
-      "isLibrary": false
-    },
-    "global": {
-      "distDir": "./dist/",
-      "source": "src/global.ts",
-      "isLibrary": false
-    },
     "window": {
       "distDir": "./dist/ui/window",
       "source": "ui/window/index.html",

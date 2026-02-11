@@ -4,9 +4,6 @@
     "*.{ts,tsx}": ["@parcel/transformer-typescript-types", "@parcel/transformer-js"]
   },
   "optimizers": {
-    "dist/ui/**/*.{html,css,js}": ["parcel-optimizer-webview", "..."],
-    "dist/index.js": [],
-    "dist/index-modern.js": [],
-    "dist/global.js": []
+    "dist/ui/**/*.{html,css,js}": ["parcel-optimizer-webview", "..."]
   }
 }

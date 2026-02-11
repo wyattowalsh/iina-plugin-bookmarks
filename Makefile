@@ -96,9 +96,6 @@ package: build
 	@echo "$(CYAN)  → Copying preferences page...$(RESET)"
 	cp preferences.html $(PLUGIN_DIR)/ 2>/dev/null || true
 	
-	@echo "$(CYAN)  → Using simple sidebar fallback...$(RESET)"
-	cp ui/sidebar/simple-index.html $(PLUGIN_DIR)/ui/sidebar/index.html 2>/dev/null || true
-	
 	@echo "$(CYAN)  → Creating archive...$(RESET)"
 	cd $(PLUGIN_DIR) && zip -r ../$(PLUGIN_NAME).iinaplgz . -x ".*"
 	
@@ -157,7 +154,7 @@ validate:
 		console.log('Info.json valid');"
 	
 	@echo "$(CYAN)  → Checking build artifacts...$(RESET)"
-	@test -f $(BUILD_DIR)/index-modern.js || test -f $(BUILD_DIR)/index.js || (echo "$(RED)✗ Main entry file missing (expected index-modern.js or index.js)$(RESET)" && exit 1)
+	@test -f $(BUILD_DIR)/index-modern.js || (echo "$(RED)✗ Main entry file missing (expected index-modern.js)$(RESET)" && exit 1)
 	@test -d $(BUILD_DIR)/ui || (echo "$(RED)✗ UI build directory missing$(RESET)" && exit 1)
 	
 	@echo "$(GREEN)✓ Plugin structure validation passed$(RESET)"
