@@ -1,0 +1,5 @@
+{
+  "title": "API Reference",
+  "icon": "Code",
+  "pages": ["bookmark-manager", "interfaces", "metadata-detector", "performance-utilities"]
+}
