@@ -9,19 +9,15 @@
     "url": "https://w4w.dev"
   },
   "entry": "index.js",
-  "permissions": [
-    "show-osd",
-    "video-overlay",
-    "file-system",
-    "internet-access"
-  ],
+  "ghRepo": "wyattowalsh/iina-plugin-bookmarks",
+  "ghVersion": 1,
+  "permissions": ["show-osd", "video-overlay", "file-system", "network-request"],
   "sidebarTab": {
     "name": "Bookmarks",
     "file": "ui/sidebar/index.html"
   },
-
   "preferencesPage": "preferences.html",
-  "allowedDomains": ["*"],
+  "allowedDomains": ["googleapis.com", "api.dropboxapi.com", "content.dropboxapi.com"],
   "preferenceDefaults": {
     "autoSave": true,
     "showTimestamps": true,

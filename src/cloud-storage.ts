@@ -44,23 +44,22 @@ class GoogleDriveProvider implements CloudStorageProvider {
     try {
       if (credentials.accessToken) {
         this.accessToken = credentials.accessToken;
-        
+
         // Verify token by making a simple API call
         const response = await fetch(`${this.API_BASE}/about?fields=user`, {
           headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
         });
-        
+
         return response.ok;
       }
-      
+
       // If no access token, we need to implement OAuth flow
       // For now, return false to indicate authentication is needed
       console.warn('Google Drive authentication requires proper OAuth setup');
       return false;
-      
     } catch (error) {
       console.error('Google Drive authentication failed:', error);
       return false;
@@ -76,17 +75,17 @@ class GoogleDriveProvider implements CloudStorageProvider {
       // First, create the file metadata
       const metadata = {
         name: filename,
-        parents: await this.getOrCreateAppFolder()
+        parents: await this.getOrCreateAppFolder(),
       };
 
       // Create the file
       const createResponse = await fetch(`${this.API_BASE}/files`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(metadata)
+        body: JSON.stringify(metadata),
       });
 
       if (!createResponse.ok) {
@@ -96,21 +95,23 @@ class GoogleDriveProvider implements CloudStorageProvider {
       const fileInfo = await createResponse.json();
 
       // Upload the content
-      const uploadResponse = await fetch(`${this.UPLOAD_BASE}/files/${fileInfo.id}?uploadType=media`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
+      const uploadResponse = await fetch(
+        `${this.UPLOAD_BASE}/files/${fileInfo.id}?uploadType=media`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
         },
-        body: JSON.stringify(data)
-      });
+      );
 
       if (!uploadResponse.ok) {
         throw new Error(`Failed to upload content: ${uploadResponse.statusText}`);
       }
 
       return fileInfo.id;
-      
     } catch (error) {
       console.error('Google Drive upload failed:', error);
       throw error;
@@ -123,20 +124,24 @@ class GoogleDriveProvider implements CloudStorageProvider {
     }
 
     try {
-      // Find the file
-      const searchResponse = await fetch(`${this.API_BASE}/files?q=name='${filename}' and trashed=false`, {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Find the file (sanitize filename to prevent query injection)
+      const safeName = filename.replace(/'/g, "\\'");
+      const searchResponse = await fetch(
+        `${this.API_BASE}/files?q=name='${safeName}' and trashed=false`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
       if (!searchResponse.ok) {
         throw new Error(`Failed to search for file: ${searchResponse.statusText}`);
       }
 
       const searchResult = await searchResponse.json();
-      
+
       if (!searchResult.files || searchResult.files.length === 0) {
         throw new Error(`File not found: ${filename}`);
       }
@@ -146,8 +151,8 @@ class GoogleDriveProvider implements CloudStorageProvider {
       // Download the file content
       const downloadResponse = await fetch(`${this.API_BASE}/files/${fileId}?alt=media`, {
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`
-        }
+          Authorization: `Bearer ${this.accessToken}`,
+        },
       });
 
       if (!downloadResponse.ok) {
@@ -155,7 +160,6 @@ class GoogleDriveProvider implements CloudStorageProvider {
       }
 
       return await downloadResponse.json();
-      
     } catch (error) {
       console.error('Google Drive download failed:', error);
       throw error;
@@ -169,12 +173,15 @@ class GoogleDriveProvider implements CloudStorageProvider {
 
     try {
       const appFolder = await this.getOrCreateAppFolder();
-      const response = await fetch(`${this.API_BASE}/files?q='${appFolder[0]}' in parents and trashed=false`, {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await fetch(
+        `${this.API_BASE}/files?q='${appFolder[0]}' in parents and trashed=false`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to list files: ${response.statusText}`);
@@ -182,7 +189,6 @@ class GoogleDriveProvider implements CloudStorageProvider {
 
       const result = await response.json();
       return result.files?.map((file: any) => file.name) || [];
-      
     } catch (error) {
       console.error('Google Drive list failed:', error);
       throw error;
@@ -195,20 +201,24 @@ class GoogleDriveProvider implements CloudStorageProvider {
     }
 
     try {
-      // Find the file first
-      const searchResponse = await fetch(`${this.API_BASE}/files?q=name='${filename}' and trashed=false`, {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Find the file first (sanitize filename to prevent query injection)
+      const safeName = filename.replace(/'/g, "\\'");
+      const searchResponse = await fetch(
+        `${this.API_BASE}/files?q=name='${safeName}' and trashed=false`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
       if (!searchResponse.ok) {
         return false;
       }
 
       const searchResult = await searchResponse.json();
-      
+
       if (!searchResult.files || searchResult.files.length === 0) {
         return false;
       }
@@ -219,12 +229,11 @@ class GoogleDriveProvider implements CloudStorageProvider {
       const deleteResponse = await fetch(`${this.API_BASE}/files/${fileId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`
-        }
+          Authorization: `Bearer ${this.accessToken}`,
+        },
       });
 
       return deleteResponse.ok;
-      
     } catch (error) {
       console.error('Google Drive delete failed:', error);
       return false;
@@ -233,13 +242,16 @@ class GoogleDriveProvider implements CloudStorageProvider {
 
   private async getOrCreateAppFolder(): Promise<string[]> {
     try {
-      // Look for existing app folder
-      const searchResponse = await fetch(`${this.API_BASE}/files?q=name='IINA Bookmarks' and mimeType='application/vnd.google-apps.folder' and trashed=false`, {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Look for existing app folder (folder name is a constant, no injection risk)
+      const searchResponse = await fetch(
+        `${this.API_BASE}/files?q=name='IINA Bookmarks' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
       if (searchResponse.ok) {
         const result = await searchResponse.json();
@@ -252,13 +264,13 @@ class GoogleDriveProvider implements CloudStorageProvider {
       const createResponse = await fetch(`${this.API_BASE}/files`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           name: 'IINA Bookmarks',
-          mimeType: 'application/vnd.google-apps.folder'
-        })
+          mimeType: 'application/vnd.google-apps.folder',
+        }),
       });
 
       if (createResponse.ok) {
@@ -286,21 +298,20 @@ class DropboxProvider implements CloudStorageProvider {
     try {
       if (credentials.accessToken) {
         this.accessToken = credentials.accessToken;
-        
+
         // Verify token
         const response = await fetch(`${this.API_BASE}/users/get_current_account`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
         });
-        
+
         return response.ok;
       }
-      
+
       return false;
-      
     } catch (error) {
       console.error('Dropbox authentication failed:', error);
       return false;
@@ -314,19 +325,19 @@ class DropboxProvider implements CloudStorageProvider {
 
     try {
       const path = `/IINA Bookmarks/${filename}`;
-      
+
       const response = await fetch(`${this.CONTENT_BASE}/files/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
+          Authorization: `Bearer ${this.accessToken}`,
           'Dropbox-API-Arg': JSON.stringify({
             path: path,
             mode: 'overwrite',
-            autorename: false
+            autorename: false,
           }),
-          'Content-Type': 'application/octet-stream'
+          'Content-Type': 'application/octet-stream',
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       });
 
       if (!response.ok) {
@@ -335,7 +346,6 @@ class DropboxProvider implements CloudStorageProvider {
 
       const result = await response.json();
       return result.id;
-      
     } catch (error) {
       console.error('Dropbox upload failed:', error);
       throw error;
@@ -349,13 +359,13 @@ class DropboxProvider implements CloudStorageProvider {
 
     try {
       const path = `/IINA Bookmarks/${filename}`;
-      
+
       const response = await fetch(`${this.CONTENT_BASE}/files/download`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Dropbox-API-Arg': JSON.stringify({ path: path })
-        }
+          Authorization: `Bearer ${this.accessToken}`,
+          'Dropbox-API-Arg': JSON.stringify({ path: path }),
+        },
       });
 
       if (!response.ok) {
@@ -364,7 +374,6 @@ class DropboxProvider implements CloudStorageProvider {
 
       const text = await response.text();
       return JSON.parse(text);
-      
     } catch (error) {
       console.error('Dropbox download failed:', error);
       throw error;
@@ -380,13 +389,13 @@ class DropboxProvider implements CloudStorageProvider {
       const response = await fetch(`${this.API_BASE}/files/list_folder`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           path: '/IINA Bookmarks',
-          recursive: false
-        })
+          recursive: false,
+        }),
       });
 
       if (!response.ok) {
@@ -395,10 +404,11 @@ class DropboxProvider implements CloudStorageProvider {
       }
 
       const result = await response.json();
-      return result.entries
-        ?.filter((entry: any) => entry['.tag'] === 'file')
-        ?.map((entry: any) => entry.name) || [];
-      
+      return (
+        result.entries
+          ?.filter((entry: any) => entry['.tag'] === 'file')
+          ?.map((entry: any) => entry.name) || []
+      );
     } catch (error) {
       console.error('Dropbox list failed:', error);
       return [];
@@ -412,18 +422,17 @@ class DropboxProvider implements CloudStorageProvider {
 
     try {
       const path = `/IINA Bookmarks/${filename}`;
-      
+
       const response = await fetch(`${this.API_BASE}/files/delete_v2`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: path })
+        body: JSON.stringify({ path: path }),
       });
 
       return response.ok;
-      
     } catch (error) {
       console.error('Dropbox delete failed:', error);
       return false;
@@ -442,10 +451,10 @@ export class CloudStorageManager {
     this.providers.set('dropbox', new DropboxProvider());
   }
 
-  getAvailableProviders(): Array<{ id: string; name: string; }> {
-    return Array.from(this.providers.values()).map(provider => ({
+  getAvailableProviders(): Array<{ id: string; name: string }> {
+    return Array.from(this.providers.values()).map((provider) => ({
       id: provider.id,
-      name: provider.name
+      name: provider.name,
     }));
   }
 
@@ -475,9 +484,9 @@ export class CloudStorageManager {
         version: '1.0.0',
         createdAt: new Date().toISOString(),
         totalBookmarks: bookmarks.length,
-        device: navigator.platform || 'Unknown',
-        userAgent: navigator.userAgent
-      }
+        device: typeof navigator !== 'undefined' ? navigator.platform : 'IINA-Plugin',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'IINA-Plugin/1.0',
+      },
     };
 
     const backupFilename = filename || `bookmarks-${new Date().toISOString().split('T')[0]}.json`;
@@ -508,11 +517,11 @@ export class CloudStorageManager {
     return await this.currentProvider.delete(filename);
   }
 
-  async syncBookmarks(localBookmarks: any[]): Promise<{ 
-    merged: any[], 
-    added: number, 
-    updated: number, 
-    conflicts: any[] 
+  async syncBookmarks(localBookmarks: any[]): Promise<{
+    merged: any[];
+    added: number;
+    updated: number;
+    conflicts: any[];
   }> {
     try {
       const backups = await this.listBackups();
@@ -523,7 +532,7 @@ export class CloudStorageManager {
           merged: localBookmarks,
           added: 0,
           updated: 0,
-          conflicts: []
+          conflicts: [],
         };
       }
 
@@ -539,14 +548,14 @@ export class CloudStorageManager {
       let updated = 0;
 
       // Add local bookmarks
-      localBookmarks.forEach(bookmark => {
+      localBookmarks.forEach((bookmark) => {
         merged.set(bookmark.id, { ...bookmark, source: 'local' });
       });
 
       // Merge cloud bookmarks
-      cloudBookmarks.forEach(cloudBookmark => {
+      cloudBookmarks.forEach((cloudBookmark) => {
         const localBookmark = merged.get(cloudBookmark.id);
-        
+
         if (!localBookmark) {
           // New bookmark from cloud
           merged.set(cloudBookmark.id, { ...cloudBookmark, source: 'cloud' });
@@ -555,7 +564,7 @@ export class CloudStorageManager {
           // Check for conflicts
           const localTime = new Date(localBookmark.createdAt).getTime();
           const cloudTime = new Date(cloudBookmark.createdAt).getTime();
-          
+
           if (localTime !== cloudTime) {
             if (cloudTime > localTime) {
               // Cloud version is newer
@@ -568,7 +577,7 @@ export class CloudStorageManager {
       });
 
       const mergedBookmarks = Array.from(merged.values());
-      
+
       // Upload merged result
       await this.uploadBookmarks(mergedBookmarks);
 
@@ -576,9 +585,8 @@ export class CloudStorageManager {
         merged: mergedBookmarks,
         added,
         updated,
-        conflicts
+        conflicts,
       };
-      
     } catch (error) {
       console.error('Cloud sync failed:', error);
       throw error;

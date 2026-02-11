@@ -26,6 +26,8 @@ export interface IINACore {
     };
   };
   seek?: (time: number) => void;
+  seekTo?: (seconds: number) => void;
+  osd?: (message: string) => void;
 }
 
 export interface IINAConsole {
@@ -54,6 +56,7 @@ export interface IINAUIAPI {
   onMessage: (callback: (message: any) => void) => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface IINASidebar extends IINAUIAPI {}
 
 export interface IINAOverlay extends IINAUIAPI {
