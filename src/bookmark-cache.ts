@@ -14,7 +14,7 @@ export interface BookmarkIndex {
   byFilePath: Map<string, number[]>;
   byTitle: Map<string, number[]>;
   byTags: Map<string, number[]>;
-  byTimestamp: Map<number, number>;
+  byTimestamp: Map<number, number[]>;
 }
 
 export class BookmarkCache {
@@ -24,7 +24,7 @@ export class BookmarkCache {
     byFilePath: new Map(),
     byTitle: new Map(),
     byTags: new Map(),
-    byTimestamp: new Map()
+    byTimestamp: new Map(),
   };
 
   /**
@@ -34,7 +34,7 @@ export class BookmarkCache {
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
-      ttl
+      ttl,
     });
   }
 
@@ -90,9 +90,11 @@ export class BookmarkCache {
         });
       }
 
-      // Timestamp index (rounded to nearest second for fuzzy matching)
+      // Timestamp index (rounded to nearest second) -- stores array to handle collisions
       const roundedTimestamp = Math.round(bookmark.timestamp);
-      this.index.byTimestamp.set(roundedTimestamp, index);
+      const tsEntries = this.index.byTimestamp.get(roundedTimestamp) || [];
+      tsEntries.push(index);
+      this.index.byTimestamp.set(roundedTimestamp, tsEntries);
     });
   }
 
@@ -115,11 +117,11 @@ export class BookmarkCache {
    */
   findByTagsIndex(tags: string[]): Set<number> {
     const results = new Set<number>();
-    
-    tags.forEach(tag => {
+
+    tags.forEach((tag) => {
       const normalizedTag = tag.toLowerCase().trim();
       const entries = this.index.byTags.get(normalizedTag) || [];
-      entries.forEach(index => results.add(index));
+      entries.forEach((index) => results.add(index));
     });
 
     return results;
@@ -131,20 +133,20 @@ export class BookmarkCache {
   findByTimestampIndex(timestamp: number, tolerance: number = 1.0): number[] {
     const results: number[] = [];
     const roundedTimestamp = Math.round(timestamp);
-    
+
     // Check exact match first
     const exact = this.index.byTimestamp.get(roundedTimestamp);
-    if (exact !== undefined) {
-      results.push(exact);
+    if (exact) {
+      results.push(...exact);
     }
 
     // Check within tolerance range
     for (let i = 1; i <= Math.ceil(tolerance); i++) {
       const lower = this.index.byTimestamp.get(roundedTimestamp - i);
       const upper = this.index.byTimestamp.get(roundedTimestamp + i);
-      
-      if (lower !== undefined) results.push(lower);
-      if (upper !== undefined) results.push(upper);
+
+      if (lower) results.push(...lower);
+      if (upper) results.push(...upper);
     }
 
     return results;
@@ -163,7 +165,7 @@ export class BookmarkCache {
       }
     });
 
-    expiredKeys.forEach(key => this.cache.delete(key));
+    expiredKeys.forEach((key) => this.cache.delete(key));
   }
 
   /**
@@ -198,8 +200,8 @@ export class BookmarkCache {
         byFilePath: this.index.byFilePath.size,
         byTitle: this.index.byTitle.size,
         byTags: this.index.byTags.size,
-        byTimestamp: this.index.byTimestamp.size
-      }
+        byTimestamp: this.index.byTimestamp.size,
+      },
     };
   }
 }

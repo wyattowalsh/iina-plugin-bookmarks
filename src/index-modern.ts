@@ -1,42 +1,81 @@
 // IINA Plugin Bookmarks - Modern TypeScript Entry Point
 // ES6 Module implementation following IINA plugin guidelines (Sept 2025)
 
-import type { IINARuntimeDependencies } from './types';
+import type { IINARuntimeDependencies, HttpAdapter } from './types';
 import { BookmarkManager } from './bookmark-manager-modern';
 
 // Plugin initialization function
 export function plugin(): void {
-  console.log('🚀 IINA Plugin Bookmarks - Starting initialization (Modern TypeScript)');
+  // Access IINA runtime (available as global variable in IINA context)
+  const iina = (globalThis as any).iina;
+
+  if (!iina) {
+    throw new Error('IINA runtime not available');
+  }
+
+  const log = iina.console as {
+    log: (m: string) => void;
+    error: (m: string) => void;
+    warn: (m: string) => void;
+  };
+  log.log('IINA Plugin Bookmarks - Starting initialization (Modern TypeScript)');
 
   try {
-    // Access IINA runtime (available as global variable in IINA context)
-    const iinaRuntime = (globalThis as any).iina as IINARuntimeDependencies;
+    // Build the HTTP adapter from iina.http to match our HttpAdapter interface
+    const http: HttpAdapter = {
+      get: (url, options) =>
+        iina.http.get(url, {
+          headers: options?.headers ?? {},
+          params: options?.params ?? {},
+        }),
+      post: (url, options) =>
+        iina.http.post(url, {
+          headers: options?.headers ?? {},
+          params: options?.params ?? {},
+          data: options?.data,
+        }),
+      put: (url, options) =>
+        iina.http.put(url, {
+          headers: options?.headers ?? {},
+          params: options?.params ?? {},
+          data: options?.data,
+        }),
+      patch: (url, options) =>
+        iina.http.patch(url, {
+          headers: options?.headers ?? {},
+          params: options?.params ?? {},
+          data: options?.data,
+        }),
+      delete: (url, options) =>
+        iina.http.delete(url, {
+          headers: options?.headers ?? {},
+          params: options?.params ?? {},
+        }),
+    };
 
-    // Validate IINA runtime availability
-    if (!iinaRuntime) {
-      throw new Error('IINA runtime not available');
-    }
+    const deps: IINARuntimeDependencies = {
+      console: iina.console,
+      core: iina.core,
+      preferences: iina.preferences,
+      menu: iina.menu,
+      event: iina.event,
+      sidebar: iina.sidebar,
+      overlay: iina.overlay,
+      standaloneWindow: iina.standaloneWindow,
+      utils: iina.utils,
+      file: iina.file,
+      http,
+    };
 
-    // Log available IINA API components
-    const availableAPIs = Object.keys(iinaRuntime).join(', ');
-    console.log('📋 Available IINA APIs:', availableAPIs);
+    const bookmarkManager = new BookmarkManager(deps);
 
-    // Initialize the bookmark manager
-    const bookmarkManager = new BookmarkManager(iinaRuntime);
-
-    console.log('✅ IINA Plugin Bookmarks - Initialization completed successfully');
+    log.log('IINA Plugin Bookmarks - Initialization completed successfully');
 
     // Store reference globally for debugging
     (globalThis as any).bookmarkManager = bookmarkManager;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('❌ IINA Plugin Bookmarks - Initialization failed:', errorMessage);
-
-    // Log additional debug information
-    console.error('🔍 Debug info:');
-    console.error('  - typeof iina:', typeof (globalThis as any).iina);
-    console.error('  - globalThis keys:', Object.keys(globalThis));
-
+    log.error(`IINA Plugin Bookmarks - Initialization failed: ${errorMessage}`);
     throw error;
   }
 }
@@ -45,5 +84,6 @@ export function plugin(): void {
 if (typeof (globalThis as any).iina !== 'undefined') {
   plugin();
 } else {
-  console.warn('⚠️ IINA runtime not detected - plugin will initialize when loaded by IINA');
+  // Cannot use iina.console here since iina is not available
+  // This is acceptable -- the warning only triggers outside IINA
 }

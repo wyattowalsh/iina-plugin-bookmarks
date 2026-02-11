@@ -1,5 +1,5 @@
 // IINA Plugin Types
-// Type definitions for IINA plugin API (September 2025)
+// Type definitions for IINA plugin API (February 2026)
 
 export interface BookmarkData {
   id: string;
@@ -8,6 +8,7 @@ export interface BookmarkData {
   filepath: string;
   description?: string;
   createdAt: string;
+  updatedAt: string;
   tags?: string[];
 }
 
@@ -25,7 +26,7 @@ export interface IINACore {
       title?: string;
     };
   };
-  seek?: (time: number) => void;
+  seek?: (time: number, exact?: boolean) => void;
   seekTo?: (seconds: number) => void;
   osd?: (message: string) => void;
 }
@@ -47,7 +48,8 @@ export interface IINAMenu {
 }
 
 export interface IINAEvent {
-  on: (event: string, callback: () => void) => void;
+  on: (event: string, callback: (...args: any[]) => void) => string;
+  off: (event: string, id: string) => void;
 }
 
 export interface IINAUIAPI {
@@ -82,6 +84,45 @@ export interface IINAFile {
   exists: (path: string) => boolean;
 }
 
+/**
+ * HTTP adapter interface that abstracts iina.http for cloud storage.
+ * Methods mirror the IINA HTTP module's API shape.
+ */
+export interface HttpAdapter {
+  get(
+    url: string,
+    options?: { headers?: Record<string, string>; params?: Record<string, string> },
+  ): Promise<{ text: string; statusCode: number }>;
+  post(
+    url: string,
+    options?: {
+      headers?: Record<string, string>;
+      data?: any;
+      params?: Record<string, string>;
+    },
+  ): Promise<{ text: string; statusCode: number }>;
+  put(
+    url: string,
+    options?: {
+      headers?: Record<string, string>;
+      data?: any;
+      params?: Record<string, string>;
+    },
+  ): Promise<{ text: string; statusCode: number }>;
+  patch(
+    url: string,
+    options?: {
+      headers?: Record<string, string>;
+      data?: any;
+      params?: Record<string, string>;
+    },
+  ): Promise<{ text: string; statusCode: number }>;
+  delete(
+    url: string,
+    options?: { headers?: Record<string, string>; params?: Record<string, string> },
+  ): Promise<{ text: string; statusCode: number }>;
+}
+
 export interface IINARuntimeDependencies {
   console: IINAConsole;
   core: IINACore;
@@ -93,4 +134,5 @@ export interface IINARuntimeDependencies {
   standaloneWindow: IINAStandaloneWindow;
   utils: IINAUtils;
   file: IINAFile;
+  http: HttpAdapter;
 }

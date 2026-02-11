@@ -2,6 +2,10 @@
  * Performance optimization utilities for bookmark operations
  */
 
+/** Safe wrapper: JavaScriptCore may not have `performance` global */
+const _perf = globalThis as unknown as { performance?: { now(): number } };
+const now: () => number = _perf.performance ? () => _perf.performance!.now() : () => Date.now();
+
 export class PerformanceUtils {
   private static performanceMarks = new Map<string, number>();
 
@@ -125,7 +129,7 @@ export class PerformanceUtils {
    * Start performance measurement
    */
   static startMark(name: string): void {
-    this.performanceMarks.set(name, performance.now());
+    this.performanceMarks.set(name, now());
   }
 
   /**
@@ -137,7 +141,7 @@ export class PerformanceUtils {
       throw new Error(`Performance mark '${name}' not found`);
     }
 
-    const duration = performance.now() - start;
+    const duration = now() - start;
     this.performanceMarks.delete(name);
     return duration;
   }

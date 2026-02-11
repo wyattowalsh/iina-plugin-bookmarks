@@ -2,16 +2,34 @@
 // ES6 Module implementation following IINA plugin guidelines (Sept 2025)
 
 import type { BookmarkData, UIMessage, IINARuntimeDependencies } from './types';
-import { cloudStorageManager } from './cloud-storage';
+import { getCloudStorageManager, CloudStorageManager } from './cloud-storage';
+
+/** Max reasonable timestamp: 365 days in seconds */
+const MAX_TIMESTAMP = 86400 * 365;
+
+/** Strip HTML tags from a string to prevent XSS on import */
+function stripHtmlTags(str: string): string {
+  return str.replace(/<[^>]*>/g, '');
+}
+
+/** Prefix CSV-dangerous leading characters with a single quote to prevent formula injection */
+function sanitizeCsvCell(value: string): string {
+  if (/^[=+\-@\t\r]/.test(value)) {
+    return "'" + value;
+  }
+  return value;
+}
 
 export class BookmarkManager {
   private bookmarks: BookmarkData[] = [];
   private readonly STORAGE_KEY = 'bookmarks';
   private readonly SORT_PREFERENCES_KEY = 'sortPreferences';
   private deps: IINARuntimeDependencies;
+  private cloudStorage: CloudStorageManager;
 
   constructor(dependencies: IINARuntimeDependencies) {
     this.deps = dependencies;
+    this.cloudStorage = getCloudStorageManager(dependencies.http, dependencies.console);
 
     // Initialize the plugin
     this.loadBookmarks();
@@ -20,7 +38,7 @@ export class BookmarkManager {
     this.setupWebUI();
     this.setupUIMessageListeners();
 
-    this.deps.console.log('✅ BookmarkManager initialized successfully');
+    this.deps.console.log('BookmarkManager initialized successfully');
   }
 
   private loadBookmarks(): void {
@@ -35,7 +53,6 @@ export class BookmarkManager {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.deps.console.error(`Error loading bookmarks: ${errorMessage}`);
-      // Try recovering from backup
       if (this.recoverFromBackup()) {
         this.deps.console.log('Recovered bookmarks from backup');
       } else {
@@ -49,7 +66,6 @@ export class BookmarkManager {
       const backup = this.deps.preferences.get(`${this.STORAGE_KEY}_backup`);
       if (backup) {
         this.bookmarks = JSON.parse(backup);
-        // Re-save as primary
         this.deps.preferences.set(this.STORAGE_KEY, backup);
         return true;
       }
@@ -62,7 +78,6 @@ export class BookmarkManager {
 
   private saveBookmarks(): void {
     try {
-      // Backup current data before overwriting
       const currentData = this.deps.preferences.get(this.STORAGE_KEY);
       if (currentData) {
         this.deps.preferences.set(`${this.STORAGE_KEY}_backup`, currentData);
@@ -77,22 +92,26 @@ export class BookmarkManager {
     }
   }
 
+  /** Immediate (non-debounced) save for import operations */
+  private saveBookmarksImmediate(): void {
+    this.saveBookmarks();
+  }
+
   private setupWebUI(): void {
     try {
-      // Load UI components
       this.deps.sidebar.loadFile('ui/sidebar/index.html');
-      this.deps.console.log('🎨 Sidebar UI loaded');
+      this.deps.console.log('Sidebar UI loaded');
 
       this.deps.overlay.loadFile('ui/overlay/index.html');
       this.deps.overlay.setClickable(true);
       this.deps.overlay.hide();
-      this.deps.console.log('🎭 Overlay UI loaded');
+      this.deps.console.log('Overlay UI loaded');
 
       this.deps.standaloneWindow.loadFile('ui/window/index.html');
-      this.deps.console.log('🪟 Window UI loaded');
+      this.deps.console.log('Window UI loaded');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error loading UI: ${errorMessage}`);
+      this.deps.console.error(`Error loading UI: ${errorMessage}`);
     }
   }
 
@@ -126,12 +145,11 @@ export class BookmarkManager {
       };
     };
 
-    // Set up message listeners
     this.deps.sidebar.onMessage(createHandler('sidebar'));
     this.deps.overlay.onMessage(createHandler('overlay'));
     this.deps.standaloneWindow.onMessage(createHandler('window'));
 
-    this.deps.console.log('🔗 UI Message Listeners set up');
+    this.deps.console.log('UI Message Listeners set up');
   }
 
   private handleUIMessage(message: UIMessage, uiSource: string): void {
@@ -172,6 +190,16 @@ export class BookmarkManager {
         if (message.payload?.id && message.payload?.data) {
           this.updateBookmark(message.payload.id, message.payload.data);
         }
+        break;
+
+      case 'IMPORT_BOOKMARKS':
+        if (message.payload?.bookmarks && Array.isArray(message.payload.bookmarks)) {
+          this.importBookmarks(message.payload.bookmarks, uiSource);
+        }
+        break;
+
+      case 'EXPORT_BOOKMARKS':
+        this.exportBookmarks(message.payload?.format || 'json', uiSource);
         break;
 
       case 'CLOUD_SYNC_REQUEST':
@@ -231,17 +259,15 @@ export class BookmarkManager {
     });
 
     target.postMessage(message);
-    this.deps.console.log(`📤 Sent ${currentBookmarks.length} bookmarks to ${uiSource}`);
+    this.deps.console.log(`Sent ${currentBookmarks.length} bookmarks to ${uiSource}`);
   }
 
   private setupEventListeners(): void {
-    // File loaded event
-    this.deps.event.on('file-loaded', () => {
-      this.deps.console.log('📁 File loaded event');
+    this.deps.event.on('iina.file-loaded', () => {
+      this.deps.console.log('File loaded event');
       this.refreshUI();
     });
 
-    // Menu items
     this.deps.menu.addItem(
       this.deps.menu.item('Add Bookmark at Current Time', () => {
         this.addBookmark().catch((error) => {
@@ -268,7 +294,7 @@ export class BookmarkManager {
       }),
     );
 
-    this.deps.console.log('🎛️ Event listeners set up');
+    this.deps.console.log('Event listeners set up');
   }
 
   async addBookmark(
@@ -278,7 +304,6 @@ export class BookmarkManager {
     tags?: string[],
   ): Promise<void> {
     try {
-      // Enforce maximum bookmarks limit
       const maxBookmarks =
         parseInt(this.deps.preferences.get('maxBookmarks') || '1000', 10) || 1000;
       if (this.bookmarks.length >= maxBookmarks) {
@@ -293,26 +318,44 @@ export class BookmarkManager {
       const currentTime =
         timestamp !== undefined ? timestamp : this.deps.core.status.currentTime || 0;
 
+      // Validate timestamp
+      if (!Number.isFinite(currentTime) || currentTime < 0 || currentTime > MAX_TIMESTAMP) {
+        this.deps.console.error(
+          `Invalid timestamp: ${currentTime}. Must be finite, >= 0, and <= ${MAX_TIMESTAMP}`,
+        );
+        return;
+      }
+
       const filename = currentPath.split('/').pop() || currentPath;
       const cleanFilename = filename.replace(/\.[^/.]+$/, '') || 'Unknown Media';
 
+      // Sanitize title and description to strip HTML tags
+      const safeTitle = title
+        ? stripHtmlTags(title)
+        : `${cleanFilename} - ${this.formatTime(currentTime)}`;
+      const safeDescription = description
+        ? stripHtmlTags(description)
+        : `Bookmark at ${this.formatTime(currentTime)}`;
+
+      const now = new Date().toISOString();
       const bookmark: BookmarkData = {
         id: this.generateId(),
-        title: title || `${cleanFilename} - ${this.formatTime(currentTime)}`,
+        title: safeTitle,
         timestamp: currentTime,
         filepath: currentPath,
-        description: description || `Bookmark at ${this.formatTime(currentTime)}`,
-        createdAt: new Date().toISOString(),
+        description: safeDescription,
+        createdAt: now,
+        updatedAt: now,
         tags: tags || [],
       };
 
       this.bookmarks.push(bookmark);
       this.saveBookmarks();
 
-      this.deps.console.log(`✅ Bookmark added: ${bookmark.title}`);
+      this.deps.console.log(`Bookmark added: ${bookmark.title}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error adding bookmark: ${errorMessage}`);
+      this.deps.console.error(`Error adding bookmark: ${errorMessage}`);
       throw error;
     }
   }
@@ -323,20 +366,29 @@ export class BookmarkManager {
 
     if (this.bookmarks.length < initialLength) {
       this.saveBookmarks();
-      this.deps.console.log(`🗑️ Bookmark removed: ${id}`);
+      this.deps.console.log(`Bookmark removed: ${id}`);
     } else {
-      this.deps.console.warn(`⚠️ Bookmark not found: ${id}`);
+      this.deps.console.warn(`Bookmark not found: ${id}`);
     }
   }
 
   updateBookmark(id: string, data: Partial<BookmarkData>): void {
     const index = this.bookmarks.findIndex((b) => b.id === id);
     if (index !== -1) {
-      this.bookmarks[index] = { ...this.bookmarks[index], ...data };
+      // Sanitize incoming title/description
+      const sanitized: Partial<BookmarkData> = { ...data };
+      if (sanitized.title) sanitized.title = stripHtmlTags(sanitized.title);
+      if (sanitized.description) sanitized.description = stripHtmlTags(sanitized.description);
+
+      this.bookmarks[index] = {
+        ...this.bookmarks[index],
+        ...sanitized,
+        updatedAt: new Date().toISOString(),
+      };
       this.saveBookmarks();
-      this.deps.console.log(`✏️ Bookmark updated: ${id}`);
+      this.deps.console.log(`Bookmark updated: ${id}`);
     } else {
-      this.deps.console.warn(`⚠️ Bookmark not found for update: ${id}`);
+      this.deps.console.warn(`Bookmark not found for update: ${id}`);
     }
   }
 
@@ -356,7 +408,6 @@ export class BookmarkManager {
       if (this.deps.core.seekTo) {
         this.deps.core.seekTo(bookmark.timestamp);
       } else if (this.deps.core.seek) {
-        // Fallback to seek if seekTo not available
         this.deps.console.warn('seekTo() not available, falling back to seek()');
         this.deps.core.seek(bookmark.timestamp);
       }
@@ -373,8 +424,82 @@ export class BookmarkManager {
     return this.bookmarks.filter((bookmark) => bookmark.filepath === filepath);
   }
 
+  /** Import bookmarks from external data, using immediate save */
+  private importBookmarks(rawBookmarks: any[], uiSource: string): void {
+    const target = this.getUITarget(uiSource);
+    let imported = 0;
+
+    for (const raw of rawBookmarks) {
+      if (!raw || typeof raw !== 'object') continue;
+
+      const ts = typeof raw.timestamp === 'number' ? raw.timestamp : 0;
+      if (!Number.isFinite(ts) || ts < 0 || ts > MAX_TIMESTAMP) continue;
+
+      const now = new Date().toISOString();
+      const bookmark: BookmarkData = {
+        id: raw.id || this.generateId(),
+        title: stripHtmlTags(String(raw.title || 'Imported Bookmark')),
+        timestamp: ts,
+        filepath: String(raw.filepath || ''),
+        description: raw.description ? stripHtmlTags(String(raw.description)) : undefined,
+        createdAt: raw.createdAt || now,
+        updatedAt: now,
+        tags: Array.isArray(raw.tags) ? raw.tags.map((t: any) => String(t)) : [],
+      };
+
+      this.bookmarks.push(bookmark);
+      imported++;
+    }
+
+    // Use immediate save for imports (not debounced)
+    this.saveBookmarksImmediate();
+
+    target.postMessage(
+      JSON.stringify({
+        type: 'IMPORT_RESULT',
+        data: { success: true, imported },
+      }),
+    );
+  }
+
+  /** Export bookmarks, sanitizing CSV cells against formula injection */
+  private exportBookmarks(format: string, uiSource: string): void {
+    const target = this.getUITarget(uiSource);
+
+    if (format === 'csv') {
+      const header = 'id,title,timestamp,filepath,description,createdAt,updatedAt,tags';
+      const rows = this.bookmarks.map((b) => {
+        return [
+          sanitizeCsvCell(b.id),
+          sanitizeCsvCell(b.title),
+          String(b.timestamp),
+          sanitizeCsvCell(b.filepath),
+          sanitizeCsvCell(b.description || ''),
+          sanitizeCsvCell(b.createdAt),
+          sanitizeCsvCell(b.updatedAt),
+          sanitizeCsvCell((b.tags || []).join(';')),
+        ]
+          .map((cell) => `"${cell.replace(/"/g, '""')}"`)
+          .join(',');
+      });
+
+      target.postMessage(
+        JSON.stringify({
+          type: 'EXPORT_RESULT',
+          data: { format: 'csv', content: [header, ...rows].join('\n') },
+        }),
+      );
+    } else {
+      target.postMessage(
+        JSON.stringify({
+          type: 'EXPORT_RESULT',
+          data: { format: 'json', content: JSON.stringify(this.bookmarks, null, 2) },
+        }),
+      );
+    }
+  }
+
   private refreshUI(): void {
-    // Refresh all UIs with current bookmarks
     setTimeout(() => {
       this.sendBookmarksToUI('sidebar');
       this.sendBookmarksToUI('overlay');
@@ -386,16 +511,16 @@ export class BookmarkManager {
     try {
       const stored = this.deps.preferences.get(this.SORT_PREFERENCES_KEY);
       if (stored) {
-        this.deps.console.log(`🔀 Sort preferences loaded: ${stored}`);
+        this.deps.console.log(`Sort preferences loaded: ${stored}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error loading sort preferences: ${errorMessage}`);
+      this.deps.console.error(`Error loading sort preferences: ${errorMessage}`);
     }
   }
 
   private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
 
   private formatTime(seconds: number): string {
@@ -412,7 +537,7 @@ export class BookmarkManager {
   // Handle cloud sync operations
   private async handleCloudSync(payload: any, uiSource: string): Promise<void> {
     try {
-      this.deps.console.log(`☁️ Handling cloud sync: ${payload.action}`);
+      this.deps.console.log(`Handling cloud sync: ${payload.action}`);
 
       const target = this.getUITarget(uiSource);
 
@@ -427,11 +552,11 @@ export class BookmarkManager {
           await this.syncBookmarksWithCloud(payload.provider, payload.credentials, target);
           break;
         default:
-          this.deps.console.warn(`⚠️ Unknown cloud sync action: ${payload.action}`);
+          this.deps.console.warn(`Unknown cloud sync action: ${payload.action}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error handling cloud sync: ${errorMessage}`);
+      this.deps.console.error(`Error handling cloud sync: ${errorMessage}`);
 
       const target = this.getUITarget(uiSource);
       target.postMessage(
@@ -450,7 +575,7 @@ export class BookmarkManager {
   // Handle file reconciliation operations
   private async handleFileReconciliation(payload: any, uiSource: string): Promise<void> {
     try {
-      this.deps.console.log(`📁 Handling file reconciliation: ${payload.action}`);
+      this.deps.console.log(`Handling file reconciliation: ${payload.action}`);
 
       const target = this.getUITarget(uiSource);
 
@@ -472,14 +597,14 @@ export class BookmarkManager {
           );
           break;
         case 'search_similar':
-          await this.searchForSimilarFiles(payload.bookmarkId, payload.originalPath, target);
+          this.searchForSimilarFiles(payload.bookmarkId, payload.originalPath, target);
           break;
         default:
-          this.deps.console.warn(`⚠️ Unknown reconciliation action: ${payload.action}`);
+          this.deps.console.warn(`Unknown reconciliation action: ${payload.action}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error handling file reconciliation: ${errorMessage}`);
+      this.deps.console.error(`Error handling file reconciliation: ${errorMessage}`);
     }
   }
 
@@ -490,14 +615,14 @@ export class BookmarkManager {
     target: any,
   ): Promise<void> {
     try {
-      this.deps.console.log(`☁️ Uploading bookmarks to ${provider}...`);
+      this.deps.console.log(`Uploading bookmarks to ${provider}...`);
 
-      const success = await cloudStorageManager.setProvider(provider, credentials);
+      const success = await this.cloudStorage.setProvider(provider, credentials);
       if (!success) {
         throw new Error('Failed to authenticate with cloud provider');
       }
 
-      const backupId = await cloudStorageManager.uploadBookmarks(this.bookmarks);
+      const backupId = await this.cloudStorage.uploadBookmarks(this.bookmarks);
 
       target.postMessage(
         JSON.stringify({
@@ -512,7 +637,7 @@ export class BookmarkManager {
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error uploading to cloud: ${errorMessage}`);
+      this.deps.console.error(`Error uploading to cloud: ${errorMessage}`);
       throw error;
     }
   }
@@ -524,21 +649,20 @@ export class BookmarkManager {
     target: any,
   ): Promise<void> {
     try {
-      this.deps.console.log(`☁️ Downloading bookmarks from ${provider}...`);
+      this.deps.console.log(`Downloading bookmarks from ${provider}...`);
 
-      const success = await cloudStorageManager.setProvider(provider, credentials);
+      const success = await this.cloudStorage.setProvider(provider, credentials);
       if (!success) {
         throw new Error('Failed to authenticate with cloud provider');
       }
 
-      const backups = await cloudStorageManager.listBackups();
+      const backups = await this.cloudStorage.listBackups();
       if (backups.length === 0) {
         throw new Error('No backups found in cloud storage');
       }
 
-      // Get the most recent backup
       const latestBackup = backups.sort().reverse()[0];
-      const backup = await cloudStorageManager.downloadBookmarks(latestBackup);
+      const backup = await this.cloudStorage.downloadBookmarks(latestBackup);
 
       target.postMessage(
         JSON.stringify({
@@ -554,7 +678,7 @@ export class BookmarkManager {
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error downloading from cloud: ${errorMessage}`);
+      this.deps.console.error(`Error downloading from cloud: ${errorMessage}`);
       throw error;
     }
   }
@@ -566,16 +690,15 @@ export class BookmarkManager {
     target: any,
   ): Promise<void> {
     try {
-      this.deps.console.log(`☁️ Syncing bookmarks with ${provider}...`);
+      this.deps.console.log(`Syncing bookmarks with ${provider}...`);
 
-      const success = await cloudStorageManager.setProvider(provider, credentials);
+      const success = await this.cloudStorage.setProvider(provider, credentials);
       if (!success) {
         throw new Error('Failed to authenticate with cloud provider');
       }
 
-      const result = await cloudStorageManager.syncBookmarks(this.bookmarks);
+      const result = await this.cloudStorage.syncBookmarks(this.bookmarks);
 
-      // Update local bookmarks with merged result
       this.bookmarks = result.merged;
       this.saveBookmarks();
 
@@ -597,7 +720,7 @@ export class BookmarkManager {
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error syncing with cloud: ${errorMessage}`);
+      this.deps.console.error(`Error syncing with cloud: ${errorMessage}`);
       throw error;
     }
   }
@@ -609,8 +732,9 @@ export class BookmarkManager {
       if (bookmark) {
         const oldPath = bookmark.filepath;
         bookmark.filepath = newPath;
+        bookmark.updatedAt = new Date().toISOString();
         this.saveBookmarks();
-        this.deps.console.log(`📁 Updated bookmark path: ${oldPath} -> ${newPath}`);
+        this.deps.console.log(`Updated bookmark path: ${oldPath} -> ${newPath}`);
 
         target.postMessage(
           JSON.stringify({
@@ -627,48 +751,27 @@ export class BookmarkManager {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error updating bookmark path: ${errorMessage}`);
+      this.deps.console.error(`Error updating bookmark path: ${errorMessage}`);
     }
   }
 
-  // Search for similar files (by name/size)
-  private async searchForSimilarFiles(
-    bookmarkId: string,
-    originalPath: string,
-    target: any,
-  ): Promise<void> {
-    try {
-      this.deps.console.log(`🔍 Searching for files similar to: ${originalPath}`);
+  // Search for similar files -- not implemented, returns empty result
+  private searchForSimilarFiles(bookmarkId: string, originalPath: string, target: any): void {
+    this.deps.console.log(`Similar file search not implemented for: ${originalPath}`);
 
-      // Extract filename from path
-      const fileName = originalPath.split('/').pop() || '';
-      const fileNameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
-
-      // Note: This is a simplified implementation
-      // In a real scenario, you would need to integrate with file system APIs or spotlight search
-      const similarFiles = [
-        // Mock similar files - in reality these would come from file system search
-        `/Users/user/Movies/${fileNameWithoutExt}_moved.mp4`,
-        `/Users/user/Downloads/${fileName}`,
-        `/Users/user/Desktop/${fileNameWithoutExt}.mov`,
-      ].filter((path) => path !== originalPath); // Remove original path if it exists
-
-      target.postMessage(
-        JSON.stringify({
-          type: 'FILE_RECONCILIATION_RESULT',
-          data: {
-            success: true,
-            action: 'search_similar',
-            bookmarkId: bookmarkId,
-            originalPath: originalPath,
-            similarFiles: similarFiles,
-          },
-        }),
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.deps.console.error(`❌ Error searching for similar files: ${errorMessage}`);
-    }
+    target.postMessage(
+      JSON.stringify({
+        type: 'FILE_RECONCILIATION_RESULT',
+        data: {
+          success: true,
+          action: 'search_similar',
+          bookmarkId: bookmarkId,
+          originalPath: originalPath,
+          similarFiles: [],
+          message: 'Similar file search is not yet implemented',
+        },
+      }),
+    );
   }
 
   // Public API methods for debugging
