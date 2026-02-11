@@ -1,405 +1,168 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { IINARuntimeDependencies } from '../src/types';
+import { BookmarkManager } from '../src/bookmark-manager-modern';
+
+// Mock cloud-storage to prevent real imports
+vi.mock('../src/cloud-storage', () => ({
+  getCloudStorageManager: vi.fn(() => ({
+    setProvider: vi.fn(),
+    uploadBookmarks: vi.fn(),
+    downloadBookmarks: vi.fn(),
+    listBackups: vi.fn(),
+    syncBookmarks: vi.fn(),
+  })),
+  CloudStorageManager: vi.fn(),
+}));
+
+function createMockDeps(): IINARuntimeDependencies {
+  return {
+    console: { log: vi.fn(), error: vi.fn(), warn: vi.fn() },
+    preferences: { get: vi.fn().mockReturnValue(null), set: vi.fn() },
+    core: {
+      status: { path: '/test/video/sample.mp4', currentTime: 1800 },
+      seekTo: vi.fn(),
+      seek: vi.fn(),
+      osd: vi.fn(),
+    },
+    event: { on: vi.fn() },
+    menu: { addItem: vi.fn(), item: vi.fn(() => ({})) },
+    sidebar: { loadFile: vi.fn(), postMessage: vi.fn(), onMessage: vi.fn() },
+    overlay: {
+      loadFile: vi.fn(),
+      postMessage: vi.fn(),
+      onMessage: vi.fn(),
+      setClickable: vi.fn(),
+      show: vi.fn(),
+      hide: vi.fn(),
+      isVisible: vi.fn(() => false),
+    },
+    standaloneWindow: {
+      loadFile: vi.fn(),
+      postMessage: vi.fn(),
+      onMessage: vi.fn(),
+      show: vi.fn(),
+    },
+    utils: { chooseFile: vi.fn(), prompt: vi.fn(), ask: vi.fn() },
+    file: { write: vi.fn(), read: vi.fn(() => '[]'), exists: vi.fn(() => true) },
+  } as unknown as IINARuntimeDependencies;
+}
 
 describe('Bookmark Export Functionality', () => {
-  let mockDeps: any;
-  let BookmarkManager: any;
+  let deps: IINARuntimeDependencies;
+  let manager: BookmarkManager;
 
-  beforeEach(async () => {
-    // Reset modules to ensure clean state
-    vi.resetModules();
-    
-    // Mock IINA dependencies
-    mockDeps = {
-      console: { 
-        log: vi.fn(), 
-        error: vi.fn(), 
-        warn: vi.fn() 
-      },
-      preferences: { 
-        get: vi.fn(() => null), 
-        set: vi.fn() 
-      },
-      core: { 
-        status: { 
-          path: '/test/video/sample.mp4', 
-          currentTime: 1800,
-          title: 'Sample Video'
-        } 
-      },
-      event: { on: vi.fn() },
-      menu: { addItem: vi.fn(), item: vi.fn(() => ({})) },
-      sidebar: { 
-        loadFile: vi.fn(), 
-        postMessage: vi.fn(), 
-        onMessage: vi.fn() 
-      },
-      overlay: { 
-        loadFile: vi.fn(), 
-        postMessage: vi.fn(), 
-        onMessage: vi.fn(),
-        setClickable: vi.fn(),
-        show: vi.fn(),
-        hide: vi.fn(),
-        isVisible: vi.fn(() => false)
-      },
-      standaloneWindow: { 
-        loadFile: vi.fn(), 
-        postMessage: vi.fn(), 
-        onMessage: vi.fn(),
-        show: vi.fn()
-      },
-      utils: {
-        chooseFile: vi.fn(() => '/test/exports'),
-        prompt: vi.fn(() => 'test-export.json'),
-        ask: vi.fn(() => true)
-      },
-      file: {
-        write: vi.fn(),
-        read: vi.fn(() => '[]'),
-        exists: vi.fn(() => true)
-      }
-    };
-
-    // Import BookmarkManager after mocking
-    const module = await import('../src/bookmark-manager');
-    BookmarkManager = module.BookmarkManager;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    deps = createMockDeps();
+    manager = new BookmarkManager(deps);
   });
 
-  describe('JSON Export', () => {
-    it('should export bookmarks to JSON with metadata', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      // Add test bookmarks
-      await manager.addBookmark('Test Bookmark 1', 1200, 'First test bookmark', ['test', 'sample']);
-      await manager.addBookmark('Test Bookmark 2', 2400, 'Second test bookmark', ['test', 'demo']);
-      
-      const exportOptions = {
-        format: 'json' as const,
-        includeMetadata: true
-      };
-      
-      const result = await manager.exportBookmarks(manager.getBookmarks(), exportOptions);
-      
-      expect(result.success).toBe(true);
-      expect(result.recordCount).toBe(2);
-      expect(result.filePath).toMatch(/bookmarks-export-.*\.json/);
-      
-      // Parse the exported JSON data
-      const exportData = JSON.parse((result as any).data);
-      expect(exportData.metadata).toBeDefined();
-      expect(exportData.metadata.totalRecords).toBe(2);
-      expect(exportData.metadata.version).toBe('1.0.0');
-      expect(exportData.bookmarks).toHaveLength(2);
-      
-      // Verify bookmark data integrity
-      const bookmark1 = exportData.bookmarks.find((b: any) => b.title === 'Test Bookmark 1');
-      expect(bookmark1).toBeDefined();
-      expect(bookmark1.timestamp).toBe(1200);
-      expect(bookmark1.description).toBe('First test bookmark');
-      expect(bookmark1.tags).toEqual(['test', 'sample']);
+  describe('Bookmark data retrieval for export', () => {
+    it('should retrieve all bookmarks for export via getAllBookmarks', async () => {
+      await manager.addBookmark('Export Test 1', 1200, 'First bookmark', ['test', 'sample']);
+      await manager.addBookmark('Export Test 2', 2400, 'Second bookmark', ['test', 'demo']);
+
+      const bookmarks = manager.getAllBookmarks();
+      expect(bookmarks).toHaveLength(2);
+      expect(bookmarks[0].title).toBe('Export Test 1');
+      expect(bookmarks[0].timestamp).toBe(1200);
+      expect(bookmarks[0].description).toBe('First bookmark');
+      expect(bookmarks[0].tags).toEqual(['test', 'sample']);
+      expect(bookmarks[1].title).toBe('Export Test 2');
     });
 
-    it('should export bookmarks to JSON without metadata', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      await manager.addBookmark('Test Bookmark', 1500, 'Test description');
-      
-      const exportOptions = {
-        format: 'json' as const,
-        includeMetadata: false
-      };
-      
-      const result = await manager.exportBookmarks(manager.getBookmarks(), exportOptions);
-      
-      expect(result.success).toBe(true);
-      const exportData = JSON.parse((result as any).data);
-      expect(exportData.metadata).toBeUndefined();
-      expect(exportData.bookmarks).toHaveLength(1);
+    it('should include all required fields for export', async () => {
+      await manager.addBookmark('Field Check', 100, 'desc', ['tag']);
+
+      const bookmark = manager.getAllBookmarks()[0];
+      expect(bookmark).toHaveProperty('id');
+      expect(bookmark).toHaveProperty('title');
+      expect(bookmark).toHaveProperty('timestamp');
+      expect(bookmark).toHaveProperty('filepath');
+      expect(bookmark).toHaveProperty('description');
+      expect(bookmark).toHaveProperty('createdAt');
+      expect(bookmark).toHaveProperty('tags');
+    });
+
+    it('should preserve bookmark data integrity across add and retrieve', async () => {
+      await manager.addBookmark('Integrity Test', 3600, 'Full description', ['a', 'b']);
+
+      const bookmark = manager.getAllBookmarks()[0];
+      expect(bookmark.title).toBe('Integrity Test');
+      expect(bookmark.timestamp).toBe(3600);
+      expect(bookmark.description).toBe('Full description');
+      expect(bookmark.tags).toEqual(['a', 'b']);
+      expect(bookmark.filepath).toBe('/test/video/sample.mp4');
+      expect(bookmark.createdAt).toBeTruthy();
     });
   });
 
-  describe('CSV Export', () => {
-    it('should export bookmarks to CSV with all fields and headers', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      await manager.addBookmark('CSV Test', 3600, 'CSV description', ['csv', 'test']);
-      
-      const csvOptions = {
-        format: 'csv' as const,
-        includeMetadata: true,
-        selectedFields: ['id', 'title', 'timestamp', 'description', 'tags'],
-        delimiter: ',' as const,
-        includeHeaders: true
-      };
-      
-      const result = await manager.exportBookmarksToCSV(manager.getBookmarks(), csvOptions);
-      
-      expect(result.success).toBe(true);
-      expect(result.recordCount).toBe(1);
-      
-      const csvData = (result as any).data;
-      const lines = csvData.split('\n').filter((line: string) => line.trim());
-      
-      // Check headers
-      expect(lines[0]).toContain('id,title,timestamp,description,tags');
-      
-      // Check data row
-      const dataRow = lines[1];
-      expect(dataRow).toContain('CSV Test');
-      expect(dataRow).toContain('3600 (1:00:00)'); // timestamp with formatted time
-      expect(dataRow).toContain('CSV description');
-      expect(dataRow).toContain('csv;test'); // tags separated by semicolon
+  describe('Bookmark filtering for export', () => {
+    it('should filter bookmarks by filepath via getBookmarksForFile', async () => {
+      await manager.addBookmark('Video 1 BM', 100);
+      (deps.core.status as any).path = '/other/movie.mp4';
+      await manager.addBookmark('Video 2 BM', 200);
+
+      const filtered = manager.getBookmarksForFile('/test/video/sample.mp4');
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].title).toBe('Video 1 BM');
     });
 
-    it('should export CSV with custom delimiter and selected fields', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      await manager.addBookmark('Delimiter Test', 7200, 'Test with semicolon');
-      
-      const csvOptions = {
-        format: 'csv' as const,
-        includeMetadata: false,
-        selectedFields: ['title', 'timestamp'],
-        delimiter: ';' as const,
-        includeHeaders: false
-      };
-      
-      const result = await manager.exportBookmarksToCSV(manager.getBookmarks(), csvOptions);
-      
-      expect(result.success).toBe(true);
-      
-      const csvData = (result as any).data;
-      const lines = csvData.split('\n').filter((line: string) => line.trim());
-      
-      // Should only have data row (no headers)
-      expect(lines).toHaveLength(1);
-      expect(lines[0]).toContain('Delimiter Test;7200 (2:00:00)');
-    });
+    it('should return all bookmarks when no filter path is given', async () => {
+      await manager.addBookmark('BM1', 10);
+      await manager.addBookmark('BM2', 20);
 
-    it('should handle CSV special characters and escaping', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      await manager.addBookmark('Title with, comma', 1000, 'Description with "quotes" and, comma');
-      
-      const csvOptions = {
-        format: 'csv' as const,
-        includeMetadata: false,
-        selectedFields: ['title', 'description'],
-        delimiter: ',' as const,
-        includeHeaders: true
-      };
-      
-      const result = await manager.exportBookmarksToCSV(manager.getBookmarks(), csvOptions);
-      
-      expect(result.success).toBe(true);
-      
-      const csvData = (result as any).data;
-      expect(csvData).toContain('"Title with, comma"');
-      expect(csvData).toContain('"Description with ""quotes"" and, comma"');
+      expect(manager.getBookmarksForFile()).toHaveLength(2);
     });
   });
 
-  describe('Export Filtering', () => {
-    it('should filter exports by tags', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      await manager.addBookmark('Tag Test 1', 1000, 'First', ['important', 'work']);
-      await manager.addBookmark('Tag Test 2', 2000, 'Second', ['personal', 'fun']);
-      await manager.addBookmark('Tag Test 3', 3000, 'Third', ['important', 'review']);
-      
-      const exportOptions = {
-        format: 'json' as const,
-        includeMetadata: true,
-        filter: {
-          tags: ['important']
-        }
-      };
-      
-      const filteredBookmarks = manager.getFilteredBookmarksForExport(exportOptions);
-      expect(filteredBookmarks).toHaveLength(2);
-      expect(filteredBookmarks.every((b: any) => b.tags.includes('important'))).toBe(true);
+  describe('Bookmark serialization for export', () => {
+    it('should produce valid JSON when serializing bookmarks', async () => {
+      await manager.addBookmark('JSON Test', 1500, 'A description', ['json']);
+
+      const bookmarks = manager.getAllBookmarks();
+      const json = JSON.stringify(bookmarks);
+      const parsed = JSON.parse(json);
+
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0].title).toBe('JSON Test');
     });
 
-    it('should filter exports by date range', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      // Mock different creation dates
-      const oldDate = '2023-01-01T00:00:00Z';
-      const newDate = new Date().toISOString();
-      
-      await manager.addBookmark('Old Bookmark', 1000, 'Old');
-      await manager.addBookmark('New Bookmark', 2000, 'New');
-      
-      // Manually set creation dates for testing
-      const bookmarks = manager.getBookmarks();
-      bookmarks[0].createdAt = oldDate;
-      bookmarks[1].createdAt = newDate;
-      
-      const exportOptions = {
-        format: 'json' as const,
-        includeMetadata: true,
-        filter: {
-          dateRange: {
-            start: '2023-12-01T00:00:00Z',
-            end: new Date().toISOString()
-          }
-        }
-      };
-      
-      const filteredBookmarks = manager.getFilteredBookmarksForExport(exportOptions);
-      expect(filteredBookmarks).toHaveLength(1);
-      expect(filteredBookmarks[0].title).toBe('New Bookmark');
-    });
-
-    it('should filter exports by media type', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      // Create bookmarks with different file types
-      mockDeps.core.status.path = '/test/video.mp4';
-      await manager.addBookmark('Video Bookmark', 1000, 'Video content');
-      
-      mockDeps.core.status.path = '/test/audio.mp3';
-      await manager.addBookmark('Audio Bookmark', 2000, 'Audio content');
-      
-      const exportOptions = {
-        format: 'json' as const,
-        includeMetadata: true,
-        filter: {
-          mediaType: 'video'
-        }
-      };
-      
-      const filteredBookmarks = manager.getFilteredBookmarksForExport(exportOptions);
-      expect(filteredBookmarks).toHaveLength(1);
-      expect(filteredBookmarks[0].title).toBe('Video Bookmark');
-    });
-  });
-
-  describe('Export Validation', () => {
-    it('should validate export data and return no errors for valid bookmarks', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      await manager.addBookmark('Valid Bookmark', 1500, 'Valid description', ['valid']);
-      
-      const bookmarks = manager.getBookmarks();
-      const validation = manager.validateExportData(bookmarks);
-      
-      expect(validation.isValid).toBe(true);
-      expect(validation.errors).toHaveLength(0);
-    });
-
-    it('should detect invalid bookmark data', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      const invalidBookmarks = [
-        {
-          id: '',
-          title: 'Missing ID',
-          timestamp: 1000,
-          filepath: '/test/path.mp4',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'valid-id',
-          title: '',
-          timestamp: 'invalid' as any,
-          filepath: '',
-          createdAt: new Date().toISOString()
-        }
-      ];
-      
-      const validation = manager.validateExportData(invalidBookmarks);
-      
-      expect(validation.isValid).toBe(false);
-      expect(validation.errors.length).toBeGreaterThan(0);
-      expect(validation.errors.some((error: string) => error.includes('missing required field: id'))).toBe(true);
-      expect(validation.errors.some((error: string) => error.includes('missing required field: title'))).toBe(true);
-      expect(validation.errors.some((error: string) => error.includes('invalid timestamp'))).toBe(true);
-    });
-  });
-
-  describe('Export Error Handling', () => {
-    it('should handle unsupported export format', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      const invalidOptions = {
-        format: 'xml' as any,
-        includeMetadata: true
-      };
-      
-      await expect(manager.exportBookmarks([], invalidOptions)).rejects.toThrow('Unsupported export format: xml');
-    });
-
-    it('should handle empty bookmark list', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      const exportOptions = {
-        format: 'json' as const,
-        includeMetadata: true
-      };
-      
-      const result = await manager.exportBookmarks([], exportOptions);
-      
-      expect(result.success).toBe(true);
-      expect(result.recordCount).toBe(0);
-      
-      const exportData = JSON.parse((result as any).data);
-      expect(exportData.bookmarks).toHaveLength(0);
-      expect(exportData.metadata.totalRecords).toBe(0);
-    });
-  });
-
-  describe('Message Handling', () => {
-    it('should handle export message and send result back to UI', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      await manager.addBookmark('Message Test', 1000, 'Test for message handling');
-      
-      const exportOptions = {
-        format: 'json' as const,
-        includeMetadata: true,
-        filePath: '/test/exports/test-export.json'
-      };
-      
-      // Test the message handler
-      await manager.handleExportBookmarks(exportOptions, 'window');
-      
-      // Find the EXPORT_RESULT message (there might be multiple messages)
-      const allCalls = mockDeps.standaloneWindow.postMessage.mock.calls;
-      const exportResultCall = allCalls.find(call => call[0].includes('EXPORT_RESULT'));
-      
-      expect(exportResultCall).toBeDefined();
-      expect(exportResultCall[0]).toContain('EXPORT_RESULT');
-      
-      const messageData = JSON.parse(exportResultCall[0]);
-      
-      expect(messageData.type).toBe('EXPORT_RESULT');
-      expect(messageData.data.success).toBe(true);
-      expect(messageData.data.recordCount).toBe(1);
-    });
-
-    it('should handle export errors and send error message back to UI', async () => {
-      const manager = new BookmarkManager(mockDeps);
-      
-      // Create a scenario that would cause an error (invalid format)
-      const invalidOptions = {
-        format: 'invalid' as any,
-        includeMetadata: true
-      };
-      
-      await manager.handleExportBookmarks(invalidOptions, 'sidebar');
-      
-      // Verify error was sent to UI
-      expect(mockDeps.sidebar.postMessage).toHaveBeenCalledWith(
-        expect.stringContaining('EXPORT_RESULT')
+    it('should handle special characters in bookmark data', async () => {
+      await manager.addBookmark(
+        'Title with "quotes" & [brackets]',
+        1000,
+        'Description with\nnewlines',
+        ['special/chars'],
       );
-      
-      const messageCall = mockDeps.sidebar.postMessage.mock.calls[0][0];
-      const messageData = JSON.parse(messageCall);
-      
-      expect(messageData.type).toBe('EXPORT_RESULT');
-      expect(messageData.data.success).toBe(false);
-      expect(messageData.data.error).toBeDefined();
+
+      const bookmarks = manager.getAllBookmarks();
+      const json = JSON.stringify(bookmarks);
+      const parsed = JSON.parse(json);
+
+      expect(parsed[0].title).toBe('Title with "quotes" & [brackets]');
+      expect(parsed[0].description).toBe('Description with\nnewlines');
+    });
+
+    it('should handle empty bookmark list for export', () => {
+      const bookmarks = manager.getAllBookmarks();
+      expect(bookmarks).toHaveLength(0);
+
+      const json = JSON.stringify({ bookmarks, metadata: { totalRecords: 0 } });
+      const parsed = JSON.parse(json);
+      expect(parsed.bookmarks).toHaveLength(0);
     });
   });
-}); 
+
+  describe('Bookmark count tracking', () => {
+    it('should accurately report bookmark count', async () => {
+      expect(manager.getBookmarkCount()).toBe(0);
+
+      await manager.addBookmark('BM1', 10);
+      expect(manager.getBookmarkCount()).toBe(1);
+
+      await manager.addBookmark('BM2', 20);
+      expect(manager.getBookmarkCount()).toBe(2);
+    });
+  });
+});

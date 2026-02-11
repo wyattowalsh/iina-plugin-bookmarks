@@ -1,6 +1,6 @@
-import { vi } from 'vitest'
+import { vi } from 'vitest';
 
-// Mock IINA global object
+// Mock IINA global object for plugin backend tests
 const mockIINA = {
   console: {
     log: vi.fn(),
@@ -44,17 +44,17 @@ const mockIINA = {
     onMessage: vi.fn(),
     show: vi.fn(),
   },
-}
+};
 
-// Make mocks available globally
-global.console = mockIINA.console as any
-global.preferences = mockIINA.preferences as any
-global.core = mockIINA.core as any
-global.event = mockIINA.event as any
-global.menu = mockIINA.menu as any
-global.sidebar = mockIINA.sidebar as any
-global.overlay = mockIINA.overlay as any
-global.standaloneWindow = mockIINA.standaloneWindow as any
+// Make IINA mocks available on globalThis (do NOT replace real console)
+(globalThis as any).iina = mockIINA;
+(globalThis as any).preferences = mockIINA.preferences;
+(globalThis as any).core = mockIINA.core;
+(globalThis as any).event = mockIINA.event;
+(globalThis as any).menu = mockIINA.menu;
+(globalThis as any).sidebar = mockIINA.sidebar;
+(globalThis as any).overlay = mockIINA.overlay;
+(globalThis as any).standaloneWindow = mockIINA.standaloneWindow;
 
 // Mock iina module
-vi.mock('iina', () => mockIINA) 
+vi.mock('iina', () => mockIINA);
