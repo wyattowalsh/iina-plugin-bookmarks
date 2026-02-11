@@ -297,7 +297,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   }, []);
 
   return (
-    <div className={`advanced-search ${className}`}>
+    <div className={`advanced-search ${className}`} role="combobox" aria-expanded={showSuggestions}>
       <div className="search-input-container">
         <input
           ref={inputRef}
@@ -311,21 +311,40 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           onBlur={handleBlur}
           onClick={(e) => setCaretPosition((e.target as HTMLInputElement).selectionStart || 0)}
           onKeyUp={(e) => setCaretPosition((e.target as HTMLInputElement).selectionStart || 0)}
+          aria-autocomplete="list"
+          aria-controls="search-suggestions"
+          aria-activedescendant={
+            selectedSuggestionIndex >= 0 ? `suggestion-${selectedSuggestionIndex}` : undefined
+          }
+          role="textbox"
+          aria-label="Advanced search for bookmarks with filters and operators"
         />
         
         {showSuggestions && suggestions.length > 0 && (
-          <div className="search-suggestions">
+          <div 
+            id="search-suggestions"
+            className="search-suggestions"
+            role="listbox"
+            aria-label="Search suggestions"
+          >
             {suggestions.map((suggestion, index) => (
               <div
                 key={`${suggestion.type}-${suggestion.value}`}
+                id={`suggestion-${index}`}
                 className={`suggestion-item ${index === selectedSuggestionIndex ? 'selected' : ''}`}
                 onMouseDown={() => applySuggestion(suggestion)}
+                role="option"
+                aria-selected={index === selectedSuggestionIndex}
+                aria-describedby={suggestion.description ? `suggestion-desc-${index}` : undefined}
               >
                 <span className={`suggestion-label ${suggestion.type}`}>
                   {suggestion.label}
                 </span>
                 {suggestion.description && (
-                  <span className="suggestion-description">
+                  <span 
+                    id={`suggestion-desc-${index}`}
+                    className="suggestion-description"
+                  >
                     {suggestion.description}
                   </span>
                 )}

@@ -147,7 +147,11 @@ export class MetadataDetector {
   async refreshMetadata(): Promise<MediaMetadata | null> {
     try {
       const filepath = this.core.status.path;
-      if (!filepath) return null;
+      if (!filepath) {
+        // Align with tests expecting an error to be logged on refresh failure
+        this.logger.error('Metadata refresh failed: No media file currently loaded');
+        return null;
+      }
 
       // Clear cache for current file to force refresh
       this.cache.delete(filepath);

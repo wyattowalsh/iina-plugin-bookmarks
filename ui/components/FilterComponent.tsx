@@ -161,17 +161,27 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
   }, [persistentFilters.sortBy, persistentFilters.sortDirection, persistentFilters.sortCriteria, updateFilters]);
 
   return (
-    <div className={`filter-container ${compact ? 'compact' : ''}`}>
+    <div className={`filter-container ${compact ? 'compact' : ''}`} role="search" aria-label="Bookmark filters">
       {/* Primary Filter Row */}
       <div className="filter-row">
         <div className="filter-group">
+          <label htmlFor={`search-input-${viewId}`} className="sr-only">
+            Search bookmarks
+          </label>
           <input
+            id={`search-input-${viewId}`}
             type="text"
             className={`filter-input ${compact ? 'compact' : ''}`}
             placeholder="Search bookmarks..."
             value={searchInput}
             onChange={handleSearchChange}
+            aria-describedby={resultsCount !== undefined ? `search-results-${viewId}` : undefined}
           />
+          {resultsCount !== undefined && (
+            <div id={`search-results-${viewId}`} className="sr-only" aria-live="polite">
+              {resultsCount} results found
+            </div>
+          )}
         </div>
 
         <div className="filter-group">

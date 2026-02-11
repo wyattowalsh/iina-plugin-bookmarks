@@ -27,7 +27,7 @@ describe('Tag Functionality', () => {
       
       const bookmarks = manager.getBookmarks()
       expect(bookmarks).toHaveLength(1)
-      // Should include user tags plus auto-generated tags
+      // Should include user tags exactly as provided
       expect(bookmarks[0].tags).toContain('work')
       expect(bookmarks[0].tags).toContain('important')
       expect(bookmarks[0].tags).toContain('meeting')
@@ -155,6 +155,8 @@ describe('Tag Functionality', () => {
       manager.addBookmark('Bookmark 1', 100, 'Desc', ['javascript', 'programming', 'web'])
       manager.addBookmark('Bookmark 2', 200, 'Desc', ['java', 'programming', 'backend'])
       manager.addBookmark('Bookmark 3', 300, 'Desc', ['python', 'data-science', 'ml'])
+      // Add bookmarks without user tags to get auto-generated tags
+      manager.addBookmark('Video Bookmark', 100, 'Auto tags test') // Should get 'video', 'beginning'
     })
 
     it('should get all unique tags from bookmarks', () => {

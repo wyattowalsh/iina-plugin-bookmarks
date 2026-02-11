@@ -1,69 +1,471 @@
 ---
 title: Bookmark Management
-description: Create, organize, and manage your media bookmarks
+description: Advanced bookmark operations with enterprise-grade features and performance optimizations
+icon: BookmarkPlus
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
 
-# Bookmark Management
+# Advanced Bookmark Management
 
-Learn how to create, organize, and manage your media bookmarks effectively with the IINA Plugin Bookmarks system.
+Master the comprehensive bookmark management system with enterprise-grade features including batch operations, intelligent validation, and high-performance optimizations.
 
-## Creating Bookmarks
+## 🚀 Creating Bookmarks
 
-### Quick Bookmark Creation
-
-The fastest way to create a bookmark is using the keyboard shortcut while watching media:
-
-1. **Press the bookmark hotkey** (configurable in settings)
-2. **Instant bookmark** - Creates a bookmark with auto-detected title and current timestamp
-3. **Optional editing** - Modify title, description, or tags if needed
-
-### Manual Bookmark Creation
-
-For more control over your bookmarks:
-
-<Steps>
-  <Step>
-    ### Open the Add Bookmark Dialog
+<Tabs items={['Quick Creation', 'Advanced Creation', 'Batch Operations']}>
+  <Tab value="Quick Creation">
+    ### Instant Bookmark Creation
     
-    - Use the plugin UI button
-    - Right-click context menu
-    - Keyboard shortcut (default: `Cmd+B`)
-  </Step>
+    The fastest method for creating bookmarks with intelligent defaults:
+    
+    <Steps>
+      <Step>
+        ### Trigger Creation
+        
+        <Tabs items={['Keyboard', 'Menu', 'Sidebar']}>
+          <Tab value="Keyboard">
+            **Default**: `Cmd+B` (configurable in settings)
+            
+            Creates instant bookmark at current playback position.
+          </Tab>
+          <Tab value="Menu">
+            **Plugin Menu** → "Add Bookmark at Current Time"
+            
+            Provides same instant creation with menu access.
+          </Tab>
+          <Tab value="Sidebar">
+            **Sidebar Interface** → "➕ Add Bookmark" button
+            
+            Visual interface with preview of current position.
+          </Tab>
+        </Tabs>
+      </Step>
+      
+      <Step>
+        ### Automatic Processing
+        
+        The plugin automatically handles:
+        - **Media title detection** from metadata or filename
+        - **Timestamp capture** at exact playback position
+        - **Intelligent cleanup** of titles and formatting
+        - **Auto-tagging** based on media type and content
+        
+        ```typescript
+        // Automatic bookmark creation process
+        const bookmark = await bookmarkManager.addBookmark();
+        // Results in:
+        {
+          id: "bookmark_1695740123456",
+          title: "The Matrix Reloaded", // Auto-detected
+          timestamp: 2847.5, // Current playback time
+          filepath: "/Movies/The.Matrix.Reloaded.2003.mp4",
+          createdAt: "2024-01-15T10:30:45.123Z",
+          tags: ["action", "sci-fi"] // Auto-generated
+        }
+        ```
+      </Step>
+    </Steps>
+    
+    <Callout type="tip" title="Performance Optimization">
+      Quick creation uses **debounced operations** to prevent excessive I/O, allowing rapid bookmark creation without performance impact.
+    </Callout>
+  </Tab>
   
-  <Step>
-    ### Fill in Details
+  <Tab value="Advanced Creation">
+    ### Manual Bookmark Creation
     
-    - **Title**: Auto-detected or custom title
-    - **Timestamp**: Current time or custom timestamp
-    - **Description**: Optional description for context
-    - **Tags**: Organize with custom tags
-  </Step>
+    For precise control over bookmark properties:
+    
+    <Steps>
+      <Step>
+        ### Open Advanced Dialog
+        
+        Access the full bookmark creation interface:
+        - **Double-click** the add bookmark button
+        - **Right-click** in media area → "Create Detailed Bookmark"
+        - **Keyboard**: `Cmd+Shift+B` for advanced dialog
+      </Step>
+      
+      <Step>
+        ### Configure Properties
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
+          <div className="p-4 border rounded-lg">
+            <h4 className="font-semibold mb-2">📝 Title & Description</h4>
+            <ul className="text-sm space-y-1">
+              <li>• Auto-detected title with override option</li>
+              <li>• Rich text description support</li>
+              <li>• Title validation and suggestions</li>
+              <li>• Character count and optimization tips</li>
+            </ul>
+          </div>
+          <div className="p-4 border rounded-lg">
+            <h4 className="font-semibold mb-2">⏰ Timing & Position</h4>
+            <ul className="text-sm space-y-1">
+              <li>• Precise timestamp control (frame-accurate)</li>
+              <li>• Preview thumbnail at selected time</li>
+              <li>• Time format customization</li>
+              <li>• Playback position validation</li>
+            </ul>
+          </div>
+          <div className="p-4 border rounded-lg">
+            <h4 className="font-semibold mb-2">🏷️ Tags & Organization</h4>
+            <ul className="text-sm space-y-1">
+              <li>• Auto-complete from existing tags</li>
+              <li>• Hierarchical tag suggestions</li>
+              <li>• Bulk tag application</li>
+              <li>• Tag validation and cleanup</li>
+            </ul>
+          </div>
+          <div className="p-4 border rounded-lg">
+            <h4 className="font-semibold mb-2">🔧 Advanced Options</h4>
+            <ul className="text-sm space-y-1">
+              <li>• Custom bookmark ID generation</li>
+              <li>• Metadata preservation settings</li>
+              <li>• Duplicate detection preferences</li>
+              <li>• Export format preparation</li>
+            </ul>
+          </div>
+        </div>
+      </Step>
+      
+      <Step>
+        ### Validation & Save
+        
+        The system performs comprehensive validation:
+        
+        ```typescript
+        // Validation pipeline
+        interface ValidationResult {
+          isValid: boolean;
+          errors: string[];
+          warnings: string[];
+          suggestions: string[];
+        }
+        
+        const validation = await bookmarkManager.validateBookmark({
+          title: "User Input Title",
+          timestamp: 1234.56,
+          description: "User description",
+          tags: ["custom", "tags"]
+        });
+        ```
+        
+        <Callout type="info" title="Smart Validation">
+          Validation includes duplicate detection, timestamp verification, file path validation, and intelligent suggestions for improvements.
+        </Callout>
+      </Step>
+    </Steps>
+  </Tab>
   
-  <Step>
-    ### Save the Bookmark
+  <Tab value="Batch Operations">
+    ### Batch Bookmark Creation
     
-    Click "Save" to add the bookmark to your collection
-  </Step>
-</Steps>
+    Create multiple bookmarks efficiently:
+    
+    <Steps>
+      <Step>
+        ### Chapter-Based Creation
+        
+        Automatically create bookmarks from media chapters:
+        
+        ```typescript
+        // Automatic chapter bookmark creation
+        const chapterBookmarks = await bookmarkManager.createFromChapters({
+          includeIntro: true,
+          includeOutro: false,
+          minChapterLength: 300, // 5 minutes minimum
+          tagPrefix: "chapter"
+        });
+        ```
+      </Step>
+      
+      <Step>
+        ### Interval-Based Creation
+        
+        Create bookmarks at regular intervals:
+        
+        ```typescript
+        // Create bookmarks every 10 minutes
+        const intervalBookmarks = await bookmarkManager.createAtIntervals({
+          interval: 600, // 10 minutes in seconds
+          startTime: 0,
+          endTime: mediaDuration,
+          titleTemplate: "Interval {index} - {timestamp}"
+        });
+        ```
+      </Step>
+      
+      <Step>
+        ### Import-Based Creation
+        
+        Create bookmarks from external timestamp lists:
+        
+        ```typescript
+        // Import from timestamp file
+        const importedBookmarks = await bookmarkManager.importFromTimestamps([
+          { time: "00:05:30", title: "Opening Scene" },
+          { time: "00:15:45", title: "Character Introduction" },
+          { time: "01:23:15", title: "Climax Scene" }
+        ]);
+        ```
+      </Step>
+    </Steps>
+    
+    <Callout type="warning" title="Performance Considerations">
+      Batch operations use **optimized processing** with progress tracking and can be cancelled if needed. Large batch operations are processed in chunks to maintain UI responsiveness.
+    </Callout>
+  </Tab>
+</Tabs>
 
-## Bookmark Properties
+## 📋 Bookmark Data Structure
 
-Each bookmark contains the following information:
+Each bookmark follows a comprehensive data model designed for extensibility and performance:
 
-### Core Properties
-- **Title**: The media title (auto-detected or custom)
-- **Timestamp**: Precise playback position (in seconds)
-- **File Path**: Location of the media file
-- **Creation Date**: When the bookmark was created
-
-### Optional Properties
-- **Description**: Detailed notes about the bookmark
-- **Tags**: Categorical labels for organization
-- **Custom Title**: Override auto-detected titles
-- **Notes**: Additional context or comments
+<Tabs items={['Core Schema', 'Properties', 'Validation', 'Examples']}>
+  <Tab value="Core Schema">
+    ### TypeScript Interface Definition
+    
+    ```typescript
+    interface BookmarkData {
+      // Required core properties
+      id: string;              // Unique identifier (auto-generated)
+      title: string;           // Display title (auto-detected or custom)
+      timestamp: number;       // Playback position in seconds (precision: 0.1s)
+      filepath: string;        // Absolute or relative path to media file
+      createdAt: string;       // ISO 8601 timestamp of creation
+      
+      // Optional enhancement properties
+      description?: string;    // User-provided description/notes
+      tags?: string[];        // Array of organizational tags
+    }
+    ```
+    
+    <Callout type="info" title="Schema Evolution">
+      The bookmark schema supports **backward compatibility** and **forward migration** for future enhancements while maintaining performance through optimized storage.
+    </Callout>
+  </Tab>
+  
+  <Tab value="Properties">
+    ### Property Specifications
+    
+    <div className="space-y-4">
+      <div className="p-4 border rounded-lg">
+        <h4 className="font-semibold mb-2 flex items-center">
+          🆔 <span className="ml-2">Unique Identifier</span>
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <strong>Format:</strong> `bookmark_{timestamp}_{random}`
+            <br />
+            <strong>Example:</strong> `bookmark_1695740123456_a1b2c3`
+            <br />
+            <strong>Purpose:</strong> Ensures uniqueness across all bookmarks
+          </div>
+          <div>
+            <strong>Generation:</strong> Automatic on creation
+            <br />
+            <strong>Mutability:</strong> Immutable after creation
+            <br />
+            <strong>Indexing:</strong> Primary key for cache lookups
+          </div>
+        </div>
+      </div>
+      
+      <div className="p-4 border rounded-lg">
+        <h4 className="font-semibold mb-2 flex items-center">
+          📝 <span className="ml-2">Title Processing</span>
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <strong>Source Priority:</strong>
+            <ol className="list-decimal list-inside mt-1">
+              <li>User-provided custom title</li>
+              <li>Media metadata title</li>
+              <li>Cleaned filename</li>
+              <li>Generic fallback</li>
+            </ol>
+          </div>
+          <div>
+            <strong>Processing Features:</strong>
+            <ul className="list-disc list-inside mt-1">
+              <li>Quality indicator removal</li>
+              <li>Special character normalization</li>
+              <li>Length optimization</li>
+              <li>Encoding standardization</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <div className="p-4 border rounded-lg">
+        <h4 className="font-semibold mb-2 flex items-center">
+          ⏱️ <span className="ml-2">Timestamp Precision</span>
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <strong>Precision:</strong> 0.1 second accuracy
+            <br />
+            <strong>Range:</strong> 0.0 to media duration
+            <br />
+            <strong>Format:</strong> Floating point (seconds.milliseconds)
+          </div>
+          <div>
+            <strong>Display Formats:</strong>
+            <ul className="list-disc list-inside mt-1">
+              <li>HH:MM:SS (default)</li>
+              <li>MM:SS (under 1 hour)</li>
+              <li>Seconds.ms (technical)</li>
+              <li>Frame numbers (advanced)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <div className="p-4 border rounded-lg">
+        <h4 className="font-semibold mb-2 flex items-center">
+          🏷️ <span className="ml-2">Tag System</span>
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <strong>Structure:</strong> Flat array of strings
+            <br />
+            <strong>Limits:</strong> Max 20 tags per bookmark
+            <br />
+            <strong>Validation:</strong> Alphanumeric + hyphens/underscores
+          </div>
+          <div>
+            <strong>Auto-generation:</strong>
+            <ul className="list-disc list-inside mt-1">
+              <li>Media type detection</li>
+              <li>Genre identification</li>
+              <li>Quality level tagging</li>
+              <li>Position-based tags</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Tab>
+  
+  <Tab value="Validation">
+    ### Data Validation Pipeline
+    
+    Comprehensive validation ensures data integrity and consistency:
+    
+    ```typescript
+    interface ValidationPipeline {
+      // Core validation checks
+      validateId(id: string): ValidationResult;
+      validateTitle(title: string): ValidationResult;
+      validateTimestamp(timestamp: number, mediaDuration: number): ValidationResult;
+      validateFilepath(filepath: string): ValidationResult;
+      validateTags(tags: string[]): ValidationResult;
+      
+      // Advanced validation
+      validateDuplicates(bookmark: BookmarkData, existing: BookmarkData[]): ValidationResult;
+      validateConsistency(bookmark: BookmarkData): ValidationResult;
+      validatePerformance(bookmark: BookmarkData): ValidationResult;
+    }
+    ```
+    
+    <div className="space-y-3">
+      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
+        <strong className="text-green-800 dark:text-green-200">✅ Valid Example:</strong>
+        <pre className="text-sm mt-1 text-green-700 dark:text-green-300">
+{`{
+  "id": "bookmark_1695740123456_a1b2c3",
+  "title": "The Matrix: Neo's Awakening Scene",
+  "timestamp": 2847.5,
+  "filepath": "/Movies/The.Matrix.1999.1080p.mp4",
+  "description": "The moment Neo chooses the red pill",
+  "createdAt": "2024-01-15T10:30:45.123Z",
+  "tags": ["sci-fi", "pivotal-moment", "character-development"]
+}`}
+        </pre>
+      </div>
+      
+      <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+        <strong className="text-red-800 dark:text-red-200">❌ Invalid Example:</strong>
+        <pre className="text-sm mt-1 text-red-700 dark:text-red-300">
+{`{
+  "id": "",                    // Empty ID - fails validation
+  "title": "",                 // Empty title - fails validation
+  "timestamp": -1,             // Negative timestamp - invalid
+  "filepath": "nonexistent",   // Invalid file path
+  "tags": ["@invalid!", ""]    // Invalid tag characters and empty tag
+}`}
+        </pre>
+      </div>
+    </div>
+    
+    <Callout type="warning" title="Validation Performance">
+      Validation is **optimized for performance** with early termination and cached validation results for frequently accessed bookmarks.
+    </Callout>
+  </Tab>
+  
+  <Tab value="Examples">
+    ### Real-World Examples
+    
+    <div className="space-y-4">
+      <div className="p-4 border rounded-lg">
+        <h5 className="font-semibold mb-2">🎬 Movie Scene Bookmark</h5>
+        <pre className="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded">
+{`{
+  "id": "bookmark_1695740123456_movie01",
+  "title": "Inception: Dream Within Dream Explanation",
+  "timestamp": 3420.8,
+  "filepath": "/Movies/Inception.2010.BluRay.1080p.mp4",
+  "description": "Dom explains the concept of dreams within dreams to Ariadne. Critical plot exposition scene with visual demonstrations of multi-level dreaming architecture.",
+  "createdAt": "2024-01-15T14:22:33.456Z",
+  "tags": ["explanation", "plot-critical", "visual-effects", "sci-fi", "favorite"]
+}`}
+        </pre>
+      </div>
+      
+      <div className="p-4 border rounded-lg">
+        <h5 className="font-semibold mb-2">📚 Educational Content Bookmark</h5>
+        <pre className="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded">
+{`{
+  "id": "bookmark_1695745678901_edu01",
+  "title": "Calculus Fundamentals: Derivative Introduction",
+  "timestamp": 1247.2,
+  "filepath": "/Education/Mathematics/Calculus_101_Lecture_03.mp4",
+  "description": "Professor introduces the formal definition of derivatives with geometric interpretation and practical examples.",
+  "createdAt": "2024-01-15T15:45:12.789Z",
+  "tags": ["mathematics", "calculus", "derivatives", "lecture", "definition", "study-material"]
+}`}
+        </pre>
+      </div>
+      
+      <div className="p-4 border rounded-lg">
+        <h5 className="font-semibold mb-2">🎵 Music Video Bookmark</h5>
+        <pre className="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded">
+{`{
+  "id": "bookmark_1695750234567_music01",
+  "title": "Bohemian Rhapsody: Opera Section",
+  "timestamp": 164.7,
+  "filepath": "/Music/Queen/Bohemian_Rhapsody_Official_Video_Remastered.mp4",
+  "description": "The iconic opera section begins - 'I see a little silhouetto of a man'",
+  "createdAt": "2024-01-15T16:12:45.234Z",
+  "tags": ["queen", "opera", "classic-rock", "iconic", "vocals", "highlight"]
+}`}
+        </pre>
+      </div>
+    </div>
+    
+    <Callout type="tip" title="Best Practices">
+      - **Descriptive titles**: Use clear, searchable titles that describe the scene or content
+      - **Meaningful tags**: Include genre, mood, importance level, and content type tags
+      - **Rich descriptions**: Add context that will be useful when revisiting the bookmark later
+      - **Consistent naming**: Develop naming conventions for similar content types
+    </Callout>
+  </Tab>
+</Tabs>
 
 ## Organizing Bookmarks
 

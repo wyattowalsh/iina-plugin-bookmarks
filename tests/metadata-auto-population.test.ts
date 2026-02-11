@@ -394,14 +394,16 @@ describe('Metadata Auto-Population', () => {
       expect(bookmarks[0].description).toBe('Custom description')
     })
 
-    it('should merge user tags with auto-generated tags', () => {
+    it('should override auto-generated tags when user provides tags', () => {
       manager.addBookmark(undefined, 100, undefined, ['custom-tag', 'user-defined'])
       const bookmarks = manager.getBookmarks()
       
       expect(bookmarks[0].tags).toContain('custom-tag')
       expect(bookmarks[0].tags).toContain('user-defined')
-      expect(bookmarks[0].tags).toContain('video') // auto-generated
-      expect(bookmarks[0].tags).toContain('beginning') // auto-generated
+      // When user provides tags, they override auto-generated ones
+      expect(bookmarks[0].tags).not.toContain('video') // auto-generated should not be present
+      expect(bookmarks[0].tags).not.toContain('beginning') // auto-generated should not be present
+      expect(bookmarks[0].tags).toEqual(['custom-tag', 'user-defined'])
     })
   })
 

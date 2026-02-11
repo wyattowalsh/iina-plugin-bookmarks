@@ -1,5 +1,11 @@
 **/mcp.json
 
+# Build output & packaging
+dist/
+packaging/*.iinaplugin
+packaging/*.iinaplgz
+.parcel-cache/
+
 # Created by https://www.toptal.com/developers/gitignore/api/node,macos,vscode+all
 # Edit at https://www.toptal.com/developers/gitignore?templates=node,macos,vscode+all
 ### macOS ###

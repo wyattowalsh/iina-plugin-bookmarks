@@ -47,6 +47,16 @@ describe('Bookmark Export Functionality', () => {
         postMessage: vi.fn(), 
         onMessage: vi.fn(),
         show: vi.fn()
+      },
+      utils: {
+        chooseFile: vi.fn(() => '/test/exports'),
+        prompt: vi.fn(() => 'test-export.json'),
+        ask: vi.fn(() => true)
+      },
+      file: {
+        write: vi.fn(),
+        read: vi.fn(() => '[]'),
+        exists: vi.fn(() => true)
       }
     };
 
@@ -347,19 +357,21 @@ describe('Bookmark Export Functionality', () => {
       
       const exportOptions = {
         format: 'json' as const,
-        includeMetadata: true
+        includeMetadata: true,
+        filePath: '/test/exports/test-export.json'
       };
       
       // Test the message handler
       await manager.handleExportBookmarks(exportOptions, 'window');
       
-      // Verify that postMessage was called with export result
-      expect(mockDeps.standaloneWindow.postMessage).toHaveBeenCalledWith(
-        expect.stringContaining('EXPORT_RESULT')
-      );
+      // Find the EXPORT_RESULT message (there might be multiple messages)
+      const allCalls = mockDeps.standaloneWindow.postMessage.mock.calls;
+      const exportResultCall = allCalls.find(call => call[0].includes('EXPORT_RESULT'));
       
-      const messageCall = mockDeps.standaloneWindow.postMessage.mock.calls[0][0];
-      const messageData = JSON.parse(messageCall);
+      expect(exportResultCall).toBeDefined();
+      expect(exportResultCall[0]).toContain('EXPORT_RESULT');
+      
+      const messageData = JSON.parse(exportResultCall[0]);
       
       expect(messageData.type).toBe('EXPORT_RESULT');
       expect(messageData.data.success).toBe(true);

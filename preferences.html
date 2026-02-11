@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookmarks Preferences</title>
+  <style>
+    /* IINA Theme Variables */
+    :root {
+      --background-color: var(--system-background-color, #1e1e1e);
+      --secondary-background-color: var(--system-secondary-background-color, #262626);
+      --tertiary-background-color: var(--system-tertiary-background-color, #2d2d2d);
+      --text-color: var(--system-text-color, #ffffff);
+      --secondary-text-color: var(--system-secondary-text-color, #999999);
+      --accent-color: var(--system-accent-color, #007AFF);
+      --separator-color: var(--system-separator-color, #404040);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --background-color: #ffffff;
+        --secondary-background-color: #f5f5f5;
+        --tertiary-background-color: #e5e5e5;
+        --text-color: #000000;
+        --secondary-text-color: #666666;
+        --accent-color: #007AFF;
+        --separator-color: #d1d1d1;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+      margin: 0;
+      padding: 24px;
+      background-color: var(--background-color);
+      color: var(--text-color);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 20px 0;
+      color: var(--text-color);
+    }
+    
+    .pref-section {
+      margin-bottom: 24px;
+    }
+    
+    .pref-label {
+      display: block;
+      margin-bottom: 12px;
+      font-weight: 500;
+      color: var(--text-color);
+      cursor: pointer;
+    }
+    
+    .pref-label:hover {
+      color: var(--accent-color);
+    }
+    
+    input[type="checkbox"] {
+      margin-right: 8px;
+      accent-color: var(--accent-color);
+      width: 16px;
+      height: 16px;
+    }
+    
+    input[type="number"], select {
+      padding: 6px 10px;
+      border: 1px solid var(--separator-color);
+      border-radius: 6px;
+      background-color: var(--tertiary-background-color);
+      color: var(--text-color);
+      font-size: 13px;
+      margin-left: 8px;
+      min-width: 120px;
+    }
+    
+    input[type="number"]:focus, select:focus {
+      outline: none;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+    }
+    
+    select option {
+      background-color: var(--tertiary-background-color);
+      color: var(--text-color);
+    }
+    
+    .pref-group {
+      background-color: var(--secondary-background-color);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .pref-group-title {
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-color);
+      font-size: 14px;
+    }
+    
+    .pref-description {
+      font-size: 11px;
+      color: var(--secondary-text-color);
+      margin-top: 4px;
+      margin-left: 24px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bookmarks Plugin Settings</h1>
+  
+  <div class="pref-group">
+    <div class="pref-group-title">General Settings</div>
+    
+    <div class="pref-section">
+      <label class="pref-label">
+        <input type="checkbox" id="autoSave" checked>
+        Auto-save bookmarks
+      </label>
+      <div class="pref-description">Automatically save bookmarks when they are created or modified</div>
+    </div>
+    
+    <div class="pref-section">
+      <label class="pref-label">
+        <input type="checkbox" id="showTimestamps" checked>
+        Show timestamps in bookmark list
+      </label>
+      <div class="pref-description">Display the playback time for each bookmark</div>
+    </div>
+  </div>
+  
+  <div class="pref-group">
+    <div class="pref-group-title">Display Options</div>
+    
+    <div class="pref-section">
+      <label class="pref-label" for="defaultSort">
+        Default sort by:
+        <select id="defaultSort">
+          <option value="timestamp">Timestamp</option>
+          <option value="title">Title</option>
+          <option value="createdAt">Created Date</option>
+        </select>
+      </label>
+      <div class="pref-description">How bookmarks should be sorted by default</div>
+    </div>
+    
+    <div class="pref-section">
+      <label class="pref-label" for="maxBookmarks">
+        Maximum bookmarks:
+        <input type="number" id="maxBookmarks" value="1000" min="10" max="10000">
+      </label>
+      <div class="pref-description">Maximum number of bookmarks to store per media file</div>
+    </div>
+  </div>
+
+  <script>
+    console.log("Bookmarks preferences page loaded");
+    
+    // Load current preference values if available
+    if (window.iina && window.iina.preferences) {
+      try {
+        document.getElementById('autoSave').checked = window.iina.preferences.get('autoSave') !== false;
+        document.getElementById('showTimestamps').checked = window.iina.preferences.get('showTimestamps') !== false;
+        document.getElementById('defaultSort').value = window.iina.preferences.get('defaultSortBy') || 'timestamp';
+        document.getElementById('maxBookmarks').value = window.iina.preferences.get('maxBookmarks') || 1000;
+      } catch (e) {
+        console.log("Could not load preferences:", e);
+      }
+    }
+    
+    // Save preferences when changed
+    function savePreferences() {
+      if (window.iina && window.iina.preferences) {
+        try {
+          window.iina.preferences.set('autoSave', document.getElementById('autoSave').checked);
+          window.iina.preferences.set('showTimestamps', document.getElementById('showTimestamps').checked);
+          window.iina.preferences.set('defaultSortBy', document.getElementById('defaultSort').value);
+          window.iina.preferences.set('maxBookmarks', parseInt(document.getElementById('maxBookmarks').value));
+        } catch (e) {
+          console.log("Could not save preferences:", e);
+        }
+      }
+    }
+    
+    // Add event listeners
+    document.getElementById('autoSave').addEventListener('change', savePreferences);
+    document.getElementById('showTimestamps').addEventListener('change', savePreferences);
+    document.getElementById('defaultSort').addEventListener('change', savePreferences);
+    document.getElementById('maxBookmarks').addEventListener('change', savePreferences);
+  </script>
+</body>
+</html>

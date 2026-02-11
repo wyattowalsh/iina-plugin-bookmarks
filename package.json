@@ -2,20 +2,28 @@
   "name": "iina-plugin-bookmarks",
   "version": "1.0.0",
   "description": "IINA plugin for user-friendly media bookmark management",
-  "main": "src/index.ts",
+  "main": "src/index-modern.ts",
   "scripts": {
     "serve-window": "parcel serve ui/window/index.html --dist-dir dist/ui/window",
     "serve-sidebar": "parcel serve ui/sidebar/index.html --dist-dir dist/ui/sidebar",
     "serve-overlay": "parcel serve ui/overlay/index.html --dist-dir dist/ui/overlay",
-    "build": "rm -rf dist && parcel build .",
+    "build": "rm -rf dist && parcel build --target entry --target window --target overlay --target sidebar",
+    "build:dev": "rm -rf dist && parcel build --target entry --target window --target overlay --target sidebar --no-optimize",
+    "build:modern": "rm -rf dist && parcel build --target modern-entry --target window --target overlay --target sidebar",
+    "build:modern:dev": "rm -rf dist && parcel build --target modern-entry --target window --target overlay --target sidebar --no-optimize",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "package": "make package"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@parcel/transformer-sass": "^2.15.2",
+    "@parcel/config-default": "^2.16.0",
+    "@parcel/core": "^2.16.0",
+    "@parcel/transformer-js": "^2.16.0",
+    "@parcel/transformer-sass": "^2.16.0",
+    "@parcel/transformer-typescript-types": "^2.16.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitest/ui": "^1.6.0",
@@ -23,8 +31,11 @@
     "jsdom": "^24.1.0",
     "prettier": "^2.8.8",
     "process": "^0.11.10",
+    "ts-loader": "^9.5.4",
     "typescript": "^5.0.0",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
   },
   "dependencies": {
     "parcel": "^2.12.0",
@@ -32,9 +43,24 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
-  "browserslist": "safari >= 9",
+  "browserslist": "safari >= 14",
   "targets": {
     "main": false,
+    "entry": {
+      "distDir": "./dist/",
+      "source": "src/index.ts",
+      "isLibrary": false
+    },
+    "modern-entry": {
+      "distDir": "./dist/",
+      "source": "src/index-modern.ts",
+      "isLibrary": false
+    },
+    "global": {
+      "distDir": "./dist/",
+      "source": "src/global.ts",
+      "isLibrary": false
+    },
     "window": {
       "distDir": "./dist/ui/window",
       "source": "ui/window/index.html",
@@ -49,17 +75,6 @@
       "distDir": "./dist/ui/sidebar",
       "source": "ui/sidebar/index.html",
       "publicUrl": "./"
-    },
-    "global": {
-      "distDir": "./dist/",
-      "source": "src/global.ts",
-      "isLibrary": false
-    },
-    "entry": {
-      "distDir": "./dist/",
-      "source": "src/index.ts",
-      "outputFormat": "global",
-      "isLibrary": false
     }
   }
 }

@@ -138,14 +138,26 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="dialog-overlay">
+    <div 
+      className="dialog-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="export-dialog-title"
+      aria-describedby="export-dialog-description"
+    >
       <div className="dialog-content export-dialog">
         <div className="dialog-header">
-          <h3>Export Bookmarks</h3>
-          <p className="dialog-subtitle">
+          <h3 id="export-dialog-title">Export Bookmarks</h3>
+          <p id="export-dialog-description" className="dialog-subtitle">
             Choose format and options for exporting your bookmarks
           </p>
-          <button onClick={handleClose} className="close-btn" disabled={isExporting}>
+          <button 
+            onClick={handleClose} 
+            className="close-btn" 
+            disabled={isExporting}
+            aria-label="Close export dialog"
+            title="Close export dialog"
+          >
             &times;
           </button>
         </div>
@@ -178,24 +190,27 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
             <form onSubmit={(e) => { e.preventDefault(); handleExport(); }}>
               {/* Format Selection */}
               <div className="form-section">
-                <h4>Export Format</h4>
-                <div className="format-options">
+                <h4 id="format-section-heading">Export Format</h4>
+                <div className="format-options" role="radiogroup" aria-labelledby="format-section-heading">
                   <label className="format-option">
                     <input
                       type="radio"
+                      name="export-format"
                       value="json"
                       checked={format === 'json'}
                       onChange={(e) => setFormat(e.target.value as 'json')}
                       disabled={isExporting}
+                      aria-describedby="json-format-description"
                     />
                     <div className="format-info">
                       <strong>JSON</strong>
-                      <span>Complete data with metadata, ideal for backup/restore</span>
+                      <span id="json-format-description">Complete data with metadata, ideal for backup/restore</span>
                     </div>
                   </label>
                   <label className="format-option">
                     <input
                       type="radio"
+                      name="export-format"
                       value="csv"
                       checked={format === 'csv'}
                       onChange={(e) => setFormat(e.target.value as 'csv')}

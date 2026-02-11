@@ -33,7 +33,11 @@ const App: React.FC = () => {
     tags: [],
     sortBy: 'createdAt',
     sortDirection: 'desc',
-    fileFilter: ''
+    fileFilter: '',
+    sortCriteria: [
+      { field: 'createdAt', direction: 'desc', priority: 1 }
+    ],
+    enableMultiSort: false
   });
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);

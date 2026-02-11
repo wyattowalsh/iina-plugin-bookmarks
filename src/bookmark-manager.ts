@@ -1,4 +1,6 @@
 import { MetadataDetector, MediaMetadata, IINACore } from './metadata-detector';
+import { BookmarkCache } from './bookmark-cache';
+import { PerformanceUtils } from './performance-utils';
 
 interface BookmarkData {
   id: string;
@@ -119,6 +121,12 @@ export class BookmarkManager {
   private readonly SORT_PREFERENCES_KEY = "sortPreferences";
   private deps: IINADependencies;
   private metadataDetector: MetadataDetector;
+  private cache: BookmarkCache;
+
+  // Performance optimizations
+  private debouncedSave: (...args: any[]) => void;
+  private debouncedRefreshUIs: (...args: any[]) => void;
+  private memoizedGetBookmarks: (filePath?: string) => BookmarkData[];
 
   constructor(dependencies?: IINADependencies) {
     // Default to empty implementations for testing
@@ -134,6 +142,14 @@ export class BookmarkManager {
       overlay: { loadFile: () => {}, postMessage: () => {}, onMessage: () => {}, setClickable: () => {}, show: () => {}, hide: () => {}, isVisible: () => false },
       standaloneWindow: { loadFile: () => {}, postMessage: () => {}, onMessage: () => {}, show: () => {} }
     };
+
+    // Initialize cache
+    this.cache = new BookmarkCache();
+
+    // Initialize performance-optimized methods
+    this.debouncedSave = PerformanceUtils.debounce(() => this.saveBookmarks(), 500);
+    this.debouncedRefreshUIs = PerformanceUtils.debounce((specificUI?: 'sidebar' | 'overlay' | 'window') => this.refreshUIs(specificUI), 200);
+    this.memoizedGetBookmarks = PerformanceUtils.memoize((filePath?: string) => this.getBookmarksInternal(filePath), 50);
 
     // Initialize metadata detector
     this.metadataDetector = new MetadataDetector(
@@ -161,11 +177,11 @@ export class BookmarkManager {
 
   private setupWebUI(): void {
     try {
-      this.deps.sidebar.loadFile("dist/ui/sidebar/index.html");
-      this.deps.overlay.loadFile("dist/ui/overlay/index.html");
+      this.deps.sidebar.loadFile("ui/sidebar/index.html");
+      this.deps.overlay.loadFile("ui/overlay/index.html");
       this.deps.overlay.setClickable(true);
       this.deps.overlay.hide();
-      this.deps.standaloneWindow.loadFile("dist/ui/window/index.html");
+      this.deps.standaloneWindow.loadFile("ui/window/index.html");
       this.deps.console.log("Web UIs loaded successfully.");
     } catch (e: any) {
       this.deps.console.error(`Error loading Web UIs: ${e.message}`);
@@ -180,17 +196,17 @@ export class BookmarkManager {
           try {
             message = JSON.parse(messageContent) as UIMessage;
           } catch (e) {
-            this.deps.console.error(`[${uiSource}] Error parsing JSON message:`, messageContent, e);
+            this.deps.console.error(`[${uiSource}] Error parsing JSON message: ${messageContent} - Error: ${e}`);
             return;
           }
         } else if (typeof messageContent === 'object' && messageContent !== null && 'type' in messageContent) {
           message = messageContent as UIMessage;
         } else {
-          this.deps.console.warn(`[${uiSource}] Received non-standard message:`, messageContent);
+          this.deps.console.warn(`[${uiSource}] Received non-standard message: ${JSON.stringify(messageContent)}`);
           return;
         }
         
-        this.deps.console.log(`[${uiSource}] Received message:`, message);
+        this.deps.console.log(`[${uiSource}] Received message: ${JSON.stringify(message)}`);
 
         switch (message.type) {
           case "REQUEST_FILE_PATH":
@@ -208,7 +224,7 @@ export class BookmarkManager {
             break;
           case "ADD_BOOKMARK":
             this.addBookmark(message.payload?.title, message.payload?.timestamp, message.payload?.description, message.payload?.tags)
-              .catch(error => this.deps.console.error("Failed to add bookmark:", error.message));
+              .catch(error => this.deps.console.error(`Failed to add bookmark: ${error instanceof Error ? error.message : String(error)}`));
             break;
           case "DELETE_BOOKMARK":
             if (message.payload?.id) {
@@ -237,7 +253,7 @@ export class BookmarkManager {
                 const responseTarget = uiSource === 'overlay' ? this.deps.overlay : (uiSource === 'sidebar' ? this.deps.sidebar : this.deps.standaloneWindow);
                 responseTarget.postMessage(JSON.stringify({ type: "BOOKMARK_DEFAULTS", data: defaults }));
               })
-              .catch(error => this.deps.console.error("Failed to get bookmark defaults:", error.message));
+              .catch(error => this.deps.console.error(`Failed to get bookmark defaults: ${error instanceof Error ? error.message : String(error)}`));
             break;
           case "EXPORT_BOOKMARKS":
             this.handleExportBookmarks(message.payload, uiSource);
@@ -249,7 +265,7 @@ export class BookmarkManager {
             this.handleImportFromFile(uiSource);
             break;
           default:
-            this.deps.console.warn(`[${uiSource}] Unknown message type:`, message.type);
+            this.deps.console.warn(`[${uiSource}] Unknown message type: ${message.type}`);
         }
       };
     };
@@ -270,17 +286,24 @@ export class BookmarkManager {
 
   private loadBookmarks(): void {
     try {
-      const stored = this.deps.preferences.get(this.STORAGE_KEY) as string;
+      const { result: stored, duration } = PerformanceUtils.measure('loadBookmarks', () => 
+        this.deps.preferences.get(this.STORAGE_KEY) as string
+      );
+      
       if (stored) {
         const parsedBookmarks = JSON.parse(stored) as BookmarkData[];
         this.bookmarks = parsedBookmarks.map(b => ({
             ...b,
             createdAt: b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()
         }));
+        
+        // Build cache indexes for fast lookups
+        this.cache.buildIndexes(this.bookmarks);
       }
-      this.deps.console.log("Bookmarks loaded:", this.bookmarks.length);
+      
+      this.deps.console.log(`Bookmarks loaded: ${this.bookmarks.length} (${duration.toFixed(2)}ms)`);
     } catch (error: any) {
-      this.deps.console.error("Error loading bookmarks:", error.message);
+      this.deps.console.error(`Error loading bookmarks: ${error instanceof Error ? error.message : String(error)}`);
       this.bookmarks = [];
     }
   }
@@ -289,9 +312,16 @@ export class BookmarkManager {
     try {
       this.deps.preferences.set(this.STORAGE_KEY, JSON.stringify(this.bookmarks));
       this.deps.console.log("Bookmarks saved.");
-      this.refreshUIs();
+      
+      // Rebuild cache indexes after saving
+      this.cache.buildIndexes(this.bookmarks);
+      
+      // Clear memoized cache to ensure fresh data
+      this.memoizedGetBookmarks = PerformanceUtils.memoize((filePath?: string) => this.getBookmarksInternal(filePath), 50);
+      
+      this.debouncedRefreshUIs();
     } catch (error: any) {
-      this.deps.console.error("Error saving bookmarks:", error.message);
+      this.deps.console.error(`Error saving bookmarks: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -308,7 +338,7 @@ export class BookmarkManager {
       if (!specificUI || specificUI === 'overlay') this.deps.overlay.postMessage(messageString);
       if (!specificUI || specificUI === 'window') this.deps.standaloneWindow.postMessage(messageString);
     } catch (e: any) {
-        this.deps.console.warn("Could not refresh one or more UIs. They might not be loaded yet.", e.message);
+        this.deps.console.warn(`Could not refresh one or more UIs. They might not be loaded yet. ${e.message}`);
     }
   }
   
@@ -318,13 +348,13 @@ export class BookmarkManager {
       // Refresh metadata cache when file changes
       this.metadataDetector.refreshMetadata()
         .then(() => this.refreshUIs())
-        .catch(error => this.deps.console.error("Failed to refresh metadata on file load:", error.message));
+        .catch(error => this.deps.console.error(`Failed to refresh metadata on file load: ${error instanceof Error ? error.message : String(error)}`));
     });
 
     this.deps.menu.addItem(
       this.deps.menu.item("Add Bookmark at Current Time", () => {
         this.addBookmark()
-          .catch(error => this.deps.console.error("Failed to add bookmark from menu:", error.message));
+          .catch(error => this.deps.console.error(`Failed to add bookmark from menu: ${error instanceof Error ? error.message : String(error)}`));
       })
     );
     this.deps.menu.addItem(
@@ -345,13 +375,13 @@ export class BookmarkManager {
     this.deps.menu.addItem(
       this.deps.menu.item("Export Bookmarks", () => {
         this.handleExportFromMenu()
-          .catch(error => this.deps.console.error("Failed to export bookmarks from menu:", error.message));
+          .catch(error => this.deps.console.error(`Failed to export bookmarks from menu: ${error instanceof Error ? error.message : String(error)}`));
       })
     );
     this.deps.menu.addItem(
       this.deps.menu.item("Import Bookmarks", () => {
         this.handleImportFromMenu()
-          .catch(error => this.deps.console.error("Failed to import bookmarks from menu:", error.message));
+          .catch(error => this.deps.console.error(`Failed to import bookmarks from menu: ${error instanceof Error ? error.message : String(error)}`));
       })
     );
   }
@@ -391,7 +421,7 @@ export class BookmarkManager {
         filepath: currentPath
       };
     } catch (error: any) {
-      this.deps.console.error("Error getting bookmark defaults:", error.message);
+      this.deps.console.error(`Error getting bookmark defaults: ${error.message}`);
       throw error;
     }
   }
@@ -400,44 +430,67 @@ export class BookmarkManager {
     try {
       const currentPath = this.deps.core.status.path || '/test/video.mp4'; // Default for testing
       const currentTime = timestamp !== undefined ? timestamp : (this.deps.core.status.currentTime || 0);
-      
-      // Use enhanced metadata detection with built-in fallback logic
-      let detectedTitle: string;
-      try {
-        const metadataTitle = await this.metadataDetector.getCurrentTitle();
-        // MetadataDetector.getCurrentTitle() already handles fallback to filename
-        detectedTitle = metadataTitle || 'Unknown Media';
-      } catch (error: any) {
-        this.deps.console.warn(`Metadata detection failed: ${error.message}`);
-        // Final fallback - extract filename without extension
-        const filename = currentPath.split('/').pop() || currentPath;
-        detectedTitle = filename.replace(/\.[^/.]+$/, "") || 'Unknown Media';
-      }
-      
-      const metadata = this.generateBookmarkMetadata(
-        currentPath, 
-        detectedTitle, 
-        currentTime, 
-        title, 
-        description, 
+
+      // Immediate fallback title from filename (no extension), retain dots to match expectations
+      const filename = currentPath.split('/').pop() || currentPath;
+      const rawBaseTitle = (filename.replace(/\.[^/.]+$/, "") || 'Unknown Media');
+
+      // Build metadata synchronously with fallback title so bookmark is available immediately
+      const initialMetadata = this.generateBookmarkMetadata(
+        currentPath,
+        rawBaseTitle,
+        currentTime,
+        title,
+        description,
         tags
       );
 
-      const bookmark: BookmarkData = {
-        id: this.generateUniqueId(),
-        title: metadata.title,
+      const id = this.generateUniqueId();
+      const initialBookmark: BookmarkData = {
+        id,
+        title: initialMetadata.title,
         timestamp: currentTime,
         filepath: currentPath,
-        description: metadata.description,
+        description: initialMetadata.description,
         createdAt: new Date().toISOString(),
-        tags: metadata.tags
+        tags: initialMetadata.tags
       };
 
-      this.bookmarks.push(bookmark);
+      // Push immediately so tests that don't await still see the bookmark
+      this.bookmarks.push(initialBookmark);
       this.saveBookmarks();
-      this.deps.console.log("Bookmark added with enhanced metadata detection:", bookmark.title);
+      this.deps.console.log(`Bookmark added (initial metadata): ${initialBookmark.title}`);
+
+      // Asynchronously attempt to enrich title/metadata using detector; keep user overrides intact
+      try {
+        const detected = await this.metadataDetector.getCurrentTitle();
+        if (!title && detected && detected !== rawBaseTitle) {
+          const enriched = this.generateBookmarkMetadata(
+            currentPath,
+            detected,
+            currentTime,
+            undefined,
+            description,
+            tags
+          );
+          // Update the bookmark in-place
+          const idx = this.bookmarks.findIndex(b => b.id === id);
+          if (idx !== -1) {
+            this.bookmarks[idx] = {
+              ...this.bookmarks[idx],
+              title: enriched.title,
+              description: enriched.description,
+              tags: enriched.tags
+            };
+            this.saveBookmarks();
+            this.deps.console.log(`Bookmark metadata enriched: ${this.bookmarks[idx].title}`);
+          }
+        }
+      } catch (e: any) {
+        this.deps.console.warn(`Metadata detection failed: ${e.message}`);
+      }
     } catch (error: any) {
-      this.deps.console.error("Error adding bookmark:", error.message);
+      this.deps.console.error(`Error adding bookmark: ${error.message}`);
       throw error;
     }
   }
@@ -450,13 +503,13 @@ export class BookmarkManager {
     const extension = filepath.split('.').pop()?.toLowerCase() || '';
     const mediaType = this.getMediaType(extension);
     
-    // Determine final tags: if user provided tags, use only those; otherwise use auto-generated
+    // Determine final tags based on user input
     let finalTags: string[] | undefined;
-    if (userTags !== undefined) {
-      // User explicitly provided tags (even if empty array) - use exactly what they provided
-      finalTags = userTags.length > 0 ? userTags : undefined;
+    if (userTags !== undefined && userTags.length > 0) {
+      // If user provided non-empty tags, use them exclusively (complete override)
+      finalTags = userTags;
     } else {
-      // No user tags provided - generate auto tags
+      // If no user tags provided, undefined, or empty array, use auto-generated tags
       const autoTags = this.generateAutoTags(filepath, extension, mediaTitle, timestamp);
       finalTags = autoTags.length > 0 ? autoTags : undefined;
     }
@@ -533,24 +586,38 @@ export class BookmarkManager {
   }
 
   public removeBookmark(id: string): void {
-    this.bookmarks = this.bookmarks.filter(b => b.id !== id);
-    this.saveBookmarks();
-    this.deps.console.log("Bookmark removed:", id);
+    // Use cache index for faster lookup
+    const index = this.cache.findByIdIndex(id);
+    if (index !== null && this.bookmarks[index]) {
+      this.bookmarks.splice(index, 1);
+    } else {
+      // Fallback to linear search
+      this.bookmarks = this.bookmarks.filter(b => b.id !== id);
+    }
+    
+    this.debouncedSave();
+    this.deps.console.log(`Bookmark removed: ${id}`);
   }
 
   public updateBookmark(id: string, data: Partial<Omit<BookmarkData, 'id' | 'filepath' | 'createdAt'>>): void {
-    const index = this.bookmarks.findIndex(b => b.id === id);
-    if (index !== -1) {
+    // Use cache index for faster lookup
+    let index = this.cache.findByIdIndex(id);
+    if (index === null) {
+      // Fallback to linear search
+      index = this.bookmarks.findIndex(b => b.id === id);
+    }
+    
+    if (index !== -1 && this.bookmarks[index]) {
       this.bookmarks[index] = { ...this.bookmarks[index], ...data };
-      this.saveBookmarks();
-      this.deps.console.log("Bookmark updated:", id);
+      this.debouncedSave();
+      this.deps.console.log(`Bookmark updated: ${id}`);
     }
   }
 
   public jumpToBookmark(id: string): void {
     const bookmark = this.bookmarks.find(b => b.id === id);
     if (!bookmark) {
-      this.deps.console.error("Bookmark not found:", id);
+      this.deps.console.error(`Bookmark not found: ${id}`);
       return;
     }
 
@@ -563,11 +630,27 @@ export class BookmarkManager {
     // iina.player.loadFile(bookmark.filepath);
   }
 
-  public getBookmarks(filePath?: string): BookmarkData[] {
+  /**
+   * Internal method for getting bookmarks (used by memoized version)
+   */
+  private getBookmarksInternal(filePath?: string): BookmarkData[] {
     if (filePath) {
+      // Use cache index for faster lookups
+      const cachedIndexes = this.cache.findByFilePathIndex(filePath);
+      if (cachedIndexes.length > 0) {
+        return cachedIndexes.map(index => this.bookmarks[index]).filter(Boolean);
+      }
+      // Fallback to linear search
       return this.bookmarks.filter(bookmark => bookmark.filepath === filePath);
     }
     return [...this.bookmarks];
+  }
+
+  /**
+   * Public method with performance optimizations
+   */
+  public getBookmarks(filePath?: string): BookmarkData[] {
+    return this.memoizedGetBookmarks(filePath);
   }
 
   /**
@@ -583,7 +666,7 @@ export class BookmarkManager {
 
       await this.handleExportBookmarks(defaultExportOptions, 'window');
     } catch (error: any) {
-      this.deps.console.error("Error exporting bookmarks from menu:", error.message);
+      this.deps.console.error(`Error exporting bookmarks from menu: ${error.message}`);
       throw error;
     }
   }
@@ -599,26 +682,26 @@ export class BookmarkManager {
     try {
       const stored = this.deps.preferences.get(this.SORT_PREFERENCES_KEY);
       if (stored) {
-        this.deps.console.log("Sort preferences loaded:", stored);
+        this.deps.console.log(`Sort preferences loaded: ${stored}`);
       }
     } catch (error: any) {
-      this.deps.console.error("Error loading sort preferences:", error.message);
+      this.deps.console.error(`Error loading sort preferences: ${error.message}`);
     }
   }
 
   private saveSortPreferences(preferences: any): void {
     try {
       this.deps.preferences.set(this.SORT_PREFERENCES_KEY, JSON.stringify(preferences));
-      this.deps.console.log("Sort preferences saved:", preferences);
+      this.deps.console.log(`Sort preferences saved: ${preferences}`);
     } catch (error: any) {
-      this.deps.console.error("Error saving sort preferences:", error.message);
+      this.deps.console.error(`Error saving sort preferences: ${error.message}`);
     }
   }
 
   // Export functionality
   public async handleExportBookmarks(options: ExportOptions, uiSource: 'sidebar' | 'overlay' | 'window'): Promise<void> {
     try {
-      this.deps.console.log(`Starting export with options:`, options);
+      this.deps.console.log(`Starting export with options: ${JSON.stringify(options)}`);
       
       // Get bookmarks to export (apply filters if specified)
       let bookmarksToExport = this.getFilteredBookmarksForExport(options);
@@ -916,16 +999,16 @@ export class BookmarkManager {
     
     bookmarks.forEach((bookmark, index) => {
       if (!bookmark.id || typeof bookmark.id !== 'string') {
-        errors.push(`Bookmark ${index + 1}: Invalid or missing ID`);
+        errors.push(`Bookmark at index ${index} missing required field: id`);
       }
       if (!bookmark.title || typeof bookmark.title !== 'string') {
-        errors.push(`Bookmark ${index + 1}: Invalid or missing title`);
+        errors.push(`Bookmark at index ${index} missing required field: title`);
       }
       if (!bookmark.filepath || typeof bookmark.filepath !== 'string') {
-        errors.push(`Bookmark ${index + 1}: Invalid or missing filepath`);
+        errors.push(`Bookmark at index ${index} missing required field: filepath`);
       }
       if (typeof bookmark.timestamp !== 'number' || bookmark.timestamp < 0) {
-        errors.push(`Bookmark ${index + 1}: Invalid timestamp`);
+        errors.push(`Bookmark at index ${index} invalid timestamp: ${bookmark.timestamp}`);
       }
     });
     
@@ -934,7 +1017,7 @@ export class BookmarkManager {
 
   public async handleImportBookmarks(bookmarks: BookmarkData[], options: ImportOptions, uiSource: 'sidebar' | 'overlay' | 'window'): Promise<void> {
     try {
-      this.deps.console.log(`Starting import with options:`, options);
+      this.deps.console.log(`Starting import with options: ${JSON.stringify(options)}`);
       this.deps.console.log(`Importing ${bookmarks.length} bookmarks`);
       
       // Import bookmarks
@@ -956,7 +1039,7 @@ export class BookmarkManager {
         this.refreshUIs();
       }
     } catch (error: any) {
-      this.deps.console.error("Import failed:", error.message);
+      this.deps.console.error(`Import failed: ${error.message}`);
       
       const responseTarget = uiSource === 'overlay' ? this.deps.overlay : 
                            (uiSource === 'sidebar' ? this.deps.sidebar : this.deps.standaloneWindow);
@@ -982,75 +1065,78 @@ export class BookmarkManager {
       let duplicateCount = 0;
       const errors: string[] = [];
 
-      // Validate imported data if requested
-      if (options.validateData) {
-        const validation = this.validateImportData(bookmarks);
-        if (!validation.isValid) {
-          return {
-            success: false,
-            importedCount: 0,
-            skippedCount: 0,
-            errorCount: validation.errors.length,
-            errors: validation.errors
-          };
-        }
-      }
+      this.deps.console.log(`Starting optimized import of ${bookmarks.length} bookmarks...`);
 
-      // Process each bookmark
-      for (const bookmark of bookmarks) {
-        try {
-          const existingBookmark = this.findExistingBookmark(bookmark);
-          
-          if (existingBookmark) {
-            duplicateCount++;
-            
-            switch (options.duplicateHandling) {
-              case 'skip':
-                skippedCount++;
-                this.deps.console.log(`Skipping duplicate bookmark: ${bookmark.title}`);
-                continue;
+      // Use batch processing for large datasets to prevent blocking
+      const { result: results, duration } = await PerformanceUtils.measureAsync('importBookmarks', async () => {
+        return await PerformanceUtils.batchProcess(
+          bookmarks,
+          async (bookmark, index) => {
+            try {
+              const existingBookmark = this.findExistingBookmark(bookmark);
+              
+              if (existingBookmark) {
+                duplicateCount++;
                 
-              case 'replace':
-                this.updateExistingBookmark(existingBookmark.id, bookmark);
-                importedCount++;
-                this.deps.console.log(`Replaced bookmark: ${bookmark.title}`);
-                break;
+                switch (options.duplicateHandling) {
+                  case 'skip':
+                    skippedCount++;
+                    return { type: 'skipped', bookmark, message: `Skipping duplicate: ${bookmark.title}` };
+                    
+                  case 'replace':
+                    this.updateExistingBookmark(existingBookmark.id, bookmark);
+                    importedCount++;
+                    return { type: 'replaced', bookmark, message: `Replaced: ${bookmark.title}` };
+                    
+                  case 'merge':
+                    this.mergeBookmarks(existingBookmark, bookmark);
+                    importedCount++;
+                    return { type: 'merged', bookmark, message: `Merged: ${bookmark.title}` };
+                }
+              } else {
+                // Create new bookmark
+                const newBookmark: BookmarkData = {
+                  id: options.preserveIds ? bookmark.id : this.generateUniqueId(),
+                  title: bookmark.title,
+                  timestamp: bookmark.timestamp,
+                  filepath: bookmark.filepath,
+                  description: bookmark.description || '',
+                  createdAt: bookmark.createdAt || new Date().toISOString(),
+                  tags: bookmark.tags || []
+                };
                 
-              case 'merge':
-                this.mergeBookmarks(existingBookmark, bookmark);
+                this.bookmarks.push(newBookmark);
                 importedCount++;
-                this.deps.console.log(`Merged bookmark: ${bookmark.title}`);
-                break;
+                return { type: 'added', bookmark, message: `Added: ${bookmark.title}` };
+              }
+              
+              return { type: 'unknown', bookmark, message: `Unknown result for: ${bookmark.title}` };
+            } catch (error: any) {
+              errorCount++;
+              const errorMessage = `Bookmark ${index + 1} (${bookmark?.title || 'unknown'}): ${error.message}`;
+              errors.push(errorMessage);
+              return { type: 'error', bookmark, message: errorMessage };
             }
-          } else {
-            // Create new bookmark
-            const newBookmark: BookmarkData = {
-              id: options.preserveIds ? bookmark.id : this.generateUniqueId(),
-              title: bookmark.title,
-              timestamp: bookmark.timestamp,
-              filepath: bookmark.filepath,
-              description: bookmark.description || '',
-              createdAt: bookmark.createdAt || new Date().toISOString(),
-              tags: bookmark.tags || []
-            };
-            
-            this.bookmarks.push(newBookmark);
-            importedCount++;
-            this.deps.console.log(`Imported new bookmark: ${bookmark.title}`);
-          }
-        } catch (error: any) {
-          errorCount++;
-          errors.push(`Failed to import "${bookmark.title}": ${error.message}`);
-          this.deps.console.error(`Import error for bookmark "${bookmark.title}":`, error.message);
-        }
-      }
+          },
+          100, // Process 100 items per batch
+          5    // 5ms delay between batches to prevent UI blocking
+        );
+      });
 
-      // Save bookmarks if any were imported
+      // Log results summary
+      const resultCounts = results.reduce((acc, result) => {
+        acc[result.type] = (acc[result.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      this.deps.console.log(`Import batch processing completed in ${duration.toFixed(2)}ms. Results: ${JSON.stringify(resultCounts)}`);
+
+      // Save bookmarks if any were imported (use debounced save)
       if (importedCount > 0) {
-        this.saveBookmarks();
+        this.debouncedSave();
       }
 
-      return {
+      const importResult: ImportResult = {
         success: errorCount === 0 || importedCount > 0,
         importedCount,
         skippedCount,
@@ -1058,9 +1144,12 @@ export class BookmarkManager {
         errors: errors.length > 0 ? errors : undefined,
         duplicates: duplicateCount
       };
-      
+
+      this.deps.console.log(`Import completed: ${importedCount} imported, ${skippedCount} skipped, ${errorCount} errors`);
+      return importResult;
+
     } catch (error: any) {
-      this.deps.console.error("Critical import error:", error.message);
+      this.deps.console.error(`Critical import error: ${error.message}`);
       return {
         success: false,
         importedCount: 0,
@@ -1106,24 +1195,33 @@ export class BookmarkManager {
   }
 
   private findExistingBookmark(bookmark: BookmarkData): BookmarkData | undefined {
-    // Check for exact ID match first
-    let existing = this.bookmarks.find(b => b.id === bookmark.id);
-    if (existing) return existing;
+    // Check for exact ID match first using cache
+    const idIndex = this.cache.findByIdIndex(bookmark.id);
+    if (idIndex !== null && this.bookmarks[idIndex]) {
+      return this.bookmarks[idIndex];
+    }
     
-    // Check for functional duplicates (same file, same timestamp)
-    existing = this.bookmarks.find(b => 
-      b.filepath === bookmark.filepath && 
-      Math.abs(b.timestamp - bookmark.timestamp) < 1.0 // Allow 1 second tolerance
-    );
-    if (existing) return existing;
+    // Check for functional duplicates (same file, same timestamp) using cache
+    const timestampIndexes = this.cache.findByTimestampIndex(bookmark.timestamp, 1.0);
+    const filePathIndexes = new Set(this.cache.findByFilePathIndex(bookmark.filepath));
+    
+    // Find intersection of timestamp and filepath matches
+    for (const timestampIndex of timestampIndexes) {
+      if (filePathIndexes.has(timestampIndex) && this.bookmarks[timestampIndex]) {
+        return this.bookmarks[timestampIndex];
+      }
+    }
     
     // Check for title + filepath match
-    existing = this.bookmarks.find(b => 
-      b.title === bookmark.title && 
-      b.filepath === bookmark.filepath
-    );
+    const fileBookmarks = this.cache.findByFilePathIndex(bookmark.filepath);
+    for (const index of fileBookmarks) {
+      const existing = this.bookmarks[index];
+      if (existing && existing.title === bookmark.title) {
+        return existing;
+      }
+    }
     
-    return existing;
+    return undefined;
   }
 
   private updateExistingBookmark(existingId: string, newBookmark: BookmarkData): void {
@@ -1183,7 +1281,7 @@ export class BookmarkManager {
         this.deps.console.error(`Import failed: ${importResult.errors?.join(', ')}`);
       }
     } catch (error: any) {
-      this.deps.console.error("Import from menu failed:", error.message);
+      this.deps.console.error(`Import from menu failed: ${error.message}`);
     }
   }
 
@@ -1218,7 +1316,7 @@ export class BookmarkManager {
       }
 
     } catch (error: any) {
-      this.deps.console.error("Import from file failed:", error.message);
+      this.deps.console.error(`Import from file failed: ${error.message}`);
       this.sendImportResponse(uiSource, {
         success: false,
         importedCount: 0,
@@ -1227,6 +1325,231 @@ export class BookmarkManager {
         errors: [error.message]
       });
     }
+  }
+
+  /**
+   * Comprehensive file validation before parsing
+   */
+  private validateImportFile(filePath: string): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // Check if file exists
+    if (!this.deps.file.exists(filePath)) {
+      errors.push("File does not exist");
+      return { isValid: false, errors };
+    }
+
+    // Validate file extension
+    const lastDotIndex = filePath.lastIndexOf('.');
+    const extension = lastDotIndex === -1 ? null : filePath.substring(lastDotIndex + 1).toLowerCase();
+    if (!extension || !['json', 'csv'].includes(extension)) {
+      errors.push(`Unsupported file extension: ${extension || 'none'}. Only JSON and CSV files are supported.`);
+    }
+
+    // Check for path traversal patterns in the full path
+    if (filePath.includes('..')) {
+      errors.push("File name contains invalid or suspicious characters");
+    }
+
+    // Validate file name (basic security check)
+    const fileName = filePath.split('/').pop() || filePath;
+    if (fileName.length > 255) {
+      errors.push("File name is too long (maximum 255 characters)");
+    }
+
+    // Check for suspicious filename patterns
+    const suspiciousPatterns = [
+      /[<>:"\\|?*]/,  // Invalid characters for most file systems
+      /^\s+|\s+$/,  // Leading/trailing spaces
+    ];
+
+    suspiciousPatterns.forEach(pattern => {
+      if (pattern.test(fileName)) {
+        errors.push("File name contains invalid or suspicious characters");
+      }
+    });
+
+    // Check Windows reserved names separately (without extension)
+    const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(nameWithoutExt)) {
+      errors.push("File name contains invalid or suspicious characters");
+    }
+
+    return { isValid: errors.length === 0, errors };
+  }
+
+  /**
+   * Validate file content structure and format
+   */
+  private validateFileContent(filePath: string, content: string): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    const extension = filePath.split('.').pop()?.toLowerCase();
+
+    // Check file size (prevent memory issues)
+    const contentSize = new Blob([content]).size;
+    const maxSize = 50 * 1024 * 1024; // 50MB limit
+    if (contentSize > maxSize) {
+      errors.push(`File is too large (${Math.round(contentSize / 1024 / 1024)}MB). Maximum allowed size is 50MB.`);
+      return { isValid: false, errors };
+    }
+
+    // Check for minimum content length
+    if (content.length < 10) {
+      errors.push("File content is too short to contain valid bookmark data");
+      return { isValid: false, errors };
+    }
+
+    // Format-specific validation
+    if (extension === 'json') {
+      return this.validateJSONContent(content);
+    } else if (extension === 'csv') {
+      return this.validateCSVContent(content);
+    }
+
+    return { isValid: true, errors };
+  }
+
+  /**
+   * Validate JSON file structure
+   */
+  private validateJSONContent(content: string): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    try {
+      const parsed = JSON.parse(content);
+
+      // Check if it's an array or object with bookmarks property
+      if (!Array.isArray(parsed)) {
+        if (typeof parsed !== 'object' || parsed === null) {
+          errors.push("JSON must contain an array of bookmarks or an object with bookmarks property");
+          return { isValid: false, errors };
+        }
+
+        if (!parsed.bookmarks || !Array.isArray(parsed.bookmarks)) {
+          errors.push("JSON must contain an array of bookmarks");
+          return { isValid: false, errors };
+        }
+      }
+
+      const bookmarks = Array.isArray(parsed) ? parsed : parsed.bookmarks;
+
+      // Validate bookmark count
+      if (bookmarks.length === 0) {
+        errors.push("No bookmarks found in file");
+        return { isValid: false, errors };
+      }
+
+      if (bookmarks.length > 10000) {
+        errors.push(`Too many bookmarks (${bookmarks.length}). Maximum allowed is 10,000.`);
+        return { isValid: false, errors };
+      }
+
+      // Sample validation of first few bookmarks
+      const sampleSize = Math.min(bookmarks.length, 5);
+      for (let i = 0; i < sampleSize; i++) {
+        const bookmark = bookmarks[i];
+        if (typeof bookmark !== 'object' || bookmark === null) {
+          errors.push(`Bookmark ${i + 1} is not a valid object`);
+          continue;
+        }
+
+        // Check required fields existence (not content validation, just presence)
+        const requiredFields = ['id', 'title', 'timestamp', 'filepath'];
+        const missingFields = requiredFields.filter(field => !(field in bookmark));
+        if (missingFields.length > 0) {
+          errors.push(`Bookmark ${i + 1} missing required fields: ${missingFields.join(', ')}`);
+        }
+      }
+
+    } catch (error: any) {
+      errors.push(`Failed to parse JSON file: ${error.message}`);
+    }
+
+    return { isValid: errors.length === 0, errors };
+  }
+
+  /**
+   * Validate CSV file structure
+   */
+  private validateCSVContent(content: string): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    try {
+      const lines = content.trim().split('\n');
+      
+      if (lines.length < 2) {
+        errors.push("CSV file must have at least a header row and one data row");
+        return { isValid: false, errors };
+      }
+
+      if (lines.length > 10001) { // Header + 10000 data rows
+        errors.push(`Too many rows (${lines.length - 1}). Maximum allowed is 10,000 bookmarks.`);
+        return { isValid: false, errors };
+      }
+
+      // Validate header row
+      const headers = this.parseCSVLine(lines[0]);
+      if (headers.length === 0) {
+        errors.push("CSV file has no headers");
+        return { isValid: false, errors };
+      }
+
+      if (headers.length > 20) {
+        errors.push("Too many columns in CSV file. Maximum 20 columns allowed.");
+        return { isValid: false, errors };
+      }
+
+      // Check for required headers
+      const requiredHeaders = ['id', 'title', 'timestamp', 'filepath'];
+      const normalizedHeaders = headers.map(h => h.toLowerCase().trim());
+      const missingHeaders = requiredHeaders.filter(header => !normalizedHeaders.includes(header));
+      
+      if (missingHeaders.length > 0) {
+        errors.push(`CSV file missing required headers: ${missingHeaders.join(', ')}`);
+      }
+
+      // Validate a few sample rows for structure (allow some flexibility)
+      const sampleSize = Math.min(lines.length - 1, 5);
+      let validRowCount = 0;
+      for (let i = 1; i <= sampleSize; i++) {
+        const line = lines[i].trim();
+        if (line === '') continue; // Skip empty lines
+        
+        try {
+          const values = this.parseCSVLine(line);
+          if (values.length === headers.length) {
+            validRowCount++;
+          }
+          // Note: We don't fail here for mismatched columns, as parsing will handle this gracefully
+        } catch (error) {
+          // Parsing errors will be handled during the actual import
+        }
+      }
+      
+      // Only fail if NO valid rows are found in the sample
+      if (validRowCount === 0 && sampleSize > 0) {
+        errors.push("No valid data rows found in CSV file sample");
+      }
+
+      // Check for suspicious content patterns
+      const suspiciousPatterns = [
+        /<script/i,
+        /<iframe/i,
+        /javascript:/i,
+        /data:text\/html/i
+      ];
+
+      suspiciousPatterns.forEach(pattern => {
+        if (pattern.test(content)) {
+          errors.push("File contains potentially unsafe content");
+        }
+      });
+
+    } catch (error: any) {
+      errors.push(`CSV parsing error: ${error.message}`);
+    }
+
+    return { isValid: errors.length === 0, errors };
   }
 
   /**
@@ -1249,7 +1572,7 @@ export class BookmarkManager {
 
       return filePath;
     } catch (error: any) {
-      this.deps.console.error("Error selecting import file:", error.message);
+      this.deps.console.error(`Error selecting import file: ${error.message}`);
       throw error;
     }
   }
@@ -1261,9 +1584,10 @@ export class BookmarkManager {
     try {
       this.deps.console.log(`Starting import from file: ${filePath}`);
 
-      // Validate file exists
-      if (!this.deps.file.exists(filePath)) {
-        throw new Error("File does not exist");
+      // Comprehensive file validation
+      const validationResult = this.validateImportFile(filePath);
+      if (!validationResult.isValid) {
+        throw new Error(`File validation failed: ${validationResult.errors.join('; ')}`);
       }
 
       // Read file content
@@ -1272,14 +1596,35 @@ export class BookmarkManager {
         throw new Error("File is empty or could not be read");
       }
 
+      // Validate file content structure
+      const contentValidation = this.validateFileContent(filePath, fileContent);
+      if (!contentValidation.isValid) {
+        throw new Error(`Content validation failed: ${contentValidation.errors.join('; ')}`);
+      }
+
       // Determine file format and parse
       const format = this.detectFileFormat(filePath, fileContent);
       let bookmarks: BookmarkData[];
 
       if (format === 'json') {
         bookmarks = this.parseJSONFile(fileContent);
+        
+        // For JSON files, apply additional validation if requested
+        if (options.validateData) {
+          const validation = this.validateImportData(bookmarks);
+          if (!validation.isValid) {
+            return {
+              success: false,
+              importedCount: 0,
+              skippedCount: 0,
+              errorCount: validation.errors.length,
+              errors: validation.errors
+            };
+          }
+        }
       } else if (format === 'csv') {
         bookmarks = this.parseCSVFile(fileContent);
+        // CSV files are already validated during parsing
       } else {
         throw new Error("Unsupported file format. Only JSON and CSV files are supported.");
       }
@@ -1290,7 +1635,7 @@ export class BookmarkManager {
       return await this.importBookmarks(bookmarks, options);
 
     } catch (error: any) {
-      this.deps.console.error("Failed to import from file:", error.message);
+      this.deps.console.error(`Failed to import from file: ${error.message}`);
       return {
         success: false,
         importedCount: 0,
@@ -1347,31 +1692,31 @@ export class BookmarkManager {
    * Parse CSV bookmark file
    */
   private parseCSVFile(content: string): BookmarkData[] {
-    try {
-      const lines = content.trim().split('\n');
-      if (lines.length === 0) {
-        throw new Error("CSV file is empty");
-      }
+    const lines = content.trim().split('\n');
+    if (lines.length === 0) {
+      throw new Error("CSV file is empty");
+    }
 
-      // Parse header line
-      const headers = this.parseCSVLine(lines[0]);
-      if (headers.length === 0) {
-        throw new Error("CSV file has no headers");
-      }
+    // Parse header line
+    const headers = this.parseCSVLine(lines[0]);
+    if (headers.length === 0) {
+      throw new Error("CSV file has no headers");
+    }
 
-      // Validate required headers
-      const requiredHeaders = ['id', 'title', 'timestamp', 'filepath'];
-      const missingHeaders = requiredHeaders.filter(header => !headers.includes(header));
-      if (missingHeaders.length > 0) {
-        throw new Error(`CSV file missing required headers: ${missingHeaders.join(', ')}`);
-      }
+    // Validate required headers
+    const requiredHeaders = ['id', 'title', 'timestamp', 'filepath'];
+    const missingHeaders = requiredHeaders.filter(header => !headers.includes(header));
+    if (missingHeaders.length > 0) {
+      throw new Error(`CSV file missing required headers: ${missingHeaders.join(', ')}`);
+    }
 
-      // Parse data lines
-      const bookmarks: BookmarkData[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line === '') continue; // Skip empty lines
+    // Parse data lines - handle errors gracefully
+    const bookmarks: BookmarkData[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === '') continue; // Skip empty lines
 
+      try {
         const values = this.parseCSVLine(line);
         if (values.length !== headers.length) {
           this.deps.console.warn(`CSV line ${i + 1} has ${values.length} values but expected ${headers.length}, skipping`);
@@ -1382,12 +1727,13 @@ export class BookmarkManager {
         if (bookmark) {
           bookmarks.push(bookmark);
         }
+      } catch (error: any) {
+        this.deps.console.warn(`Failed to parse CSV line ${i + 1}: ${error.message}, skipping`);
+        continue;
       }
-
-      return bookmarks;
-    } catch (error: any) {
-      throw new Error(`Failed to parse CSV file: ${error.message}`);
     }
+
+    return bookmarks;
   }
 
   /**

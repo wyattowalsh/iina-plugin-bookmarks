@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "lib": ["es6", "es7", "esnext", "dom", "webworker"],
+    "target": "es6",
+    "module": "es6",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": false,
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": false,
+    "removeComments": true,
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/iina-plugin-definition"
+    ]
+  },
+  "include": [
+    "src/index-modern.ts",
+    "src/bookmark-manager-modern.ts", 
+    "src/types.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "ui",
+    "tests",
+    "src/plugin-bundle.ts",
+    "src/bookmark-manager.ts",
+    "src/global.ts",
+    "src/performance-utils.ts"
+  ]
+}

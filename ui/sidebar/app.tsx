@@ -4,6 +4,8 @@ import AdvancedSearch, { ParsedSearchQuery } from "../components/AdvancedSearch"
 import TextHighlighter from "../components/TextHighlighter";
 import ExportDialog from "../components/ExportDialog";
 import ImportDialog from "../components/ImportDialog";
+import CloudSyncDialog from "../components/CloudSyncDialog";
+import FileReconciliationDialog from "../components/FileReconciliationDialog";
 import { ToastContainer } from "../components/Toast";
 import Loading from "../components/Loading";
 import useAdvancedBookmarkFilters from "../hooks/useAdvancedBookmarkFilters";
@@ -37,12 +39,19 @@ const App: React.FC = () => {
     tags: [],
     sortBy: 'createdAt',
     sortDirection: 'desc',
-    fileFilter: ''
+    fileFilter: '',
+    sortCriteria: [
+      { field: 'createdAt', direction: 'desc', priority: 1 }
+    ],
+    enableMultiSort: false
   });
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showCloudSyncDialog, setShowCloudSyncDialog] = useState(false);
+  const [showReconciliationDialog, setShowReconciliationDialog] = useState(false);
+  const [movedFiles, setMovedFiles] = useState<BookmarkData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
@@ -96,6 +105,11 @@ const App: React.FC = () => {
       } else if (messageData?.type === "IMPORT_STARTED") {
         setIsLoading(true);
         setLoadingMessage("Importing bookmarks...");
+      } else if (messageData?.type === "SHOW_CLOUD_SYNC_DIALOG") {
+        setShowCloudSyncDialog(true);
+      } else if (messageData?.type === "SHOW_FILE_RECONCILIATION_DIALOG" && messageData.data?.movedFiles) {
+        setMovedFiles(messageData.data.movedFiles);
+        setShowReconciliationDialog(true);
       } else if (messageData?.type === "ERROR") {
         showError("Error", messageData.data?.message || "An unexpected error occurred");
       }
@@ -193,6 +207,24 @@ const App: React.FC = () => {
             title="Export bookmarks to file"
           >
             Export
+          </button>
+          <button 
+            onClick={() => setShowCloudSyncDialog(true)} 
+            className="cloud-sync-btn"
+            aria-label="Sync bookmarks with cloud storage"
+            title="Sync bookmarks with cloud storage"
+          >
+            ☁️ Cloud
+          </button>
+          <button 
+            onClick={() => {
+              appWindow.iina?.postMessage?.("RECONCILE_FILES");
+            }} 
+            className="reconcile-btn"
+            aria-label="Check for moved files"
+            title="Check for moved files and reconcile bookmarks"
+          >
+            📁 Check Files
           </button>
         </div>
       </div>
@@ -314,6 +346,20 @@ const App: React.FC = () => {
         onClose={() => setShowExportDialog(false)}
         availableTags={availableTags}
         postMessage={postMessage}
+      />
+
+      <CloudSyncDialog
+        isOpen={showCloudSyncDialog}
+        onClose={() => setShowCloudSyncDialog(false)}
+        postMessage={postMessage}
+        bookmarkCount={bookmarks.length}
+      />
+
+      <FileReconciliationDialog
+        isOpen={showReconciliationDialog}
+        onClose={() => setShowReconciliationDialog(false)}
+        postMessage={postMessage}
+        movedFiles={movedFiles}
       />
     </div>
   );
