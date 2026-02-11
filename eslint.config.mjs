@@ -23,6 +23,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/**/*.ts'],
+    rules: {
+      'no-console': 'warn',
+    },
+  },
+  {
     ignores: ['dist/', 'node_modules/', 'packaging/', '.parcel-cache/', 'docs/'],
   },
 );
