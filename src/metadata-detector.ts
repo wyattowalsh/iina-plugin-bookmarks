@@ -47,8 +47,12 @@ export class MetadataDetector {
 
   constructor(
     core: IINACore,
-    logger: { log: (message: string) => void; error: (message: string) => void; warn: (message: string) => void },
-    config: MetadataDetectorConfig = {}
+    logger: {
+      log: (message: string) => void;
+      error: (message: string) => void;
+      warn: (message: string) => void;
+    },
+    config: MetadataDetectorConfig = {},
   ) {
     this.core = core;
     this.logger = logger;
@@ -56,7 +60,7 @@ export class MetadataDetector {
       retryAttempts: config.retryAttempts ?? 3,
       retryDelay: config.retryDelay ?? 100,
       cacheTimeout: config.cacheTimeout ?? 30000, // 30 seconds
-      enableLogging: config.enableLogging ?? true
+      enableLogging: config.enableLogging ?? true,
     };
   }
 
@@ -66,15 +70,15 @@ export class MetadataDetector {
    */
   async getCurrentTitle(): Promise<string | null> {
     const startTime = Date.now();
-    
+
     try {
       const metadata = await this.getCurrentMetadata();
       const responseTime = Date.now() - startTime;
-      
+
       if (this.config.enableLogging) {
         this.logger.log(`Title detection completed in ${responseTime}ms`);
       }
-      
+
       return metadata.title || this.extractTitleFromFilename(metadata.filename);
     } catch (error: any) {
       const responseTime = Date.now() - startTime;
@@ -95,7 +99,7 @@ export class MetadataDetector {
    */
   async getCurrentMetadata(): Promise<MediaMetadata> {
     const filepath = this.core.status.path;
-    
+
     if (!filepath) {
       throw new Error('No media file currently loaded');
     }
@@ -111,10 +115,10 @@ export class MetadataDetector {
 
     // Get fresh metadata with retry logic
     const metadata = await this.fetchMetadataWithRetry(filepath);
-    
+
     // Cache the result
     this.cacheMetadata(filepath, metadata);
-    
+
     // Check if media changed and notify listeners
     if (this.currentFilePath !== filepath) {
       this.currentFilePath = filepath;
@@ -155,7 +159,7 @@ export class MetadataDetector {
 
       // Clear cache for current file to force refresh
       this.cache.delete(filepath);
-      
+
       return await this.getCurrentMetadata();
     } catch (error: any) {
       this.logger.error(`Metadata refresh failed: ${error.message}`);
@@ -177,36 +181,38 @@ export class MetadataDetector {
 
   private async fetchMetadataWithRetry(filepath: string): Promise<MediaMetadata> {
     let lastError: Error | null = null;
-    
+
     for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
       try {
         return await this.fetchMetadata(filepath);
       } catch (error: any) {
         lastError = error;
-        
+
         if (attempt < this.config.retryAttempts) {
           if (this.config.enableLogging) {
-            this.logger.warn(`Metadata fetch attempt ${attempt} failed, retrying in ${this.config.retryDelay}ms`);
+            this.logger.warn(
+              `Metadata fetch attempt ${attempt} failed, retrying in ${this.config.retryDelay}ms`,
+            );
           }
           await this.delay(this.config.retryDelay);
         }
       }
     }
-    
+
     throw lastError || new Error('All retry attempts failed');
   }
 
   private async fetchMetadata(filepath: string): Promise<MediaMetadata> {
     // Extract filename from path
     const filename = filepath.split('/').pop() || 'unknown';
-    
+
     // Get title from IINA core status with fallback
     let title = this.core.status.title;
-    
+
     // Normalize and clean title
     if (title) {
       title = this.normalizeTitle(title);
-      
+
       // If title is just the filename, treat as if no title available
       if (title === filename || title === filename.replace(/\.[^/.]+$/, '')) {
         title = undefined;
@@ -223,7 +229,7 @@ export class MetadataDetector {
       filename,
       filepath,
       duration: this.core.status.duration,
-      format: this.extractFormat(filename)
+      format: this.extractFormat(filename),
     };
 
     if (this.config.enableLogging) {
@@ -234,24 +240,24 @@ export class MetadataDetector {
   }
 
   private normalizeTitle(title: string): string {
-    return title
-      .trim()
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-      .slice(0, 200); // Limit length
+    return (
+      title
+        .trim()
+        // eslint-disable-next-line no-control-regex
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+        .slice(0, 200)
+    ); // Limit length
   }
 
   private extractTitleFromFilename(filename: string): string {
     // Remove extension
     let title = filename.replace(/\.[^/.]+$/, '');
-    
+
     // Replace common separators with spaces
-    title = title
-      .replace(/[._-]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
+    title = title.replace(/[._-]/g, ' ').replace(/\s+/g, ' ').trim();
+
     // Handle common naming patterns
     title = title
       .replace(/\b(19|20)\d{2}\b/g, '') // Remove years
@@ -262,10 +268,10 @@ export class MetadataDetector {
       .replace(/\bx264\b/gi, '')
       .replace(/\s+/g, ' ')
       .trim();
-    
+
     // Capitalize first letter of each word
-    title = title.replace(/\b\w/g, l => l.toUpperCase());
-    
+    title = title.replace(/\b\w/g, (l) => l.toUpperCase());
+
     return title || 'Unknown Media';
   }
 
@@ -277,20 +283,20 @@ export class MetadataDetector {
   private getCachedMetadata(filepath: string): MediaMetadata | null {
     const cached = this.cache.get(filepath);
     if (!cached) return null;
-    
+
     const isExpired = Date.now() - cached.timestamp > this.config.cacheTimeout;
     if (isExpired) {
       this.cache.delete(filepath);
       return null;
     }
-    
+
     return cached.metadata;
   }
 
   private cacheMetadata(filepath: string, metadata: MediaMetadata): void {
     this.cache.set(filepath, {
       metadata,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -305,6 +311,6 @@ export class MetadataDetector {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
-} 
+}

@@ -18,12 +18,11 @@ interface UseAdvancedBookmarkFiltersProps {
   parsedQuery?: ParsedSearchQuery;
 }
 
-export const useAdvancedBookmarkFilters = ({ 
-  bookmarks, 
-  filters, 
-  parsedQuery 
+export const useAdvancedBookmarkFilters = ({
+  bookmarks,
+  filters,
+  parsedQuery,
 }: UseAdvancedBookmarkFiltersProps) => {
-  
   const filteredAndSortedBookmarks = useMemo(() => {
     let result = [...bookmarks];
 
@@ -36,14 +35,14 @@ export const useAdvancedBookmarkFilters = ({
 
     // Apply file filter
     if (filters.fileFilter) {
-      result = result.filter(bookmark => bookmark.filepath === filters.fileFilter);
+      result = result.filter((bookmark) => bookmark.filepath === filters.fileFilter);
     }
 
     // Apply tag filter
     if (filters.tags.length > 0) {
-      result = result.filter(bookmark => {
+      result = result.filter((bookmark) => {
         const bookmarkTags = bookmark.tags || [];
-        return filters.tags.every(filterTag => bookmarkTags.includes(filterTag));
+        return filters.tags.every((filterTag) => bookmarkTags.includes(filterTag));
       });
     }
 
@@ -53,31 +52,39 @@ export const useAdvancedBookmarkFilters = ({
     }
 
     // Apply sorting
-    result = applySorting(result, filters.sortBy, filters.sortDirection, filters.sortCriteria, filters.enableMultiSort);
+    result = applySorting(
+      result,
+      filters.sortBy,
+      filters.sortDirection,
+      filters.sortCriteria,
+      filters.enableMultiSort,
+    );
 
     return result;
   }, [bookmarks, filters, parsedQuery]);
 
   const availableFiles = useMemo(() => {
-    return Array.from(new Set(bookmarks.map(b => b.filepath))).sort();
+    return Array.from(new Set(bookmarks.map((b) => b.filepath))).sort();
   }, [bookmarks]);
 
   const availableTags = useMemo(() => {
-    const allTags = bookmarks.flatMap(b => b.tags || []);
+    const allTags = bookmarks.flatMap((b) => b.tags || []);
     return Array.from(new Set(allTags)).sort();
   }, [bookmarks]);
 
   const filterAnalytics = useMemo(() => {
     const totalBookmarks = bookmarks.length;
     const filteredCount = filteredAndSortedBookmarks.length;
-    const reductionPercentage = totalBookmarks > 0 ? 
-      ((totalBookmarks - filteredCount) / totalBookmarks * 100).toFixed(1) : '0';
-    
+    const reductionPercentage =
+      totalBookmarks > 0
+        ? (((totalBookmarks - filteredCount) / totalBookmarks) * 100).toFixed(1)
+        : '0';
+
     return {
       totalBookmarks,
       filteredCount,
       reductionPercentage: parseFloat(reductionPercentage),
-      hasActiveFilters: filteredCount !== totalBookmarks
+      hasActiveFilters: filteredCount !== totalBookmarks,
     };
   }, [bookmarks.length, filteredAndSortedBookmarks.length]);
 
@@ -86,33 +93,41 @@ export const useAdvancedBookmarkFilters = ({
     resultsCount: filteredAndSortedBookmarks.length,
     availableFiles,
     availableTags,
-    analytics: filterAnalytics
+    analytics: filterAnalytics,
   };
 };
 
 // Helper function to apply advanced search logic
 function applyAdvancedSearch(bookmarks: BookmarkData[], query: ParsedSearchQuery): BookmarkData[] {
-  return bookmarks.filter(bookmark => {
+  return bookmarks.filter((bookmark) => {
     // Field-specific searches
-    if (query.fieldSearches.title && 
-        !bookmark.title.toLowerCase().includes(query.fieldSearches.title.toLowerCase())) {
+    if (
+      query.fieldSearches.title &&
+      !bookmark.title.toLowerCase().includes(query.fieldSearches.title.toLowerCase())
+    ) {
       return false;
     }
-    
-    if (query.fieldSearches.description && 
-        !(bookmark.description || '').toLowerCase().includes(query.fieldSearches.description.toLowerCase())) {
+
+    if (
+      query.fieldSearches.description &&
+      !(bookmark.description || '')
+        .toLowerCase()
+        .includes(query.fieldSearches.description.toLowerCase())
+    ) {
       return false;
     }
-    
-    if (query.fieldSearches.filepath && 
-        !bookmark.filepath.toLowerCase().includes(query.fieldSearches.filepath.toLowerCase())) {
+
+    if (
+      query.fieldSearches.filepath &&
+      !bookmark.filepath.toLowerCase().includes(query.fieldSearches.filepath.toLowerCase())
+    ) {
       return false;
     }
-    
+
     if (query.fieldSearches.tags && query.fieldSearches.tags.length > 0) {
-      const bookmarkTags = (bookmark.tags || []).map(tag => tag.toLowerCase());
-      const hasAllTags = query.fieldSearches.tags.every(searchTag => 
-        bookmarkTags.some(bookmarkTag => bookmarkTag.includes(searchTag.toLowerCase()))
+      const bookmarkTags = (bookmark.tags || []).map((tag) => tag.toLowerCase());
+      const hasAllTags = query.fieldSearches.tags.every((searchTag) =>
+        bookmarkTags.some((bookmarkTag) => bookmarkTag.includes(searchTag.toLowerCase())),
       );
       if (!hasAllTags) return false;
     }
@@ -127,23 +142,21 @@ function applyAdvancedSearch(bookmarks: BookmarkData[], query: ParsedSearchQuery
 
     // Boolean operators
     if (query.operators.NOT.length > 0) {
-      const hasExcludedTerm = query.operators.NOT.some(term => 
-        matchesBookmarkContent(bookmark, term)
+      const hasExcludedTerm = query.operators.NOT.some((term) =>
+        matchesBookmarkContent(bookmark, term),
       );
       if (hasExcludedTerm) return false;
     }
 
     if (query.operators.AND.length > 0) {
-      const hasAllTerms = query.operators.AND.every(term => 
-        matchesBookmarkContent(bookmark, term)
+      const hasAllTerms = query.operators.AND.every((term) =>
+        matchesBookmarkContent(bookmark, term),
       );
       if (!hasAllTerms) return false;
     }
 
     if (query.operators.OR.length > 0) {
-      const hasAnyTerm = query.operators.OR.some(term => 
-        matchesBookmarkContent(bookmark, term)
-      );
+      const hasAnyTerm = query.operators.OR.some((term) => matchesBookmarkContent(bookmark, term));
       if (!hasAnyTerm) return false;
     }
 
@@ -159,82 +172,97 @@ function applyAdvancedSearch(bookmarks: BookmarkData[], query: ParsedSearchQuery
 // Helper function for basic search (fallback)
 function applyBasicSearch(bookmarks: BookmarkData[], searchTerm: string): BookmarkData[] {
   const term = searchTerm.toLowerCase();
-  return bookmarks.filter(bookmark => 
-    bookmark.title.toLowerCase().includes(term) ||
-    (bookmark.description || '').toLowerCase().includes(term) ||
-    bookmark.filepath.toLowerCase().includes(term) ||
-    (bookmark.tags || []).some(tag => tag.toLowerCase().includes(term))
+  return bookmarks.filter(
+    (bookmark) =>
+      bookmark.title.toLowerCase().includes(term) ||
+      (bookmark.description || '').toLowerCase().includes(term) ||
+      bookmark.filepath.toLowerCase().includes(term) ||
+      (bookmark.tags || []).some((tag) => tag.toLowerCase().includes(term)),
   );
 }
 
 // Helper function to check if bookmark matches a search term
 function matchesBookmarkContent(bookmark: BookmarkData, term: string): boolean {
   const searchTerm = term.toLowerCase();
-  return bookmark.title.toLowerCase().includes(searchTerm) ||
-         (bookmark.description || '').toLowerCase().includes(searchTerm) ||
-         bookmark.filepath.toLowerCase().includes(searchTerm) ||
-         (bookmark.tags || []).some(tag => tag.toLowerCase().includes(searchTerm));
+  return (
+    bookmark.title.toLowerCase().includes(searchTerm) ||
+    (bookmark.description || '').toLowerCase().includes(searchTerm) ||
+    bookmark.filepath.toLowerCase().includes(searchTerm) ||
+    (bookmark.tags || []).some((tag) => tag.toLowerCase().includes(searchTerm))
+  );
 }
 
 // Helper function to apply date filters
 function applyDateFilter(
-  bookmarkDate: Date, 
-  dateFilter: { operator: string; value?: string }
+  bookmarkDate: Date,
+  dateFilter: { operator: string; value?: string },
 ): boolean {
   const now = new Date();
-  
+
   switch (dateFilter.operator) {
-    case 'today':
+    case 'today': {
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       return bookmarkDate >= today;
-      
-    case 'yesterday':
+    }
+
+    case 'yesterday': {
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const yesterdayStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+      const yesterdayStart = new Date(
+        yesterday.getFullYear(),
+        yesterday.getMonth(),
+        yesterday.getDate(),
+      );
       const yesterdayEnd = new Date(yesterdayStart.getTime() + 24 * 60 * 60 * 1000);
       return bookmarkDate >= yesterdayStart && bookmarkDate < yesterdayEnd;
-      
-    case 'this-week':
+    }
+
+    case 'this-week': {
       const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       return bookmarkDate >= weekStart;
-      
-    case 'this-month':
+    }
+
+    case 'this-month': {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       return bookmarkDate >= monthStart;
-      
+    }
+
     case '>':
       if (dateFilter.value) {
         const compareDate = new Date(dateFilter.value);
         return bookmarkDate > compareDate;
       }
       break;
-      
+
     case '<':
       if (dateFilter.value) {
         const compareDate = new Date(dateFilter.value);
         return bookmarkDate < compareDate;
       }
       break;
-      
+
     case '=':
       if (dateFilter.value) {
         const compareDate = new Date(dateFilter.value);
-        const dayStart = new Date(compareDate.getFullYear(), compareDate.getMonth(), compareDate.getDate());
+        const dayStart = new Date(
+          compareDate.getFullYear(),
+          compareDate.getMonth(),
+          compareDate.getDate(),
+        );
         const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
         return bookmarkDate >= dayStart && bookmarkDate < dayEnd;
       }
       break;
   }
-  
+
   return true;
 }
 
 // Helper function to apply date range filter
 function applyDateRangeFilter(
-  bookmarks: BookmarkData[], 
-  dateRange: { start: string; end: string }
+  bookmarks: BookmarkData[],
+  dateRange: { start: string; end: string },
 ): BookmarkData[] {
-  return bookmarks.filter(bookmark => {
+  return bookmarks.filter((bookmark) => {
     const bookmarkDate = new Date(bookmark.createdAt);
     const startDate = dateRange.start ? new Date(dateRange.start) : null;
     const endDate = dateRange.end ? new Date(dateRange.end) : null;
@@ -247,18 +275,18 @@ function applyDateRangeFilter(
 
 // Helper function to apply sorting
 function applySorting(
-  bookmarks: BookmarkData[], 
-  sortBy: FilterState['sortBy'], 
+  bookmarks: BookmarkData[],
+  sortBy: FilterState['sortBy'],
   sortDirection: FilterState['sortDirection'],
   sortCriteria?: FilterState['sortCriteria'],
-  enableMultiSort?: boolean
+  enableMultiSort?: boolean,
 ): BookmarkData[] {
   const sorted = [...bookmarks].sort((a, b) => {
     // Use multi-criteria sorting if enabled and criteria are provided
     if (enableMultiSort && sortCriteria && sortCriteria.length > 0) {
       return applyMultiCriteriaSorting(a, b, sortCriteria);
     }
-    
+
     // Fall back to single-criteria sorting
     return applySingleCriteriaSorting(a, b, sortBy, sortDirection);
   });
@@ -268,10 +296,10 @@ function applySorting(
 
 // Helper function for single-criteria sorting
 function applySingleCriteriaSorting(
-  a: BookmarkData, 
-  b: BookmarkData, 
-  sortBy: FilterState['sortBy'], 
-  sortDirection: FilterState['sortDirection']
+  a: BookmarkData,
+  b: BookmarkData,
+  sortBy: FilterState['sortBy'],
+  sortDirection: FilterState['sortDirection'],
 ): number {
   let comparison = 0;
 
@@ -282,21 +310,24 @@ function applySingleCriteriaSorting(
     case 'timestamp':
       comparison = a.timestamp - b.timestamp;
       break;
-    case 'description':
+    case 'description': {
       const aDesc = (a.description || '').toLowerCase();
       const bDesc = (b.description || '').toLowerCase();
       comparison = aDesc.localeCompare(bDesc);
       break;
-    case 'tags':
+    }
+    case 'tags': {
       const aTags = (a.tags || []).join(', ').toLowerCase();
       const bTags = (b.tags || []).join(', ').toLowerCase();
       comparison = aTags.localeCompare(bTags);
       break;
-    case 'mediaFileName':
+    }
+    case 'mediaFileName': {
       const aFileName = extractFileName(a.filepath);
       const bFileName = extractFileName(b.filepath);
       comparison = aFileName.localeCompare(bFileName);
       break;
+    }
     case 'createdAt':
     default:
       comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -308,13 +339,13 @@ function applySingleCriteriaSorting(
 
 // Helper function for multi-criteria sorting
 function applyMultiCriteriaSorting(
-  a: BookmarkData, 
-  b: BookmarkData, 
-  sortCriteria: FilterState['sortCriteria']
+  a: BookmarkData,
+  b: BookmarkData,
+  sortCriteria: FilterState['sortCriteria'],
 ): number {
   // Sort criteria by priority (lower number = higher priority)
   const sortedCriteria = [...sortCriteria].sort((x, y) => x.priority - y.priority);
-  
+
   for (const criterion of sortedCriteria) {
     const comparison = applySingleCriteriaSorting(a, b, criterion.field, criterion.direction);
     if (comparison !== 0) {
@@ -322,7 +353,7 @@ function applyMultiCriteriaSorting(
     }
     // If comparison is 0, continue to next criterion
   }
-  
+
   return 0; // All criteria resulted in equality
 }
 
@@ -334,4 +365,4 @@ function extractFileName(filepath: string): string {
   return filename.replace(/\.[^/.]+$/, '').toLowerCase();
 }
 
-export default useAdvancedBookmarkFilters; 
+export default useAdvancedBookmarkFilters;
