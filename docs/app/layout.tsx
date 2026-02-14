@@ -6,6 +6,7 @@ import type { Metadata } from 'next';
 
 const inter = Inter({
   subsets: ['latin'],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -14,15 +15,28 @@ export const metadata: Metadata = {
     default: 'IINA Plugin Bookmarks Documentation',
   },
   description:
-    'Comprehensive documentation for the IINA Plugin Bookmarks - A smart bookmark management system for the IINA media player.',
-  keywords: ['IINA', 'plugin', 'bookmarks', 'media player', 'documentation', 'macOS'],
+    'Complete documentation for IINA Plugin Bookmarks - Advanced bookmark management for IINA media player with cloud sync, tagging, and search.',
+  keywords: [
+    'IINA',
+    'plugin',
+    'bookmarks',
+    'media player',
+    'macOS',
+    'video player',
+    'cloud sync',
+    'bookmark manager',
+    'JavaScript',
+    'TypeScript',
+  ],
   authors: [{ name: 'Wyatt Walsh', url: 'https://github.com/wyattowalsh' }],
   creator: 'Wyatt Walsh',
   publisher: 'IINA Plugin Bookmarks',
-  metadataBase: new URL('https://wyattowalsh.github.io/iina-plugin-bookmarks'),
+  applicationName: 'IINA Plugin Bookmarks',
+  metadataBase: new URL('https://iina-plugin-bookmarks.w4w.dev'),
   alternates: {
     canonical: '/',
   },
+  category: 'Technology',
   icons: {
     icon: [
       { url: '/assets/favicon/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
@@ -76,7 +90,15 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen">
-        <RootProvider>{children}</RootProvider>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-background focus:text-foreground focus:outline-2 focus:outline-ring"
+        >
+          Skip to main content
+        </a>
+        <RootProvider>
+          <div id="main-content">{children}</div>
+        </RootProvider>
       </body>
     </html>
   );

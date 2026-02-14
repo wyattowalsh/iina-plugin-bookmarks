@@ -1,4 +1,6 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
+import Image from 'next/image';
+import { GithubIcon } from 'lucide-react';
 
 /**
  * Shared layout configurations
@@ -11,11 +13,11 @@ export const baseOptions: BaseLayoutProps = {
   nav: {
     title: (
       <>
-        <img
+        <Image
           src="/assets/icon.png"
           alt="IINA Plugin Bookmarks"
-          width="24"
-          height="24"
+          width={24}
+          height={24}
           className="rounded"
         />
         IINA Plugin Bookmarks
@@ -30,6 +32,7 @@ export const baseOptions: BaseLayoutProps = {
       active: 'nested-url',
     },
     {
+      icon: <GithubIcon />,
       text: 'GitHub',
       url: 'https://github.com/wyattowalsh/iina-plugin-bookmarks',
       external: true,

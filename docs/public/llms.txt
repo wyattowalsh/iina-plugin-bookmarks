@@ -1,0 +1,89 @@
+# IINA Plugin Bookmarks Documentation
+
+> Bookmark management system for IINA media player
+> https://iina-plugin-bookmarks.w4w.dev
+
+## Overview
+
+IINA Plugin Bookmarks is a production-ready bookmark management plugin for the IINA media player on macOS. It provides intelligent media title detection, advanced filtering and search, cloud synchronization, and comprehensive data management with import/export capabilities.
+
+## Documentation Structure
+
+### Getting Started
+- Home: /docs
+  Overview of the plugin, key features, quick start guide, and core concepts
+
+### Features
+- Bookmark Management: /docs/features/bookmark-management
+  Advanced bookmark operations including create, update, delete, batch operations, performance optimizations, and caching
+
+- Media Title Detection: /docs/features/media-detection
+  Intelligent media title detection with auto-detection from metadata, filename cleaning, and smart fallback logic
+
+- Advanced Filtering & Search: /docs/features/filtering
+  Comprehensive filtering system with text search, multi-select filters, date ranges, advanced search syntax, filter presets, and analytics
+
+- Multi-Criteria Sorting: /docs/features/sorting
+  Flexible sorting with multiple criteria, priority-based ordering, custom sort functions, and persistent preferences
+
+- Data Management: /docs/features/data-management
+  Export/import system supporting JSON and CSV formats with validation, batch processing, and error handling
+
+### API Reference
+- BookmarkManager API: /docs/api/bookmark-manager
+  Complete API reference for the BookmarkManager class including all public methods, properties, and event handlers
+
+- Interfaces & Types: /docs/api/interfaces
+  Complete TypeScript interface definitions and type declarations for Bookmark, Filter, SortConfig, CloudSyncConfig, and other core types
+
+### Development
+- Architecture: /docs/development/architecture
+  Technical architecture including core components, data flow, state management, caching strategy, and event system
+
+- Contributing Guide: /docs/development/contributing
+  How to contribute to the project including setup, development workflow, testing, code style, and pull request process
+
+- Implementation Notes: /docs/development/implementation-notes
+  Detailed technical implementation notes for key features including performance optimizations, error handling, and design decisions
+
+## Key Capabilities
+
+- **Bookmark Management**: Create, edit, delete, and organize bookmarks with tags, descriptions, and thumbnails
+- **Intelligent Detection**: Auto-detect media titles from metadata with smart fallback to filename cleaning
+- **Advanced Search**: Full-text search with boolean operators, field-specific queries, and filter presets
+- **Cloud Sync**: Synchronize bookmarks across devices using cloud storage (WebDAV, S3, Google Drive, Dropbox)
+- **Import/Export**: Export bookmarks to JSON or CSV; import with validation and conflict resolution
+- **Performance**: High-performance caching, debounced operations, and optimized rendering
+- **Accessibility**: ARIA labels, keyboard navigation, and screen reader support throughout UI
+- **Testing**: Comprehensive test suite with unit tests, integration tests, and CI/CD automation
+
+## Technology Stack
+
+- TypeScript 5.8
+- IINA Plugin API (JavaScriptCore environment)
+- UI: WKWebView with React 19 components
+- Build: Parcel bundler with custom optimizer
+- Testing: Vitest with comprehensive coverage
+- CI/CD: GitHub Actions with automated releases
+
+## Plugin Integration
+
+The plugin integrates with IINA through:
+- Event system for player state changes
+- Core API for seeking and playback control
+- UI interfaces (sidebar, overlay, window)
+- Network API for cloud sync operations
+- Storage API for local data persistence
+
+## Use Cases
+
+- Quick navigation within long videos using timestamped bookmarks
+- Organizing reference points across multiple media files
+- Syncing bookmarks between multiple machines
+- Exporting bookmark data for analysis or backup
+- Batch operations on large bookmark collections
+
+## Version
+
+Current version: 1.0.0 (Production-ready)
+Last updated: February 2026

@@ -12,6 +12,7 @@
 /out/
 /build
 *.tsbuildinfo
+*.log
 
 # misc
 .DS_Store

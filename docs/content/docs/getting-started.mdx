@@ -1,0 +1,243 @@
+---
+title: Getting Started
+description: Installation and setup guide for IINA Plugin Bookmarks
+---
+
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Getting Started
+
+Get up and running with IINA Plugin Bookmarks in minutes.
+
+## Prerequisites
+
+Before installing the plugin, ensure you have:
+
+- **macOS** 10.15 (Catalina) or later
+- **IINA** 1.3.0 or later ([download here](https://iina.io))
+- Basic familiarity with IINA media player
+
+<Callout type="info">
+  IINA Plugin Bookmarks is specifically designed for IINA and cannot be used with other media players.
+</Callout>
+
+## Installation
+
+<Steps>
+
+<Step>
+
+### Download the Plugin
+
+Download the latest release from the [GitHub Releases page](https://github.com/wyattowalsh/iina-plugin-bookmarks/releases).
+
+Look for the `.iinaplugin` file in the release assets.
+
+</Step>
+
+<Step>
+
+### Install in IINA
+
+Double-click the downloaded `.iinaplugin` file. IINA will automatically:
+- Install the plugin
+- Enable it in your preferences
+- Load it on next startup
+
+Alternatively, install manually:
+1. Open IINA Preferences (Cmd+,)
+2. Go to the **Plugins** tab
+3. Click **+** and select the `.iinaplugin` file
+
+</Step>
+
+<Step>
+
+### Verify Installation
+
+Open a video file in IINA and check the sidebar. You should see a **Bookmarks** section.
+
+If the sidebar isn't visible:
+- Press Cmd+Shift+B to toggle the sidebar
+- Or go to View → Toggle Sidebar
+
+</Step>
+
+</Steps>
+
+## Building from Source
+
+For development or to use the latest unreleased features:
+
+<Steps>
+
+<Step>
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/wyattowalsh/iina-plugin-bookmarks.git
+cd iina-plugin-bookmarks
+```
+
+</Step>
+
+<Step>
+
+### Install Dependencies
+
+The project uses pnpm for package management:
+
+```bash
+# Install pnpm if you don't have it
+npm install -g pnpm
+
+# Install project dependencies
+pnpm install
+```
+
+</Step>
+
+<Step>
+
+### Build the Plugin
+
+```bash
+make build
+```
+
+This compiles TypeScript, bundles the UI, and prepares the plugin for installation.
+
+</Step>
+
+<Step>
+
+### Package and Install
+
+```bash
+make package
+```
+
+This creates `dist/iina-plugin-bookmarks.iinaplugin`. Double-click to install in IINA.
+
+</Step>
+
+</Steps>
+
+<Callout type="warning">
+  Development builds may contain experimental features. For production use, download official releases.
+</Callout>
+
+## First Use
+
+Once installed, create your first bookmark:
+
+<Steps>
+
+<Step>
+
+### Open a Video
+
+Launch IINA and open any video file.
+
+</Step>
+
+<Step>
+
+### Navigate to Desired Timestamp
+
+Play the video and pause at the moment you want to bookmark (e.g., an important scene or quote).
+
+</Step>
+
+<Step>
+
+### Create Bookmark
+
+In the sidebar, click **Add Bookmark**. The plugin will auto-detect:
+- Current timestamp
+- Video file path
+- Media title (from filename or metadata)
+
+Optionally, add:
+- Custom description
+- Tags for organization
+
+Click **Save**.
+
+</Step>
+
+<Step>
+
+### Jump to Bookmark
+
+Click any bookmark in the list to instantly jump to that timestamp in the video.
+
+</Step>
+
+</Steps>
+
+## UI Modes
+
+IINA Plugin Bookmarks offers three interface modes:
+
+### Sidebar (Recommended)
+
+Integrated IINA sidebar with full functionality:
+- View all bookmarks
+- Add, edit, delete bookmarks
+- Filter and search
+- Import/export data
+- Cloud sync
+
+**Access:** Cmd+Shift+B or View → Toggle Sidebar
+
+### Overlay
+
+Lightweight overlay for quick bookmark jumping:
+- Minimal interface
+- Search bookmarks
+- Quick jump to timestamp
+
+**Access:** Configure hotkey in IINA preferences
+
+### Standalone Window
+
+Independent window with complete features:
+- Same functionality as sidebar
+- Can be positioned anywhere on screen
+- Useful for multi-monitor setups
+
+**Access:** Via IINA menu → Plugins → Bookmarks → Open Window
+
+## Next Steps
+
+- Learn about [Bookmark Management](/docs/features/bookmark-management)
+- Set up [Cloud Sync](/docs/features/cloud-sync) for cross-device access
+- Explore [Filtering and Search](/docs/features/filtering)
+- Import existing bookmarks via [Data Management](/docs/features/data-management)
+
+## Troubleshooting
+
+### Plugin Not Appearing
+
+1. Check that IINA version is 1.3.0 or later
+2. Restart IINA after installation
+3. Check Preferences → Plugins to ensure it's enabled
+
+### Bookmarks Not Saving
+
+1. Check file permissions for IINA's plugin storage directory
+2. Restart IINA to trigger auto-save
+3. Try manual backup via Export function
+
+### UI Not Loading
+
+1. Clear cache: Close IINA, delete `~/Library/Application Support/com.colliderli.iina/plugin_data/`
+2. Reinstall the plugin
+3. Check Console.app for JavaScript errors
+
+<Callout type="info">
+  For additional help, [open an issue](https://github.com/wyattowalsh/iina-plugin-bookmarks/issues) on GitHub.
+</Callout>

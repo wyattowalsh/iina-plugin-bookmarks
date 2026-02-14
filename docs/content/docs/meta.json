@@ -2,6 +2,8 @@
   "title": "Documentation",
   "pages": [
     "index",
+    "getting-started",
+    "user-interface",
     "---Core Features---",
     "features",
     "---API Reference---",

@@ -13,113 +13,184 @@ This document outlines the technical architecture and design patterns used in th
 
 ```
 iina-plugin-bookmarks/
-├── src/                    # TypeScript source code
-│   ├── bookmark-manager.ts # Core bookmark management
-│   ├── metadata-detector.ts # Media title detection
-│   ├── global.ts          # Global types and interfaces
-│   └── ui/                # User interface components
-├── dist/                  # Compiled JavaScript output
-├── tests/                 # Unit and integration tests
-├── docs/                  # Fumadocs documentation site
-├── .github/               # GitHub workflows and assets
-└── assets/               # Plugin assets and resources
+├── src/
+│   ├── index.ts              # Plugin entry point
+│   ├── bookmark-manager.ts   # Core bookmark management (unified orchestrator)
+│   ├── bookmark-import-export.ts # Import/export functionality
+│   ├── bookmark-persistence.ts   # Storage/persistence layer
+│   ├── cloud-storage.ts      # Cloud storage provider
+│   ├── cloud-sync-handler.ts # Cloud sync orchestration
+│   ├── types.ts              # TypeScript type definitions
+│   └── utils/                # Utility functions
+│       ├── formatTime.ts     # Time formatting helpers
+│       └── validation.ts     # Input validation and sanitization
+├── ui/
+│   ├── sidebar/              # IINA sidebar UI
+│   │   ├── index.html
+│   │   ├── index.tsx
+│   │   └── app.tsx
+│   ├── overlay/              # Media overlay UI
+│   │   ├── index.html
+│   │   ├── index.tsx
+│   │   └── app.tsx
+│   ├── window/               # Standalone window UI
+│   │   ├── index.html
+│   │   ├── index.tsx
+│   │   └── app.tsx
+│   ├── components/           # Shared React components
+│   ├── hooks/                # Custom React hooks
+│   ├── utils/                # UI utility functions
+│   ├── types.ts              # UI-specific types
+│   └── shared.scss           # Shared styles
+├── tests/                    # Vitest test suites
+├── docs/                     # Fumadocs documentation site
+└── ...config files           # ESLint, TypeScript, Parcel, etc.
 ```
 
 ## Core Components
 
 ### BookmarkManager
 
-The central orchestrator for all bookmark operations:
+The central orchestrator that coordinates all bookmark operations and manages communication between components:
 
 ```typescript
 class BookmarkManager {
-  // Core bookmark operations
-  async addBookmark(title?: string, timestamp?: number): Promise<void>
-  async removeBookmark(id: string): Promise<void>
-  async editBookmark(id: string, updates: Partial<BookmarkData>): Promise<void>
-  
+  private bookmarks: BookmarkData[];
+  private persistence: BookmarkPersistence;
+  private importExport: BookmarkImportExport;
+  private cloudSync: CloudSyncHandler;
+
+  constructor(dependencies: IINARuntimeDependencies)
+
+  // Bookmark operations
+  addBookmark(title?: string, timestamp?: number, filepath?: string): void
+  deleteBookmark(id: string): void
+  updateBookmark(id: string, updates: BookmarkUpdatableFields): void
+  jumpToBookmark(id: string): void
+
   // Data management
-  async exportBookmarks(format: ExportFormat): Promise<string>
-  async importBookmarks(data: string, format: ImportFormat): Promise<void>
-  
-  // Search and filtering
-  searchBookmarks(query: string): BookmarkData[]
-  filterByTags(tags: string[]): BookmarkData[]
+  exportBookmarks(format: 'json' | 'csv'): string
+  importBookmarks(data: BookmarkData[], options: ImportOptions): ImportResult
+
+  // Cloud sync
+  syncToCloud(provider: 'google-drive' | 'dropbox', credentials: CloudCredentials): Promise<void>
+
+  // UI management
+  private setupWebUI(): void
+  private handleUIMessage(message: UIMessage, source: UISource): void
 }
 ```
 
-### MetadataDetector
+### BookmarkPersistence
 
-Handles intelligent media title detection:
+Handles local storage with automatic backup:
 
 ```typescript
-class MetadataDetector {
-  async getCurrentTitle(): Promise<string>
-  extractTitleFromFilename(path: string): string
-  private cleanTitle(title: string): string
-  private removeQualityIndicators(title: string): string
+class BookmarkPersistence {
+  load(): BookmarkData[]
+  save(bookmarks: BookmarkData[]): void
+  recoverFromBackup(): BookmarkData[]
+}
+```
+
+### BookmarkImportExport
+
+Manages import/export functionality with validation:
+
+```typescript
+class BookmarkImportExport {
+  import(existing: BookmarkData[], raw: unknown[], options?: ImportOptions): ImportResult
+  exportJSON(bookmarks: BookmarkData[]): string
+  exportCSV(bookmarks: BookmarkData[]): string
+}
+```
+
+### CloudSyncHandler
+
+Orchestrates cloud synchronization with conflict resolution:
+
+```typescript
+class CloudSyncHandler {
+  sync(provider: CloudStorageManager, bookmarks: BookmarkData[]): Promise<BookmarkData[]>
+  upload(provider: CloudStorageManager, bookmarks: BookmarkData[]): Promise<void>
+  download(provider: CloudStorageManager): Promise<BookmarkData[]>
 }
 ```
 
 ### UI Components
 
-Modular user interface components built with modern web technologies:
+Three distinct interface modes built with React:
 
-- **Plugin Sidebar** - Integrated IINA sidebar component
-- **Standalone Window** - Independent bookmark manager window
-- **Add Bookmark Dialog** - Modal for creating new bookmarks
-- **Settings Panel** - Configuration interface
+- **Sidebar** (`ui/sidebar/`) - Full bookmark manager integrated into IINA sidebar with filters, search, and all dialogs
+- **Overlay** (`ui/overlay/`) - Lightweight overlay with search and quick jump functionality
+- **Window** (`ui/window/`) - Standalone window with complete editing capabilities
+
+Shared components include:
+- `AddBookmarkDialog` - Create new bookmarks
+- `ImportDialog` / `ExportDialog` - Data import/export
+- `CloudSyncDialog` - Cloud provider authentication
+- `FilterComponent` / `AdvancedSearch` - Filtering and search
+- `FileReconciliationDialog` - Handle file path conflicts
 
 ## Design Patterns
 
 ### Dependency Injection
 
-The plugin uses dependency injection for better testability and modularity:
+The plugin uses dependency injection through the `IINARuntimeDependencies` interface:
 
 ```typescript
-interface Dependencies {
-  core: IINACore;
-  logger: Logger;
-  storage: StorageProvider;
+interface IINARuntimeDependencies {
+  core: IINACore;           // Media playback control
+  event: IINAEventBus;      // Event system
+  preferences: IINAPreferences; // Persistent storage
+  menu: IINAMenu;           // Menu integration
+  overlay: IINAUIAPI;       // Overlay UI
+  sidebar: IINAUIAPI;       // Sidebar UI
+  standaloneWindow: IINAUIAPI; // Window UI
+  http: IINAHttp;           // Network requests
+  console: IINAConsole;     // Logging
 }
 
 class BookmarkManager {
-  constructor(private deps: Dependencies) {}
-}
-```
-
-### Observer Pattern
-
-Event-driven updates for UI synchronization:
-
-```typescript
-class BookmarkEventEmitter {
-  on(event: 'bookmark-added' | 'bookmark-removed', handler: Function): void
-  emit(event: string, data: any): void
-}
-```
-
-### Strategy Pattern
-
-Flexible export/import handling:
-
-```typescript
-interface ExportStrategy {
-  export(bookmarks: BookmarkData[]): string;
-}
-
-class JSONExportStrategy implements ExportStrategy {
-  export(bookmarks: BookmarkData[]): string {
-    return JSON.stringify(bookmarks, null, 2);
-  }
-}
-
-class CSVExportStrategy implements ExportStrategy {
-  export(bookmarks: BookmarkData[]): string {
-    // CSV export implementation
+  constructor(dependencies: IINARuntimeDependencies) {
+    this.deps = dependencies;
+    // Inject dependencies into sub-components
+    this.persistence = new BookmarkPersistence(dependencies.preferences, dependencies.console);
+    this.importExport = new BookmarkImportExport(dependencies.console);
+    // ...
   }
 }
 ```
+
+### Message-Based Communication
+
+UI components communicate with the plugin backend via structured messages:
+
+```typescript
+type UIMessage = {
+  type: 'ADD_BOOKMARK' | 'DELETE_BOOKMARK' | 'JUMP_TO_BOOKMARK' | /* ... */;
+  payload: Record<string, unknown>;
+};
+
+private handleUIMessage(message: UIMessage, source: UISource): void {
+  switch (message.type) {
+    case 'ADD_BOOKMARK':
+      this.addBookmark(/* ... */);
+      break;
+    // ...
+  }
+}
+```
+
+### Separation of Concerns
+
+Each module has a single, well-defined responsibility:
+
+- **BookmarkManager** - Orchestration and UI communication
+- **BookmarkPersistence** - Local storage operations
+- **BookmarkImportExport** - Data transformation
+- **CloudSyncHandler** - Cloud synchronization logic
+- **CloudStorage** - Provider-specific implementations (Google Drive, Dropbox)
 
 ## Data Flow
 
@@ -127,26 +198,46 @@ class CSVExportStrategy implements ExportStrategy {
 
 ```mermaid
 graph TD
-    A[User Action] --> B[Detect Media Title]
-    B --> C[Get Current Timestamp]
-    C --> D[Open Add Dialog]
-    D --> E[User Input]
-    E --> F[Validate Data]
-    F --> G[Save Bookmark]
-    G --> H[Update UI]
-    H --> I[Emit Event]
+    A[UI: User clicks Add Bookmark] --> B[UI sends ADD_BOOKMARK message]
+    B --> C[BookmarkManager receives message]
+    C --> D[Get current file path from IINA core]
+    D --> E[Get current timestamp from player]
+    E --> F[Create BookmarkData with auto-detected metadata]
+    F --> G[Add to bookmarks array]
+    G --> H[BookmarkPersistence saves to storage]
+    H --> I[Send updated bookmarks to all UIs]
 ```
 
-### Search and Filter Flow
+### Cloud Sync Flow
 
 ```mermaid
 graph TD
-    A[Search Input] --> B[Parse Query]
-    B --> C[Apply Text Filter]
-    C --> D[Apply Tag Filter]
-    D --> E[Apply Date Filter]
-    E --> F[Sort Results]
-    F --> G[Update Display]
+    A[User initiates cloud sync] --> B[CloudSyncHandler.sync called]
+    B --> C[Download existing bookmarks from cloud]
+    C --> D[Merge local + cloud bookmarks]
+    D --> E{Conflicts?}
+    E -->|Yes| F[Keep both versions with conflict markers]
+    E -->|No| G[Upload merged bookmarks to cloud]
+    F --> G
+    G --> H[Update local storage]
+    H --> I[Return merged bookmarks to UI]
+```
+
+### Import Flow
+
+```mermaid
+graph TD
+    A[User selects file to import] --> B[BookmarkImportExport.import called]
+    B --> C[Validate bookmark array structure]
+    C --> D{Duplicate handling mode?}
+    D -->|skip| E[Skip duplicates by filepath+timestamp]
+    D -->|replace| F[Replace matching bookmarks]
+    D -->|merge| G[Keep both versions]
+    E --> H[Return import result with stats]
+    F --> H
+    G --> H
+    H --> I[BookmarkManager updates bookmarks]
+    I --> J[Save to persistence]
 ```
 
 ## Storage Architecture
@@ -178,128 +269,228 @@ Automatic backup rotation for data safety:
 
 ## Error Handling
 
-### Graceful Degradation
+### Input Validation
 
-The plugin is designed to handle errors gracefully:
+All user inputs are validated and sanitized:
 
 ```typescript
-try {
-  const title = await this.metadataDetector.getCurrentTitle();
-} catch (error) {
-  this.logger.error('Title detection failed', error);
-  // Fallback to generic title
-  const title = 'Unknown Media';
+// Strip HTML tags to prevent injection
+import { stripHtmlTags } from './utils/validation';
+
+const sanitizedTitle = stripHtmlTags(userInput);
+
+// Validate bookmark array structure
+const validated = validateBookmarkArray(rawBookmarks, console);
+```
+
+### CSV Formula Injection Prevention
+
+Export operations protect against CSV formula injection:
+
+```typescript
+function sanitizeCsvCell(value: string): string {
+  if (/^[=+\-@\t\r]/.test(value)) {
+    return "'" + value; // Prefix dangerous characters
+  }
+  return value;
+}
+```
+
+### Backup and Recovery
+
+Automatic backup system for data safety:
+
+```typescript
+class BookmarkPersistence {
+  save(bookmarks: BookmarkData[]): void {
+    // Save to backup key before overwriting
+    preferences.set('bookmarks_backup', JSON.stringify(bookmarks));
+    preferences.set('bookmarks', JSON.stringify(bookmarks));
+  }
+
+  recoverFromBackup(): BookmarkData[] {
+    // Restore from backup if main storage is corrupted
+    return JSON.parse(preferences.get('bookmarks_backup') || '[]');
+  }
 }
 ```
 
 ### User Feedback
 
-Comprehensive error reporting and user notifications:
+The UI provides comprehensive feedback:
 
-- **Toast notifications** for quick feedback
-- **Error dialogs** for critical issues
-- **Logging system** for debugging
-- **Retry mechanisms** for transient failures
+- **Toast notifications** - Success/error messages
+- **Error boundaries** - Graceful UI error handling (React)
+- **Console logging** - Debug information via IINA console
+- **Reconciliation dialogs** - Handle missing file paths
 
 ## Performance Considerations
 
-### Lazy Loading
+### Debounced Search
 
-UI components are loaded on-demand:
-
-```typescript
-const StandaloneWindow = lazy(() => import('./ui/StandaloneWindow'));
-```
-
-### Debounced Operations
-
-Search and filter operations are debounced to prevent excessive processing:
+Search operations use custom debounce hook to prevent excessive re-renders:
 
 ```typescript
-const debouncedSearch = debounce((query: string) => {
-  this.performSearch(query);
-}, 300);
+// ui/hooks/useDebounce.ts
+const debouncedSearchTerm = useDebounce(searchTerm, 300);
 ```
 
-### Memory Management
+### Concurrency Control
 
-Efficient handling of large bookmark collections:
+Cloud sync operations include timeout protection:
 
-- **Virtual scrolling** for large lists
-- **Pagination** for export operations
-- **Cleanup routines** for unused resources
+```typescript
+class CloudSyncHandler {
+  private syncInProgress = false;
+  private readonly SYNC_TIMEOUT = 60000; // 60 seconds
+
+  async sync(/* ... */): Promise<BookmarkData[]> {
+    if (this.syncInProgress) {
+      throw new Error('Sync already in progress');
+    }
+    // Implement timeout guard...
+  }
+}
+```
+
+### Memory Efficient Storage
+
+Bookmarks are stored as JSON strings and parsed on demand:
+
+```typescript
+// Only parse when needed
+const bookmarks = JSON.parse(preferences.get('bookmarks') || '[]');
+```
 
 ## Testing Strategy
 
 ### Unit Tests
 
-Individual component testing with Vitest:
+Component testing with Vitest and comprehensive mocking:
 
 ```typescript
-describe('MetadataDetector', () => {
-  it('should extract title from filename', () => {
-    const detector = new MetadataDetector(mockDeps);
-    const title = detector.extractTitleFromFilename('Movie.2023.1080p.mp4');
-    expect(title).toBe('Movie');
+describe('BookmarkImportExport', () => {
+  it('should skip duplicates when importing', () => {
+    const existing = [{ id: '1', filepath: '/test.mp4', timestamp: 100, /* ... */ }];
+    const toImport = [{ filepath: '/test.mp4', timestamp: 100, /* ... */ }];
+
+    const result = importExport.import(existing, toImport, {
+      duplicateHandling: 'skip'
+    });
+
+    expect(result.imported).toBe(0);
+    expect(result.skipped).toBe(1);
   });
 });
 ```
 
 ### Integration Tests
 
-End-to-end workflow testing:
+End-to-end workflow testing with mocked IINA APIs:
 
 ```typescript
-describe('Bookmark Workflow', () => {
-  it('should create, edit, and delete bookmark', async () => {
-    const manager = new BookmarkManager(mockDeps);
-    await manager.addBookmark('Test Movie', 100);
-    // Test complete workflow
+describe('Cloud Sync Integration', () => {
+  it('should merge local and cloud bookmarks', async () => {
+    const mockCloudStorage = createMockCloudStorageManager();
+    const handler = new CloudSyncHandler(mockCloudStorage, mockConsole);
+
+    const local = [/* local bookmarks */];
+    const merged = await handler.sync(mockCloudStorage, local);
+
+    expect(merged.length).toBeGreaterThan(local.length);
+  });
+});
+```
+
+### UI Component Tests
+
+React component testing with React Testing Library:
+
+```typescript
+describe('ErrorBoundary', () => {
+  it('should catch errors and display fallback UI', () => {
+    const ThrowError = () => { throw new Error('Test error'); };
+
+    render(
+      <ErrorBoundary>
+        <ThrowError />
+      </ErrorBoundary>
+    );
+
+    expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
   });
 });
 ```
 
 ## Security Considerations
 
-### Input Validation
+### Input Sanitization
 
-All user inputs are validated and sanitized:
+All user inputs are sanitized to prevent injection attacks:
 
 ```typescript
-function validateBookmarkData(data: Partial<BookmarkData>): BookmarkData {
-  return {
-    title: sanitizeString(data.title || ''),
-    timestamp: Math.max(0, data.timestamp || 0),
-    tags: (data.tags || []).map(sanitizeString),
-    // ... other validations
-  };
+import { stripHtmlTags } from './utils/validation';
+
+// Strip HTML/script tags from all user-provided strings
+const sanitized = {
+  title: stripHtmlTags(userInput.title),
+  description: userInput.description ? stripHtmlTags(userInput.description) : undefined,
+  tags: userInput.tags.map(stripHtmlTags)
+};
+```
+
+### CSV Formula Injection Prevention
+
+CSV exports protect against formula injection:
+
+```typescript
+// Prefix dangerous characters with single quote
+function sanitizeCsvCell(value: string): string {
+  if (/^[=+\-@\t\r]/.test(value)) {
+    return "'" + value;
+  }
+  return value;
 }
 ```
 
-### File System Access
+### IINA Security Sandbox
 
-Secure handling of file paths and media access:
+The plugin operates within IINA's security model:
 
-- **Path validation** to prevent directory traversal
-- **Permission checks** before file operations
-- **Sandboxed execution** within IINA's security model
+- **Permissions** - Network access requires `"network-request"` permission in Info.json
+- **File access** - Limited to media files opened in IINA
+- **Storage** - Isolated plugin preferences storage
+- **Network** - HTTPS-only cloud connections
 
 <Callout type="info">
-  The plugin operates within IINA's security sandbox and follows all platform security guidelines.
+  The plugin follows IINA's security guidelines and operates within its sandboxed environment.
 </Callout>
 
-## Future Architecture Improvements
+## Technology Stack
 
-### Planned Enhancements
+### Backend (JavaScriptCore Runtime)
 
-- **Plugin ecosystem** support for extensions
-- **Cloud sync** capabilities for cross-device bookmarks
-- **API layer** for third-party integrations
-- **Machine learning** for smart tagging and recommendations
+- **TypeScript 5.8** - Type-safe development
+- **ES2019 target** - Compatible with IINA's JavaScriptCore engine
+- **No DOM APIs** - Backend runs in non-browser environment
+- **Parcel 2.16** - Module bundling and compilation
 
-### Scalability Considerations
+### Frontend (WKWebView)
 
-- **Database migration** for large bookmark collections
-- **Microservice architecture** for advanced features
-- **Caching strategies** for improved performance
-- **Progressive loading** for better user experience 
+- **React 19** - UI component framework
+- **TypeScript** - Type safety
+- **SCSS** - Styling with variables and nesting
+- **Parcel** - Build system with `parcel-optimizer-webview`
+
+### Testing
+
+- **Vitest 4.x** - Fast unit testing framework
+- **React Testing Library** - Component testing utilities
+- **Mock IINA APIs** - Comprehensive test doubles
+
+### Development Tools
+
+- **pnpm** - Fast, disk-efficient package manager
+- **ESLint 9** - Flat config linting
+- **Prettier 3** - Code formatting
+- **Husky v9** - Git hooks for quality gates

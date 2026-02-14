@@ -1,6 +1,6 @@
 ---
 title: IINA Plugin Bookmarks
-description: Enterprise-grade bookmark management system for IINA media player with advanced features
+description: Bookmark management system for IINA media player
 icon: Bookmark
 ---
 
@@ -16,74 +16,63 @@ import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
   **Version 1.0.0** - Production-ready bookmark management with advanced filtering, batch operations, and performance optimizations.
 </Callout>
 
-**IINA Plugin Bookmarks** is an enterprise-grade bookmark management system specifically engineered for the IINA media player. It features intelligent metadata detection, sophisticated organizational tools, high-performance caching, and comprehensive data management capabilities.
+**IINA Plugin Bookmarks** is a bookmark management system for the IINA media player. It provides bookmark creation, organization with tags and filtering, data import/export, and cloud sync capabilities.
 
 ## ✨ Key Features
 
 <Cards>
-  <Card 
-    title="🎬 Smart Media Detection" 
-    href="/docs/features/media-detection"
-    description="AI-powered media title detection with intelligent fallback systems and metadata extraction"
-  >
-    - Auto-detection from media metadata
-    - Intelligent filename cleaning
-    - Quality indicator removal
-    - Fallback title generation
-  </Card>
-  
-  <Card 
-    title="📚 Advanced Bookmark Management" 
+  <Card
+    title="📚 Bookmark Management"
     href="/docs/features/bookmark-management"
-    description="Professional-grade bookmark operations with batch processing and validation"
+    description="Create, edit, and delete bookmarks with validation"
   >
-    - Instant bookmark creation
-    - Batch operations support
-    - Duplicate detection & prevention
-    - Comprehensive validation
+    - Bookmark creation at any timestamp
+    - Update titles, descriptions, and tags
+    - Auto-generated titles from filenames
+    - Input sanitization for security
   </Card>
-  
-  <Card 
-    title="🏷️ Sophisticated Tag System" 
+
+  <Card
+    title="🏷️ Tags and Filtering"
     href="/docs/features/filtering"
-    description="Multi-criteria filtering and organization with advanced search capabilities"
+    description="Organize bookmarks with tags and filters"
   >
-    - Hierarchical tag structure
-    - Auto-tagging algorithms
-    - Advanced filtering logic
-    - Tag suggestions & completion
+    - Tag-based organization
+    - Multi-criteria filtering
+    - Sort by various fields
+    - Search functionality
   </Card>
-  
-  <Card 
-    title="📤 Enterprise Data Management" 
+
+  <Card
+    title="📤 Data Management"
     href="/docs/features/data-management"
-    description="Professional export/import with multiple formats and advanced options"
+    description="Export and import bookmarks in JSON or CSV"
   >
-    - JSON & CSV export/import
-    - Metadata preservation
-    - Batch processing
-    - Data validation & error handling
+    - JSON export/import
+    - CSV export/import
+    - Duplicate handling (skip, replace, merge)
+    - Data validation
   </Card>
-  
-  <Card 
-    title="🚀 Performance Optimizations" 
-    href="/docs/development/architecture"
-    description="High-performance architecture with caching and debouncing"
+
+  <Card
+    title="☁️ Cloud Sync"
+    href="/docs/features/cloud-sync"
+    description="Sync bookmarks across devices"
   >
-    - Indexed bookmark cache
-    - Debounced operations
-    - Memoized search functions
-    - Optimized memory usage
+    - Google Drive support
+    - Dropbox support
+    - Upload, download, and bidirectional sync
+    - Conflict resolution
   </Card>
-  
-  <Card 
-    title="🎨 Multi-Interface Design" 
+
+  <Card
+    title="🎨 Three Interfaces"
     href="/docs/ui/interfaces"
-    description="Three integrated interfaces for different use cases"
+    description="Multiple ways to interact with bookmarks"
   >
     - IINA sidebar integration
     - Standalone management window
-    - Media overlay interface
+    - Media overlay display
   </Card>
 </Cards>
 
@@ -247,32 +236,28 @@ import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
 ```typescript
 // Core plugin structure
 class BookmarkManager {
-  // High-performance bookmark operations
-  async addBookmark(title?: string, timestamp?: number): Promise<void>
+  // Bookmark operations
+  async addBookmark(title?: string, timestamp?: number, description?: string, tags?: string[]): Promise<void>
   removeBookmark(id: string): void
-  updateBookmark(id: string, data: Partial<BookmarkData>): void
-  
-  // Advanced data management
-  async exportBookmarks(options: ExportOptions): Promise<ExportResult>
-  async importBookmarks(data: BookmarkData[], options: ImportOptions): Promise<ImportResult>
-  
-  // Search and filtering
-  getBookmarks(filePath?: string): BookmarkData[]
-  searchBookmarks(query: string): BookmarkData[]
-  
-  // Performance optimizations
-  private cache: BookmarkCache
-  private debouncedSave: (...args: any[]) => void
-  private memoizedGetBookmarks: (filePath?: string) => BookmarkData[]
+  updateBookmark(id: string, data: BookmarkUpdatableFields): void
+  jumpToBookmark(id: string): void
+
+  // Query operations
+  getBookmarksForFile(filepath?: string): BookmarkData[]
+  getAllBookmarks(): BookmarkData[]
+  getBookmarkCount(): number
+
+  // Lifecycle
+  destroy(): void
 }
 ```
 
-<Callout type="info" title="Performance Features">
-  The plugin includes enterprise-grade performance optimizations:
-  - **Indexed caching** for O(1) bookmark lookups
-  - **Debounced operations** to prevent excessive I/O
-  - **Memoized functions** for frequently accessed data
-  - **Batch processing** for large import/export operations
+<Callout type="info" title="Architecture">
+  The plugin uses a modular architecture:
+  - **BookmarkManager** orchestrates all operations
+  - **BookmarkPersistence** handles storage
+  - **BookmarkImportExport** manages data transformation
+  - **CloudSyncHandler** coordinates cloud operations
 </Callout>
 
 ## 🆘 Support & Community

@@ -1,592 +1,361 @@
 ---
 title: BookmarkManager API
-description: Complete API reference for the BookmarkManager class with methods, interfaces, and examples
+description: Complete API reference for the BookmarkManager class
 icon: Code
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
-import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
-import { Card, Cards } from 'fumadocs-ui/components/card';
 
 # BookmarkManager API Reference
 
-Complete technical reference for the `BookmarkManager` class, the core component responsible for all bookmark operations, data management, and system integration.
+The `BookmarkManager` class is the central orchestrator for all bookmark operations, UI communication, and system integration.
 
-## 🏗️ Class Overview
+## Class Overview
 
 ```typescript
 export class BookmarkManager {
-  // Core properties
   private bookmarks: BookmarkData[];
-  private readonly STORAGE_KEY = "bookmarks";
-  private deps: IINADependencies;
-  private metadataDetector: MetadataDetector;
-  private cache: BookmarkCache;
+  private readonly SORT_PREFERENCES_KEY = 'sortPreferences';
+  private deps: IINARuntimeDependencies;
+  private persistence: BookmarkPersistence;
+  private importExport: BookmarkImportExport;
+  private cloudSync: CloudSyncHandler;
+  private eventIds: string[];
+  private idCounter: number;
 
-  // Performance optimizations
-  private debouncedSave: (...args: any[]) => void;
-  private debouncedRefreshUIs: (...args: any[]) => void;
-  private memoizedGetBookmarks: (filePath?: string) => BookmarkData[];
-
-  constructor(dependencies?: IINADependencies);
+  constructor(dependencies: IINARuntimeDependencies)
 }
 ```
 
-<Callout type="info" title="Architecture Note">
-  The BookmarkManager follows a **dependency injection pattern** for testability and uses **performance optimizations** including caching, debouncing, and memoization.
+<Callout type="info">
+  The BookmarkManager delegates specialized operations to focused modules: `BookmarkPersistence` for storage, `BookmarkImportExport` for data transformation, and `CloudSyncHandler` for cloud operations.
 </Callout>
 
-## 📚 Core Methods
+## Constructor
 
-<Tabs items={['Bookmark Operations', 'Data Management', 'Search & Filter', 'Performance']}>
+Creates a new BookmarkManager instance and initializes all subsystems.
+
+```typescript
+constructor(dependencies: IINARuntimeDependencies)
+```
+
+**Parameters:**
+- `dependencies` - IINA runtime dependencies (console, core, preferences, menu, event, sidebar, overlay, standaloneWindow, utils, file, http)
+
+**Initialization sequence:**
+1. Creates persistence, import/export, and cloud sync handlers
+2. Loads existing bookmarks from storage
+3. Loads sort preferences
+4. Sets up event listeners for file-loaded events
+5. Sets up web UI (sidebar, overlay, window)
+6. Sets up UI message listeners for all message types
+
+## Core Methods
+
+<Tabs items={['Bookmark Operations', 'Query Operations', 'Lifecycle']}>
   <Tab value="Bookmark Operations">
-    ### Bookmark CRUD Operations
-    
-    #### `addBookmark()`
-    
-    Creates a new bookmark with intelligent defaults and validation.
-    
+    ### `addBookmark()`
+
+    Creates a new bookmark with auto-populated defaults and validation.
+
     ```typescript
     async addBookmark(
-      title?: string,           // Custom title (optional, auto-detected if not provided)
-      timestamp?: number,       // Playback position (optional, uses current time)
-      description?: string,     // User description (optional)
-      tags?: string[]          // Custom tags (optional, auto-generated if not provided)
+      title?: string,
+      timestamp?: number,
+      description?: string,
+      tags?: string[]
     ): Promise<void>
     ```
-    
-    **Example Usage:**
+
+    **Parameters:**
+    - `title` (optional) - Bookmark title. If omitted, auto-generated from filename and timestamp.
+    - `timestamp` (optional) - Playback position in seconds. If omitted, uses current playback position.
+    - `description` (optional) - User description. If omitted, auto-generated.
+    - `tags` (optional) - Array of tags. Defaults to empty array.
+
+    **Behavior:**
+    - Validates timestamp is within valid range (0 to MAX_TIMESTAMP)
+    - Enforces maximum bookmark limit from preferences (default: 1000)
+    - Auto-generates title from filename if not provided
+    - Sanitizes all inputs to prevent XSS (strips HTML tags)
+    - Generates unique ID using timestamp + counter + random component
+    - Saves immediately and refreshes all UIs
+
+    **Example:**
     ```typescript
-    // Quick bookmark with auto-detection
-    await bookmarkManager.addBookmark();
-    
-    // Custom bookmark with specific details
-    await bookmarkManager.addBookmark(
+    // Quick bookmark at current position with auto-generated title
+    await manager.addBookmark();
+
+    // Custom bookmark with full details
+    await manager.addBookmark(
       "Epic Battle Scene",
       2847.5,
-      "Amazing fight choreography with practical effects",
-      ["action", "favorite", "climax"]
+      "Amazing fight choreography",
+      ["action", "favorite"]
     );
     ```
-    
-    **Behavior:**
-    - **Auto-detection**: Title extracted from media metadata or filename
-    - **Timestamp capture**: Uses current playback position if not specified
-    - **Validation**: Ensures all required fields are present and valid
-    - **Duplicate prevention**: Checks for existing bookmarks at same timestamp
-    - **Performance**: Uses debounced save to prevent excessive I/O
-    
+
     ---
-    
-    #### `removeBookmark()`
-    
-    Removes a bookmark by ID with optimized lookup.
-    
+
+    ### `removeBookmark()`
+
+    Removes a bookmark by ID.
+
     ```typescript
     removeBookmark(id: string): void
     ```
-    
-    **Example Usage:**
-    ```typescript
-    bookmarkManager.removeBookmark("bookmark_1695740123456_a1b2c3");
-    ```
-    
+
+    **Parameters:**
+    - `id` - Unique bookmark identifier
+
     **Behavior:**
-    - **Cache optimization**: Uses indexed cache for O(1) lookup
-    - **Fallback safety**: Falls back to linear search if cache miss
-    - **Automatic save**: Triggers debounced save operation
-    - **UI refresh**: Updates all connected interfaces
-    
+    - Filters bookmark array to remove matching ID
+    - Logs warning if bookmark not found
+    - Saves immediately and refreshes all UIs
+
     ---
-    
-    #### `updateBookmark()`
-    
-    Updates bookmark properties with validation and change tracking.
-    
+
+    ### `updateBookmark()`
+
+    Updates bookmark properties.
+
     ```typescript
-    updateBookmark(
-      id: string,
-      data: Partial<Omit<BookmarkData, 'id' | 'filepath' | 'createdAt'>>
-    ): void
+    updateBookmark(id: string, data: BookmarkUpdatableFields): void
     ```
-    
-    **Example Usage:**
+
+    **Parameters:**
+    - `id` - Unique bookmark identifier
+    - `data` - Partial update object containing title, description, and/or tags
+
+    **Behavior:**
+    - Finds bookmark by ID
+    - Sanitizes updated fields (strips HTML tags)
+    - Updates `updatedAt` timestamp
+    - Saves immediately and refreshes all UIs
+    - Logs warning if bookmark not found
+
+    **Example:**
     ```typescript
-    bookmarkManager.updateBookmark("bookmark_123", {
-      title: "Updated Scene Title",
-      description: "Added more context about this scene",
-      tags: ["updated", "enhanced", "favorite"]
+    manager.updateBookmark("bookmark_123", {
+      title: "Updated Title",
+      description: "New description",
+      tags: ["updated", "favorite"]
     });
     ```
-    
-    **Behavior:**
-    - **Partial updates**: Only specified fields are modified
-    - **Immutable fields**: ID, filepath, and createdAt cannot be changed
-    - **Validation**: Validates all changes before applying
-    - **Change tracking**: Logs modifications for debugging
-    
+
     ---
-    
-    #### `jumpToBookmark()`
-    
-    Navigates to a bookmark's timestamp in the current media.
-    
+
+    ### `jumpToBookmark()`
+
+    Seeks to the bookmark's timestamp in the current media.
+
     ```typescript
     jumpToBookmark(id: string): void
     ```
-    
-    **Example Usage:**
-    ```typescript
-    bookmarkManager.jumpToBookmark("bookmark_1695740123456_a1b2c3");
-    ```
-    
+
+    **Parameters:**
+    - `id` - Unique bookmark identifier
+
     **Behavior:**
-    - **Media synchronization**: Works with currently loaded media file
-    - **Validation**: Ensures bookmark exists and is valid
-    - **UI feedback**: Provides visual confirmation of jump
-    - **Error handling**: Graceful failure for invalid bookmarks
+    - Finds bookmark by ID
+    - Calls `iina.core.seekTo(timestamp)` to jump to position
+    - Logs error if bookmark not found or seek unavailable
+    - Shows OSD message if seek operation fails
   </Tab>
-  
-  <Tab value="Data Management">
-    ### Export/Import Operations
-    
-    #### `exportBookmarks()`
-    
-    Exports bookmark data with advanced filtering and format options.
-    
+
+  <Tab value="Query Operations">
+    ### `getBookmarksForFile()`
+
+    Retrieves bookmarks filtered by file path.
+
     ```typescript
-    private async exportBookmarks(
-      bookmarks: BookmarkData[],
-      options: ExportOptions
-    ): Promise<ExportResult>
+    getBookmarksForFile(filepath?: string): BookmarkData[]
     ```
-    
-    **Export Options Interface:**
-    ```typescript
-    interface ExportOptions {
-      format: 'json' | 'csv';
-      includeMetadata: boolean;
-      compressOutput?: boolean;
-      filePath?: string;
-      filter?: {
-        tags?: string[];
-        dateRange?: { start: string; end: string };
-        mediaType?: string;
-      };
-    }
-    ```
-    
-    **Example Usage:**
-    ```typescript
-    const exportResult = await bookmarkManager.exportBookmarks(
-      bookmarks,
-      {
-        format: 'json',
-        includeMetadata: true,
-        filePath: '/exports/my-bookmarks.json',
-        filter: {
-          tags: ['favorite', 'important'],
-          dateRange: {
-            start: '2024-01-01T00:00:00Z',
-            end: '2024-12-31T23:59:59Z'
-          }
-        }
-      }
-    );
-    ```
-    
-    ---
-    
-    #### `importBookmarks()`
-    
-    Imports bookmark data with validation and duplicate handling.
-    
-    ```typescript
-    private async importBookmarks(
-      bookmarks: BookmarkData[],
-      options: ImportOptions
-    ): Promise<ImportResult>
-    ```
-    
-    **Import Options Interface:**
-    ```typescript
-    interface ImportOptions {
-      duplicateHandling: 'skip' | 'replace' | 'merge';
-      validateData: boolean;
-      preserveIds: boolean;
-    }
-    ```
-    
-    **Example Usage:**
-    ```typescript
-    const importResult = await bookmarkManager.importBookmarks(
-      importedBookmarks,
-      {
-        duplicateHandling: 'merge',
-        validateData: true,
-        preserveIds: false
-      }
-    );
-    ```
-    
-    **Import Result Interface:**
-    ```typescript
-    interface ImportResult {
-      success: boolean;
-      importedCount: number;
-      skippedCount: number;
-      errorCount: number;
-      errors?: string[];
-      duplicates?: number;
-    }
-    ```
-  </Tab>
-  
-  <Tab value="Search & Filter">
-    ### Search and Filtering Operations
-    
-    #### `getBookmarks()`
-    
-    Retrieves bookmarks with optional file path filtering and memoization.
-    
-    ```typescript
-    getBookmarks(filePath?: string): BookmarkData[]
-    ```
-    
-    **Example Usage:**
+
+    **Parameters:**
+    - `filepath` (optional) - Absolute path to media file. If omitted, returns all bookmarks.
+
+    **Returns:**
+    - Array of matching bookmarks
+
+    **Example:**
     ```typescript
     // Get all bookmarks
-    const allBookmarks = bookmarkManager.getBookmarks();
-    
+    const all = manager.getBookmarksForFile();
+
     // Get bookmarks for specific file
-    const movieBookmarks = bookmarkManager.getBookmarks('/Movies/Inception.mp4');
+    const movieBookmarks = manager.getBookmarksForFile('/Movies/Inception.mp4');
     ```
-    
-    **Behavior:**
-    - **Memoization**: Results cached for 50ms to improve performance
-    - **Filtering**: Optional file path filtering
-    - **Sorting**: Returns bookmarks in configured sort order
-    - **Performance**: O(1) for cached results, O(n) for uncached
-    
+
     ---
-    
-    #### `searchBookmarks()`
-    
-    Performs full-text search across bookmark properties.
-    
+
+    ### `getAllBookmarks()`
+
+    Returns a copy of all bookmarks.
+
     ```typescript
-    searchBookmarks(query: string): BookmarkData[]
+    getAllBookmarks(): BookmarkData[]
     ```
-    
-    **Example Usage:**
-    ```typescript
-    // Search by title
-    const dreamScenes = bookmarkManager.searchBookmarks("dream");
-    
-    // Search by description
-    const actionScenes = bookmarkManager.searchBookmarks("fight");
-    
-    // Search by tags
-    const favorites = bookmarkManager.searchBookmarks("favorite");
-    ```
-    
-    **Search Behavior:**
-    - **Multi-field search**: Searches title, description, and tags
-    - **Case-insensitive**: Automatic case normalization
-    - **Partial matching**: Supports substring matching
-    - **Ranking**: Results ordered by relevance
-    
+
+    **Returns:**
+    - Array copy of all bookmarks (prevents external mutation)
+
     ---
-    
-    #### `filterByTags()`
-    
-    Filters bookmarks by tag criteria with AND/OR logic.
-    
+
+    ### `getBookmarkCount()`
+
+    Returns the total number of bookmarks.
+
     ```typescript
-    filterByTags(tags: string[], mode: 'AND' | 'OR' = 'OR'): BookmarkData[]
+    getBookmarkCount(): number
     ```
-    
-    **Example Usage:**
-    ```typescript
-    // Bookmarks with ANY of these tags
-    const sciFiOrAction = bookmarkManager.filterByTags(['sci-fi', 'action'], 'OR');
-    
-    // Bookmarks with ALL of these tags
-    const favoriteSciFi = bookmarkManager.filterByTags(['favorite', 'sci-fi'], 'AND');
-    ```
+
+    **Returns:**
+    - Total bookmark count
   </Tab>
-  
-  <Tab value="Performance">
-    ### Performance Optimization Methods
-    
-    #### Cache Management
-    
+
+  <Tab value="Lifecycle">
+    ### `destroy()`
+
+    Cleans up event listeners registered by this instance.
+
     ```typescript
-    private cache: BookmarkCache;
-    
-    // Cache operations
-    private refreshCache(): void;
-    private invalidateCache(): void;
-    private getCacheStats(): CacheStats;
+    destroy(): void
     ```
-    
-    **Cache Features:**
-    - **Indexed lookup**: O(1) bookmark retrieval by ID
-    - **LRU eviction**: Least recently used items removed first
-    - **Memory limits**: Configurable cache size limits
-    - **Statistics**: Performance monitoring and optimization
-    
-    ---
-    
-    #### Debounced Operations
-    
-    ```typescript
-    private debouncedSave: (...args: any[]) => void;
-    private debouncedRefreshUIs: (...args: any[]) => void;
-    
-    // Configuration
-    const SAVE_DEBOUNCE_MS = 500;
-    const UI_REFRESH_DEBOUNCE_MS = 200;
-    ```
-    
-    **Debouncing Benefits:**
-    - **Reduced I/O**: Prevents excessive file system operations
-    - **UI responsiveness**: Batches UI updates for smooth experience
-    - **Performance**: Significant improvement during rapid operations
-    - **Battery life**: Reduces CPU usage on mobile devices
-    
-    ---
-    
-    #### Memoization
-    
-    ```typescript
-    private memoizedGetBookmarks: (filePath?: string) => BookmarkData[];
-    
-    // Memoization configuration
-    const MEMOIZATION_TIMEOUT_MS = 50;
-    ```
-    
-    **Memoization Features:**
-    - **Function caching**: Results cached based on parameters
-    - **Time-based invalidation**: Cache expires after timeout
-    - **Memory efficient**: Automatic cleanup of old cache entries
-    - **Performance gains**: 10-100x improvement for repeated calls
+
+    **Behavior:**
+    - Unregisters all file-loaded event listeners
+    - Clears event ID array
+
+    <Callout type="warn">
+      Call this method before discarding a BookmarkManager instance to prevent memory leaks.
+    </Callout>
   </Tab>
 </Tabs>
 
-## 🔧 Configuration & Lifecycle
+## Private Methods
 
-### Constructor & Initialization
+The BookmarkManager uses several private methods for internal operations:
 
-```typescript
-constructor(dependencies?: IINADependencies) {
-  // Dependency injection with fallbacks
-  this.deps = dependencies || defaultDependencies;
-  
-  // Initialize performance components
-  this.cache = new BookmarkCache();
-  this.debouncedSave = PerformanceUtils.debounce(() => this.saveBookmarks(), 500);
-  this.debouncedRefreshUIs = PerformanceUtils.debounce(
-    (specificUI?: 'sidebar' | 'overlay' | 'window') => this.refreshUIs(specificUI), 
-    200
-  );
-  this.memoizedGetBookmarks = PerformanceUtils.memoize(
-    (filePath?: string) => this.getBookmarksInternal(filePath), 
-    50
-  );
-  
-  // Initialize metadata detector
-  this.metadataDetector = new MetadataDetector(/* ... */);
-  
-  // Setup system integration
-  this.loadBookmarks();
-  this.setupEventListeners();
-  this.setupWebUI();
-  this.setupUIMessageListeners();
-}
-```
+### UI Communication
+
+- `setupWebUI()` - Loads sidebar, overlay, and window HTML files
+- `setupUIMessageListeners()` - Registers message handlers for all UI message types
+- `handleUIMessage()` - Routes incoming messages to appropriate handlers
+- `getUITarget()` - Returns the correct UI API object (sidebar/overlay/window)
+- `sendCurrentFilePath()` - Sends current media file path to UI
+- `sendBookmarksToUI()` - Sends filtered bookmarks to UI
+- `sendBookmarkDefaults()` - Sends auto-populated bookmark defaults for creation
+- `refreshUI()` - Refreshes all three UI interfaces
 
 ### Event Handling
 
-The BookmarkManager integrates with IINA's event system:
+- `setupEventListeners()` - Registers file-loaded events and menu items
+- `loadSortPreferences()` - Loads and sends sort preferences to all UIs
+- `saveSortPreferencesFromUI()` - Saves sort preferences from UI
+
+### Data Management
+
+- `saveBookmarks()` - Delegates to BookmarkPersistence, then refreshes UIs
+- `importBookmarks()` - Delegates to BookmarkImportExport
+- `exportBookmarks()` - Delegates to BookmarkImportExport
+- `handleCloudSync()` - Delegates to CloudSyncHandler
+
+### File Reconciliation
+
+- `handleReconcileFiles()` - Finds bookmarks with missing files
+- `handleFileReconciliation()` - Routes reconciliation actions (update_path, remove_bookmark, search_similar)
+- `updateBookmarkPath()` - Updates a bookmark's file path
+- `searchForSimilarFiles()` - Placeholder for similar file search (not yet implemented)
+
+### Utilities
+
+- `generateId()` - Generates unique bookmark IDs using timestamp + counter + random
+
+## UI Message Protocol
+
+The BookmarkManager handles the following messages from UIs:
+
+**Incoming Messages (UI → Backend):**
+- `UI_READY` - UI initialization complete, triggers bookmark sync
+- `REQUEST_FILE_PATH` - Request current media file path
+- `REQUEST_BOOKMARK_DEFAULTS` - Request auto-populated defaults for new bookmark
+- `ADD_BOOKMARK` - Create new bookmark
+- `DELETE_BOOKMARK` - Remove bookmark by ID
+- `UPDATE_BOOKMARK` - Update bookmark fields
+- `JUMP_TO_BOOKMARK` - Seek to bookmark timestamp
+- `HIDE_OVERLAY` - Hide overlay UI
+- `IMPORT_BOOKMARKS` - Import bookmarks from external data
+- `EXPORT_BOOKMARKS` - Export bookmarks to JSON/CSV
+- `CLOUD_SYNC_REQUEST` - Perform cloud sync operation
+- `FILE_RECONCILIATION_REQUEST` - Handle file path reconciliation
+- `RECONCILE_FILES` - Show file reconciliation dialog
+- `SAVE_SORT_PREFERENCES` - Save sort preferences
+
+**Outgoing Messages (Backend → UI):**
+- `BOOKMARKS_UPDATED` - Current bookmarks for file
+- `CURRENT_FILE_PATH` - Current media file path
+- `BOOKMARK_ADDED` - Confirmation of bookmark creation
+- `BOOKMARK_DELETED` - Confirmation of bookmark deletion
+- `BOOKMARK_JUMPED` - Confirmation of seek operation
+- `BOOKMARK_DEFAULTS` - Auto-populated bookmark defaults
+- `SORT_PREFERENCES` - Current sort preferences
+- `IMPORT_RESULT` - Import operation result
+- `EXPORT_RESULT` - Export operation result
+- `CLOUD_SYNC_RESULT` - Cloud sync operation result
+- `SHOW_FILE_RECONCILIATION_DIALOG` - Trigger reconciliation dialog
+- `FILE_RECONCILIATION_RESULT` - File reconciliation result
+
+## Example Usage
 
 ```typescript
-private setupEventListeners(): void {
-  this.deps.event.on("file-loaded", () => {
-    this.metadataDetector.refreshMetadata()
-      .then(() => this.refreshUIs())
-      .catch(error => this.deps.console.error(`Metadata refresh failed: ${error.message}`));
-  });
-  
-  // Menu integration
-  this.deps.menu.addItem(
-    this.deps.menu.item("Add Bookmark at Current Time", () => {
-      this.addBookmark().catch(error => 
-        this.deps.console.error(`Menu bookmark creation failed: ${error.message}`)
-      );
-    })
-  );
-  
-  // Additional menu items for export, import, management...
-}
+// Initialize BookmarkManager with IINA runtime dependencies
+const manager = new BookmarkManager({
+  console: iina.console,
+  core: iina.core,
+  preferences: iina.preferences,
+  menu: iina.menu,
+  event: iina.event,
+  sidebar: iina.sidebar,
+  overlay: iina.overlay,
+  standaloneWindow: iina.standaloneWindow,
+  utils: iina.utils,
+  file: iina.file,
+  http: httpAdapter
+});
+
+// Add a bookmark at current position
+await manager.addBookmark();
+
+// Add a bookmark with custom details
+await manager.addBookmark(
+  "Important Scene",
+  1234.5,
+  "Key plot point revealed",
+  ["plot", "important"]
+);
+
+// Get bookmarks for current file
+const currentPath = iina.core.status.path;
+const bookmarks = manager.getBookmarksForFile(currentPath);
+
+// Jump to a bookmark
+manager.jumpToBookmark("bookmark_id_here");
+
+// Update bookmark
+manager.updateBookmark("bookmark_id", {
+  title: "Updated Title",
+  tags: ["updated"]
+});
+
+// Remove bookmark
+manager.removeBookmark("bookmark_id");
+
+// Clean up when done
+manager.destroy();
 ```
 
-## 🎯 Usage Examples
-
-<Tabs items={['Basic Usage', 'Advanced Workflows', 'Error Handling', 'Performance Tips']}>
-  <Tab value="Basic Usage">
-    ### Common Operations
-    
-    ```typescript
-    // Initialize the bookmark manager
-    const bookmarkManager = new BookmarkManager({
-      console: iina.console,
-      preferences: iina.preferences,
-      core: iina.core,
-      // ... other dependencies
-    });
-    
-    // Create a bookmark at current position
-    await bookmarkManager.addBookmark();
-    
-    // Create a bookmark with custom details
-    await bookmarkManager.addBookmark(
-      "Important Scene",
-      1234.5,
-      "This scene explains the main plot twist",
-      ["plot", "important", "twist"]
-    );
-    
-    // Get all bookmarks for current media
-    const bookmarks = bookmarkManager.getBookmarks();
-    
-    // Search for specific content
-    const searchResults = bookmarkManager.searchBookmarks("action scene");
-    
-    // Jump to a specific bookmark
-    bookmarkManager.jumpToBookmark("bookmark_id_here");
-    
-    // Update bookmark details
-    bookmarkManager.updateBookmark("bookmark_id", {
-      title: "Updated Title",
-      tags: ["updated", "enhanced"]
-    });
-    
-    // Remove a bookmark
-    bookmarkManager.removeBookmark("bookmark_id");
-    ```
-  </Tab>
-  
-  <Tab value="Advanced Workflows">
-    ### Complex Operations
-    
-    ```typescript
-    // Batch bookmark creation from chapters
-    const mediaChapters = await getMediaChapters();
-    for (const chapter of mediaChapters) {
-      await bookmarkManager.addBookmark(
-        chapter.title,
-        chapter.startTime,
-        `Chapter: ${chapter.description}`,
-        ["chapter", "auto-generated"]
-      );
-    }
-    
-    // Export filtered bookmarks
-    const favoriteBookmarks = bookmarkManager.getBookmarks()
-      .filter(b => b.tags?.includes("favorite"));
-    
-    const exportResult = await bookmarkManager.exportBookmarks(favoriteBookmarks, {
-      format: 'json',
-      includeMetadata: true,
-      filePath: '/exports/favorites.json'
-    });
-    
-    // Import with custom handling
-    const importData = JSON.parse(await readFile('/imports/bookmarks.json'));
-    const importResult = await bookmarkManager.importBookmarks(importData.bookmarks, {
-      duplicateHandling: 'merge',
-      validateData: true,
-      preserveIds: false
-    });
-    
-    console.log(`Import completed: ${importResult.importedCount} bookmarks added`);
-    ```
-  </Tab>
-  
-  <Tab value="Error Handling">
-    ### Error Management
-    
-    ```typescript
-    try {
-      await bookmarkManager.addBookmark("Test Bookmark", -100); // Invalid timestamp
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        console.error("Validation failed:", error.details);
-      } else {
-        console.error("Unexpected error:", error.message);
-      }
-    }
-    
-    // Handle export failures
-    const exportResult = await bookmarkManager.exportBookmarks(bookmarks, options);
-    if (!exportResult.success) {
-      console.error("Export failed:", exportResult.error);
-      // Implement retry logic or user notification
-    }
-    
-    // Handle import with error recovery
-    const importResult = await bookmarkManager.importBookmarks(data, options);
-    if (importResult.errorCount > 0) {
-      console.warn(`Import completed with ${importResult.errorCount} errors:`);
-      importResult.errors?.forEach(error => console.warn("- " + error));
-    }
-    ```
-  </Tab>
-  
-  <Tab value="Performance Tips">
-    ### Optimization Strategies
-    
-    ```typescript
-    // Use batch operations for multiple bookmarks
-    const bookmarksToAdd = [...]; // Array of bookmark data
-    
-    // Instead of individual adds (slow):
-    // for (const data of bookmarksToAdd) {
-    //   await bookmarkManager.addBookmark(...);
-    // }
-    
-    // Use batch import (fast):
-    await bookmarkManager.importBookmarks(bookmarksToAdd, {
-      duplicateHandling: 'skip',
-      validateData: true,
-      preserveIds: false
-    });
-    
-    // Leverage memoization for repeated queries
-    const filePath = '/path/to/movie.mp4';
-    
-    // First call: computed and cached
-    const bookmarks1 = bookmarkManager.getBookmarks(filePath);
-    
-    // Subsequent calls within 50ms: returned from cache
-    const bookmarks2 = bookmarkManager.getBookmarks(filePath); // Fast!
-    
-    // Use debounced operations for rapid changes
-    // Multiple rapid calls will be batched automatically:
-    bookmarkManager.updateBookmark(id1, {title: "New Title 1"});
-    bookmarkManager.updateBookmark(id2, {title: "New Title 2"});
-    bookmarkManager.updateBookmark(id3, {title: "New Title 3"});
-    // Only one save operation will occur after 500ms debounce
-    ```
-  </Tab>
-</Tabs>
-
-<Callout type="tip" title="Best Practices">
-  - **Use batch operations** for multiple bookmark changes
-  - **Leverage caching** by grouping related operations
-  - **Handle errors gracefully** with appropriate fallbacks
-  - **Monitor performance** using built-in cache statistics
-  - **Test thoroughly** with edge cases and large datasets
+<Callout type="info">
+  BookmarkManager delegates to internal modules: BookmarkPersistence (file I/O), BookmarkImportExport (import/export), and CloudSyncHandler (cloud sync). See the [Interfaces](/docs/api/interfaces) page for their type definitions.
 </Callout>

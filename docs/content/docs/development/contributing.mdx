@@ -14,8 +14,8 @@ Thank you for your interest in contributing to IINA Plugin Bookmarks! This guide
 
 ### Prerequisites
 
-- **Node.js** (v18 or higher)
-- **npm** or **pnpm** 
+- **Node.js** (v22 or higher)
+- **pnpm** (v10 or higher)
 - **Git**
 - **IINA** media player (for testing)
 - **TypeScript** knowledge (recommended)
@@ -34,23 +34,32 @@ Thank you for your interest in contributing to IINA Plugin Bookmarks! This guide
   
   <Step>
     ### Install Dependencies
-    
+
     ```bash
-    npm install
+    pnpm install
     ```
   </Step>
-  
+
   <Step>
     ### Build and Test
-    
+
     ```bash
-    npm run build
-    npm test
+    make build
+    make test
     ```
   </Step>
 </Steps>
 
 ## Development Workflow
+
+### Build Commands
+
+```bash
+make build    # TypeScript compile + Parcel UI build
+make test     # Run test suite with Vitest
+make dev      # Start dev servers for sidebar/overlay/window
+make release  # Full production pipeline
+```
 
 ### Commit Guidelines
 
@@ -58,16 +67,18 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```bash
 feat: add bookmark export functionality
-fix: resolve metadata detection for edge cases  
+fix: resolve metadata detection for edge cases
 docs: update installation instructions
 test: add unit tests for bookmark manager
 ```
+
+The project uses Husky v9 pre-commit hooks with lint-staged to enforce code quality. Your commits will automatically be linted and formatted before being accepted.
 
 ### Code Standards
 
 - Use strict TypeScript settings
 - Add JSDoc comments for public APIs
-- Follow ESLint and Prettier configurations
+- Follow ESLint 9 flat config and Prettier 3.x configurations
 - Maintain 80%+ test coverage
 
 ## Testing
@@ -85,7 +96,7 @@ describe('BookmarkManager', () => {
 
 ## Pull Request Process
 
-1. Create feature branch from `develop`
+1. Create feature branch from `main`
 2. Make changes with tests
 3. Update documentation if needed
 4. Submit PR with clear description
@@ -102,4 +113,4 @@ describe('BookmarkManager', () => {
 - Help others learn and grow
 - Follow our Code of Conduct
 
-Thank you for contributing! 🎉 
+Thank you for contributing!

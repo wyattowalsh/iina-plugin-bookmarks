@@ -1,0 +1,265 @@
+---
+title: Cloud Sync
+description: Synchronize bookmarks across devices using Google Drive or Dropbox
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Cloud Sync
+
+Keep your bookmarks synchronized across multiple devices using cloud storage providers.
+
+## Overview
+
+Cloud Sync allows you to:
+- **Backup** bookmarks to cloud storage
+- **Sync** bookmarks across multiple Macs
+- **Restore** bookmarks from cloud backups
+- **Merge** local and cloud bookmarks intelligently
+
+## Supported Providers
+
+<Tabs items={['Google Drive', 'Dropbox']}>
+
+<Tab value="Google Drive">
+
+### Google Drive Setup
+
+1. Open the **Cloud Sync** dialog in the sidebar
+2. Select **Google Drive** as your provider
+3. Click **Authenticate**
+4. Follow OAuth flow to grant access
+5. Enter your access token
+
+**Requirements:**
+- Google account
+- OAuth 2.0 access token with Drive API scope
+- `https://www.googleapis.com/auth/drive.file` permission
+
+<Callout type="info">
+  The plugin stores bookmarks in an app-specific folder, isolated from your other Drive files.
+</Callout>
+
+</Tab>
+
+<Tab value="Dropbox">
+
+### Dropbox Setup
+
+1. Open the **Cloud Sync** dialog in the sidebar
+2. Select **Dropbox** as your provider
+3. Click **Authenticate**
+4. Generate an access token from [Dropbox App Console](https://www.dropbox.com/developers/apps)
+5. Enter your access token
+
+**Requirements:**
+- Dropbox account
+- App access token with `files.content.write` and `files.content.read` scopes
+
+<Callout type="warning">
+  Keep your access tokens secure. Never share them publicly or commit them to version control.
+</Callout>
+
+</Tab>
+
+</Tabs>
+
+## Sync Operations
+
+### Upload
+
+Upload your local bookmarks to cloud storage:
+
+1. Click **Cloud Sync** in the sidebar
+2. Select your provider and authenticate
+3. Choose **Upload** action
+4. Click **Sync**
+
+**Result:** Local bookmarks are uploaded to cloud storage. Existing cloud backup is overwritten.
+
+### Download
+
+Download bookmarks from cloud storage:
+
+1. Click **Cloud Sync** in the sidebar
+2. Select your provider and authenticate
+3. Choose **Download** action
+4. Click **Sync**
+
+**Result:** Cloud bookmarks are displayed but **not** automatically merged with local. Review before importing.
+
+### Sync (Merge)
+
+Intelligently merge local and cloud bookmarks:
+
+1. Click **Cloud Sync** in the sidebar
+2. Select your provider and authenticate
+3. Choose **Sync** action
+4. Click **Sync**
+
+**Result:** Local and cloud bookmarks are merged with conflict resolution.
+
+## Conflict Resolution
+
+When syncing, the plugin detects conflicts based on `filepath + timestamp` matching.
+
+### Conflict Handling
+
+- **Same content** → Keep one copy
+- **Different content** → Keep both with conflict markers
+- **Local only** → Add to merged result
+- **Cloud only** → Add to merged result
+
+Conflicts are marked with:
+```json
+{
+  "title": "Bookmark Title [CONFLICT]",
+  "description": "⚠️ Merged from cloud sync conflict",
+  // ... other fields
+}
+```
+
+<Callout type="tip">
+  Review conflict-marked bookmarks after sync and manually resolve by editing or deleting duplicates.
+</Callout>
+
+## Sync Statistics
+
+After each sync operation, the UI displays:
+
+- **Added** - New bookmarks merged from cloud
+- **Updated** - Existing bookmarks modified
+- **Conflicts** - Number of conflicts detected
+- **Total** - Final bookmark count
+
+## Backup Format
+
+Bookmarks are stored in cloud as JSON files:
+
+```json
+{
+  "bookmarks": [
+    {
+      "id": "abc123",
+      "title": "Important Scene",
+      "timestamp": 125.5,
+      "filepath": "/path/to/video.mp4",
+      "description": "Key plot point",
+      "tags": ["plot", "important"],
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "deviceId": "unique-device-id",
+    "bookmarkCount": 1
+  }
+}
+```
+
+## Concurrency Protection
+
+Cloud sync operations include safety mechanisms:
+
+### Sync Lock
+
+- Only one sync operation can run at a time
+- Prevents race conditions and data corruption
+- Displays error if sync already in progress
+
+### Timeout Protection
+
+- Operations timeout after 60 seconds
+- Prevents hanging on network issues
+- Automatically releases sync lock on timeout
+
+<Callout type="warning">
+  If a sync operation times out, check your internet connection and try again.
+</Callout>
+
+## Security Considerations
+
+### Data Transmission
+
+- All cloud connections use **HTTPS only**
+- Access tokens are stored in IINA's secure preferences
+- No credentials are logged or transmitted to third parties
+
+### File Validation
+
+- Filenames are validated to prevent path traversal
+- Only alphanumeric characters, dashes, underscores, and dots allowed
+- Dropbox paths are sanitized to remove `../` sequences
+
+### Access Scopes
+
+- **Google Drive**: Limited to app-created files only
+- **Dropbox**: Limited to app folder (not full Dropbox access)
+
+## Best Practices
+
+### Regular Backups
+
+- Sync before major changes (e.g., bulk imports)
+- Keep local backups via [Export](/docs/features/data-management#export)
+- Test restore process periodically
+
+### Multiple Devices
+
+- Sync on each device before editing
+- Avoid simultaneous edits on different devices
+- Review conflicts carefully before resolving
+
+### Token Management
+
+- Rotate access tokens periodically
+- Revoke tokens for unused devices
+- Use OAuth refresh tokens when available
+
+## Troubleshooting
+
+### Authentication Failed
+
+**Cause:** Invalid or expired access token
+
+**Solution:**
+1. Generate new access token from provider console
+2. Re-authenticate in Cloud Sync dialog
+3. Ensure correct scopes/permissions
+
+### Sync Timeout
+
+**Cause:** Slow network or large bookmark collection
+
+**Solution:**
+1. Check internet connection
+2. Try uploading/downloading instead of sync
+3. Reduce bookmark count via export/delete
+
+### Conflicts After Every Sync
+
+**Cause:** Timestamps may differ slightly between devices
+
+**Solution:**
+1. Manually resolve conflicts once
+2. Perform full upload from primary device
+3. Download (don't sync) on other devices
+
+### No Backups Found
+
+**Cause:** No previous uploads to cloud
+
+**Solution:**
+1. Perform Upload operation first
+2. Check provider console to verify file was created
+3. Ensure authentication was successful
+
+## API Reference
+
+For developers, see:
+- [CloudSyncHandler API](/docs/api/interfaces#cloudsynchandler)
+- [CloudStorage API](/docs/api/interfaces#cloudstoragemanager)
+- [Network requests via iina.http](/docs/development/implementation-notes)
