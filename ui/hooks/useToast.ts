@@ -28,7 +28,11 @@ const useToast = (): UseToastReturn => {
         ...toast,
       };
 
-      setToasts((prev) => [...prev, newToast]);
+      const MAX_TOASTS = 5;
+      setToasts((prev) => {
+        const next = [...prev, newToast];
+        return next.length > MAX_TOASTS ? next.slice(-MAX_TOASTS) : next;
+      });
       return id;
     },
     [generateId],

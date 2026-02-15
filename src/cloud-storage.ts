@@ -2,7 +2,15 @@
 // Provides abstraction layer for different cloud storage providers
 // Uses injected HttpAdapter (backed by iina.http) -- no fetch(), no navigator, no console
 
-import type { HttpAdapter, IINAConsole } from './types';
+import {
+  errorMessage,
+  type BackupMetadata,
+  type BookmarkData,
+  type CloudCredentials,
+  type HttpAdapter,
+  type IINAConsole,
+} from './types';
+import { validateBookmarkArray } from './utils/validation';
 
 interface CloudStorageProvider {
   id: string;
@@ -14,24 +22,8 @@ interface CloudStorageProvider {
   delete(filename: string): Promise<boolean>;
 }
 
-interface CloudCredentials {
-  apiKey?: string;
-  accessToken?: string;
-  clientId?: string;
-  clientSecret?: string;
-  refreshToken?: string;
-}
-
-interface BackupMetadata {
-  version: string;
-  createdAt: string;
-  totalBookmarks: number;
-  device: string;
-  userAgent: string;
-}
-
 interface BookmarkBackup {
-  bookmarks: any[];
+  bookmarks: BookmarkData[];
   metadata: BackupMetadata;
 }
 
@@ -46,6 +38,10 @@ function sanitizeDropboxPathComponent(component: string): string {
     .replace(/\.\.\//g, '')
     .replace(/\.\.\\/g, '')
     .replace(/[/\\]/g, '');
+}
+
+function isOk(res: { statusCode: number }): boolean {
+  return res.statusCode >= 200 && res.statusCode < 300;
 }
 
 // Google Drive Provider Implementation
@@ -75,15 +71,13 @@ class GoogleDriveProvider implements CloudStorageProvider {
           },
         });
 
-        return response.statusCode >= 200 && response.statusCode < 300;
+        return isOk(response);
       }
 
       this.logger.warn('Google Drive authentication requires proper OAuth setup');
       return false;
     } catch (error) {
-      this.logger.error(
-        `Google Drive authentication failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Google Drive authentication failed: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -111,7 +105,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
         data: metadata,
       });
 
-      if (createResponse.statusCode < 200 || createResponse.statusCode >= 300) {
+      if (!isOk(createResponse)) {
         throw new Error(`Failed to create file: status ${createResponse.statusCode}`);
       }
 
@@ -128,15 +122,13 @@ class GoogleDriveProvider implements CloudStorageProvider {
         },
       );
 
-      if (uploadResponse.statusCode < 200 || uploadResponse.statusCode >= 300) {
+      if (!isOk(uploadResponse)) {
         throw new Error(`Failed to upload content: status ${uploadResponse.statusCode}`);
       }
 
       return fileInfo.id;
     } catch (error) {
-      this.logger.error(
-        `Google Drive upload failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Google Drive upload failed: ${errorMessage(error)}`);
       throw error;
     }
   }
@@ -151,9 +143,9 @@ class GoogleDriveProvider implements CloudStorageProvider {
     }
 
     try {
-      const safeName = encodeURIComponent(filename);
+      // SECURITY: isValidFilename() prevents query injection by blocking special chars
       const searchResponse = await this.http.get(
-        `${this.API_BASE}/files?q=name='${safeName}' and trashed=false`,
+        `${this.API_BASE}/files?q=name='${filename}' and trashed=false`,
         {
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
@@ -162,7 +154,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
         },
       );
 
-      if (searchResponse.statusCode < 200 || searchResponse.statusCode >= 300) {
+      if (!isOk(searchResponse)) {
         throw new Error(`Failed to search for file: status ${searchResponse.statusCode}`);
       }
 
@@ -180,15 +172,17 @@ class GoogleDriveProvider implements CloudStorageProvider {
         },
       });
 
-      if (downloadResponse.statusCode < 200 || downloadResponse.statusCode >= 300) {
+      if (!isOk(downloadResponse)) {
         throw new Error(`Failed to download file: status ${downloadResponse.statusCode}`);
       }
 
-      return JSON.parse(downloadResponse.text);
+      const backup = JSON.parse(downloadResponse.text);
+      if (backup.bookmarks) {
+        backup.bookmarks = validateBookmarkArray(backup.bookmarks);
+      }
+      return backup;
     } catch (error) {
-      this.logger.error(
-        `Google Drive download failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Google Drive download failed: ${errorMessage(error)}`);
       throw error;
     }
   }
@@ -210,16 +204,14 @@ class GoogleDriveProvider implements CloudStorageProvider {
         },
       );
 
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (!isOk(response)) {
         throw new Error(`Failed to list files: status ${response.statusCode}`);
       }
 
       const result = JSON.parse(response.text);
-      return result.files?.map((file: any) => file.name) || [];
+      return result.files?.map((file: Record<string, unknown>) => file.name as string) || [];
     } catch (error) {
-      this.logger.error(
-        `Google Drive list failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Google Drive list failed: ${errorMessage(error)}`);
       throw error;
     }
   }
@@ -234,9 +226,8 @@ class GoogleDriveProvider implements CloudStorageProvider {
     }
 
     try {
-      const safeName = encodeURIComponent(filename);
       const searchResponse = await this.http.get(
-        `${this.API_BASE}/files?q=name='${safeName}' and trashed=false`,
+        `${this.API_BASE}/files?q=name='${filename}' and trashed=false`,
         {
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
@@ -245,7 +236,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
         },
       );
 
-      if (searchResponse.statusCode < 200 || searchResponse.statusCode >= 300) {
+      if (!isOk(searchResponse)) {
         return false;
       }
 
@@ -263,11 +254,9 @@ class GoogleDriveProvider implements CloudStorageProvider {
         },
       });
 
-      return deleteResponse.statusCode >= 200 && deleteResponse.statusCode < 300;
+      return isOk(deleteResponse);
     } catch (error) {
-      this.logger.error(
-        `Google Drive delete failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Google Drive delete failed: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -285,7 +274,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
         },
       );
 
-      if (searchResponse.statusCode >= 200 && searchResponse.statusCode < 300) {
+      if (isOk(searchResponse)) {
         const result = JSON.parse(searchResponse.text);
         if (result.files && result.files.length > 0) {
           return [result.files[0].id];
@@ -303,16 +292,14 @@ class GoogleDriveProvider implements CloudStorageProvider {
         },
       });
 
-      if (createResponse.statusCode >= 200 && createResponse.statusCode < 300) {
+      if (isOk(createResponse)) {
         const folder = JSON.parse(createResponse.text);
         return [folder.id];
       }
 
       throw new Error('Failed to create app folder');
     } catch (error) {
-      this.logger.error(
-        `Failed to get/create app folder: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Failed to get/create app folder: ${errorMessage(error)}`);
       throw error;
     }
   }
@@ -345,14 +332,12 @@ class DropboxProvider implements CloudStorageProvider {
           },
         });
 
-        return response.statusCode >= 200 && response.statusCode < 300;
+        return isOk(response);
       }
 
       return false;
     } catch (error) {
-      this.logger.error(
-        `Dropbox authentication failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Dropbox authentication failed: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -383,16 +368,14 @@ class DropboxProvider implements CloudStorageProvider {
         data: data,
       });
 
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (!isOk(response)) {
         throw new Error(`Upload failed: status ${response.statusCode}`);
       }
 
       const result = JSON.parse(response.text);
       return result.id;
     } catch (error) {
-      this.logger.error(
-        `Dropbox upload failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Dropbox upload failed: ${errorMessage(error)}`);
       throw error;
     }
   }
@@ -417,15 +400,17 @@ class DropboxProvider implements CloudStorageProvider {
         },
       });
 
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (!isOk(response)) {
         throw new Error(`Download failed: status ${response.statusCode}`);
       }
 
-      return JSON.parse(response.text);
+      const backup = JSON.parse(response.text);
+      if (backup.bookmarks) {
+        backup.bookmarks = validateBookmarkArray(backup.bookmarks);
+      }
+      return backup;
     } catch (error) {
-      this.logger.error(
-        `Dropbox download failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Dropbox download failed: ${errorMessage(error)}`);
       throw error;
     }
   }
@@ -447,20 +432,18 @@ class DropboxProvider implements CloudStorageProvider {
         },
       });
 
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (!isOk(response)) {
         return [];
       }
 
       const result = JSON.parse(response.text);
       return (
         result.entries
-          ?.filter((entry: any) => entry['.tag'] === 'file')
-          ?.map((entry: any) => entry.name) || []
+          ?.filter((entry: Record<string, unknown>) => entry['.tag'] === 'file')
+          ?.map((entry: Record<string, unknown>) => entry.name as string) || []
       );
     } catch (error) {
-      this.logger.error(
-        `Dropbox list failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Dropbox list failed: ${errorMessage(error)}`);
       return [];
     }
   }
@@ -486,11 +469,9 @@ class DropboxProvider implements CloudStorageProvider {
         data: { path: path },
       });
 
-      return response.statusCode >= 200 && response.statusCode < 300;
+      return isOk(response);
     } catch (error) {
-      this.logger.error(
-        `Dropbox delete failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Dropbox delete failed: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -508,13 +489,6 @@ export class CloudStorageManager {
     this.providers.set('dropbox', new DropboxProvider(http, logger));
   }
 
-  getAvailableProviders(): Array<{ id: string; name: string }> {
-    return Array.from(this.providers.values()).map((provider) => ({
-      id: provider.id,
-      name: provider.name,
-    }));
-  }
-
   async setProvider(providerId: string, credentials: CloudCredentials): Promise<boolean> {
     const provider = this.providers.get(providerId);
     if (!provider) {
@@ -530,7 +504,7 @@ export class CloudStorageManager {
     return false;
   }
 
-  async uploadBookmarks(bookmarks: any[], filename?: string): Promise<string> {
+  async uploadBookmarks(bookmarks: BookmarkData[], filename?: string): Promise<string> {
     if (!this.currentProvider) {
       throw new Error('No cloud provider configured');
     }
@@ -566,19 +540,11 @@ export class CloudStorageManager {
     return await this.currentProvider.list();
   }
 
-  async deleteBackup(filename: string): Promise<boolean> {
-    if (!this.currentProvider) {
-      throw new Error('No cloud provider configured');
-    }
-
-    return await this.currentProvider.delete(filename);
-  }
-
-  async syncBookmarks(localBookmarks: any[]): Promise<{
-    merged: any[];
+  async syncBookmarks(localBookmarks: BookmarkData[]): Promise<{
+    merged: BookmarkData[];
     added: number;
     updated: number;
-    conflicts: any[];
+    conflicts: BookmarkData[];
   }> {
     try {
       const backups = await this.listBackups();
@@ -596,20 +562,19 @@ export class CloudStorageManager {
       const cloudBackup = await this.downloadBookmarks(latestBackup);
       const cloudBookmarks = cloudBackup.bookmarks;
 
-      const merged = new Map<string, any>();
-      const conflicts: any[] = [];
+      const merged = new Map<string, BookmarkData>();
       let added = 0;
       let updated = 0;
 
       localBookmarks.forEach((bookmark) => {
-        merged.set(bookmark.id, { ...bookmark, source: 'local' });
+        merged.set(bookmark.id, { ...bookmark });
       });
 
       cloudBookmarks.forEach((cloudBookmark) => {
         const localBookmark = merged.get(cloudBookmark.id);
 
         if (!localBookmark) {
-          merged.set(cloudBookmark.id, { ...cloudBookmark, source: 'cloud' });
+          merged.set(cloudBookmark.id, { ...cloudBookmark });
           added++;
         } else {
           // Use updatedAt for conflict resolution (falls back to createdAt)
@@ -618,7 +583,7 @@ export class CloudStorageManager {
 
           if (localTime !== cloudTime) {
             if (cloudTime > localTime) {
-              merged.set(cloudBookmark.id, { ...cloudBookmark, source: 'cloud' });
+              merged.set(cloudBookmark.id, { ...cloudBookmark });
               updated++;
             }
           }
@@ -633,12 +598,10 @@ export class CloudStorageManager {
         merged: mergedBookmarks,
         added,
         updated,
-        conflicts,
+        conflicts: [],
       };
     } catch (error) {
-      this.logger.error(
-        `Cloud sync failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Cloud sync failed: ${errorMessage(error)}`);
       throw error;
     }
   }
@@ -655,4 +618,9 @@ export function getCloudStorageManager(
     _instance = new CloudStorageManager(http, logger);
   }
   return _instance;
+}
+
+/** Reset the singleton for test isolation */
+export function resetCloudStorageManager(): void {
+  _instance = null;
 }

@@ -1,8 +1,8 @@
-// IINA Plugin Bookmarks - Modern TypeScript Entry Point
+// IINA Plugin Bookmarks - Entry Point
 // ES6 Module implementation following IINA plugin guidelines (Sept 2025)
 
-import type { IINARuntimeDependencies, HttpAdapter } from './types';
-import { BookmarkManager } from './bookmark-manager-modern';
+import { errorMessage, type IINARuntimeDependencies, type HttpAdapter } from './types';
+import { BookmarkManager } from './bookmark-manager';
 
 // Plugin initialization function
 export function plugin(): void {
@@ -18,7 +18,7 @@ export function plugin(): void {
     error: (m: string) => void;
     warn: (m: string) => void;
   };
-  log.log('IINA Plugin Bookmarks - Starting initialization (Modern TypeScript)');
+  log.log('IINA Plugin Bookmarks - Starting initialization');
 
   try {
     // Build the HTTP adapter from iina.http to match our HttpAdapter interface
@@ -74,8 +74,7 @@ export function plugin(): void {
     // Store reference globally for debugging
     (globalThis as any).bookmarkManager = bookmarkManager;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error(`IINA Plugin Bookmarks - Initialization failed: ${errorMessage}`);
+    log.error(`IINA Plugin Bookmarks - Initialization failed: ${errorMessage(error)}`);
     throw error;
   }
 }

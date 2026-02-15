@@ -56,6 +56,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const [caretPosition, setCaretPosition] = useState(0);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const onSearchChangeRef = useRef(onSearchChange);
+  onSearchChangeRef.current = onSearchChange;
   const debouncedSearchTerm = useDebounce(searchTerm, 200);
 
   // Parse search query into structured format
@@ -228,9 +230,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   useEffect(() => {
     if (debouncedSearchTerm !== undefined) {
       const parsedQuery = parseSearchQuery(debouncedSearchTerm);
-      onSearchChange(debouncedSearchTerm, parsedQuery);
+      onSearchChangeRef.current(debouncedSearchTerm, parsedQuery);
     }
-  }, [debouncedSearchTerm, parseSearchQuery, onSearchChange]);
+  }, [debouncedSearchTerm, parseSearchQuery]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);

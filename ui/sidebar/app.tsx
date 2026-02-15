@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import FilterComponent, { FilterState } from '../components/FilterComponent';
+import React, { useState, useRef, useCallback } from 'react';
+import FilterComponent, { FilterState, DEFAULT_FILTER_STATE } from '../components/FilterComponent';
 import AdvancedSearch, { ParsedSearchQuery } from '../components/AdvancedSearch';
 import TextHighlighter from '../components/TextHighlighter';
 import ExportDialog from '../components/ExportDialog';
@@ -11,21 +11,14 @@ import Loading from '../components/Loading';
 import useAdvancedBookmarkFilters from '../hooks/useAdvancedBookmarkFilters';
 import useFilterHistory from '../hooks/useFilterHistory';
 import useToast from '../hooks/useToast';
+import { useIinaMessages } from '../hooks/useIinaMessages';
 import { BookmarkData, AppWindow } from '../types';
+import { formatTime, formatDate } from '../utils/formatTime';
 
 const App: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
   const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
-  const [filters, setFilters] = useState<FilterState>({
-    searchTerm: '',
-    dateRange: { start: '', end: '' },
-    tags: [],
-    sortBy: 'createdAt',
-    sortDirection: 'desc',
-    fileFilter: '',
-    sortCriteria: [{ field: 'createdAt', direction: 'desc', priority: 1 }],
-    enableMultiSort: false,
-  });
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -35,9 +28,10 @@ const App: React.FC = () => {
   const [movedFiles, setMovedFiles] = useState<BookmarkData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const appWindow = window as unknown as AppWindow;
-  const { toasts, showSuccess, showError, showWarning, showInfo, dismissToast } = useToast();
+  const { toasts, showSuccess, showError, showInfo, dismissToast } = useToast();
 
   const { filteredBookmarks, resultsCount, availableTags } = useAdvancedBookmarkFilters({
     bookmarks,
@@ -54,109 +48,78 @@ const App: React.FC = () => {
   showErrorRef.current = showError;
   const showInfoRef = useRef(showInfo);
   showInfoRef.current = showInfo;
-  const handlerRegistered = useRef(false);
 
-  useEffect(() => {
-    if (handlerRegistered.current) return;
-    handlerRegistered.current = true;
-
-    const handleMessage = (event: any) => {
-      let messageData = event.data;
-      if (typeof event.data === 'string') {
-        try {
-          messageData = JSON.parse(event.data);
-        } catch (e) {
-          return;
-        }
-      }
-
-      if (messageData?.type === 'BOOKMARKS_UPDATED' && messageData.data) {
-        setBookmarks(messageData.data);
-      } else if (messageData?.type === 'CURRENT_FILE_PATH' && messageData.data) {
-        setCurrentFile(messageData.data);
-      } else if (messageData?.type === 'BOOKMARK_ADDED') {
+  useIinaMessages(
+    {
+      BOOKMARKS_UPDATED: (data: BookmarkData[]) => {
+        setBookmarks(data);
+      },
+      CURRENT_FILE_PATH: (data: string) => {
+        setCurrentFile(data);
+      },
+      BOOKMARK_ADDED: () => {
         showSuccessRef.current('Bookmark Added', 'New bookmark created successfully');
-      } else if (messageData?.type === 'BOOKMARK_DELETED') {
+      },
+      BOOKMARK_DELETED: () => {
         showSuccessRef.current('Bookmark Deleted', 'Bookmark removed successfully');
-      } else if (messageData?.type === 'BOOKMARK_JUMPED') {
+      },
+      BOOKMARK_JUMPED: () => {
         showInfoRef.current('Jumped to Bookmark', 'Playback position updated');
-      } else if (messageData?.type === 'EXPORT_SUCCESS') {
+      },
+      EXPORT_RESULT: (data: any) => {
         setIsLoading(false);
         showSuccessRef.current(
           'Export Complete',
-          `Bookmarks exported to ${messageData.data?.filename || 'file'}`,
+          `Bookmarks exported as ${data?.format || 'file'}`,
         );
-      } else if (messageData?.type === 'EXPORT_ERROR') {
+        window.postMessage({ type: 'EXPORT_RESULT', data }, window.location.origin);
+      },
+      IMPORT_RESULT: (data: any) => {
         setIsLoading(false);
-        showErrorRef.current(
-          'Export Failed',
-          messageData.data?.error || 'Failed to export bookmarks',
-        );
-      } else if (messageData?.type === 'EXPORT_STARTED') {
-        setIsLoading(true);
-        setLoadingMessage('Exporting bookmarks...');
-      } else if (messageData?.type === 'IMPORT_RESULT') {
-        setIsLoading(false);
-        if (messageData.data?.success) {
+        if (data?.success) {
           showSuccessRef.current(
             'Import Complete',
-            `Successfully imported ${messageData.data.importedCount} bookmarks`,
+            `Successfully imported ${data.importedCount} bookmarks`,
           );
-          if (messageData.data.skippedCount > 0) {
+          if (data.skippedCount > 0) {
             showInfoRef.current(
               'Import Info',
-              `${messageData.data.skippedCount} bookmarks were skipped as duplicates`,
+              `${data.skippedCount} bookmarks were skipped as duplicates`,
             );
           }
         } else {
-          showErrorRef.current(
-            'Import Failed',
-            messageData.data?.errors?.[0] || 'Failed to import bookmarks',
-          );
+          showErrorRef.current('Import Failed', data?.errors?.[0] || 'Failed to import bookmarks');
         }
-      } else if (messageData?.type === 'IMPORT_STARTED') {
+        window.postMessage({ type: 'IMPORT_RESULT', data }, window.location.origin);
+      },
+      IMPORT_STARTED: () => {
         setIsLoading(true);
         setLoadingMessage('Importing bookmarks...');
-      } else if (messageData?.type === 'SHOW_CLOUD_SYNC_DIALOG') {
+      },
+      SHOW_CLOUD_SYNC_DIALOG: () => {
         setShowCloudSyncDialog(true);
-      } else if (
-        messageData?.type === 'SHOW_FILE_RECONCILIATION_DIALOG' &&
-        messageData.data?.movedFiles
-      ) {
-        setMovedFiles(messageData.data.movedFiles);
-        setShowReconciliationDialog(true);
-      } else if (messageData?.type === 'ERROR') {
-        showErrorRef.current('Error', messageData.data?.message || 'An unexpected error occurred');
-      }
-    };
-
-    if (appWindow.iina?.onMessage) {
-      appWindow.iina.onMessage('message', handleMessage);
-    } else {
-      window.addEventListener('message', handleMessage);
-    }
-
-    if (appWindow.iina?.postMessage) {
-      appWindow.iina.postMessage('UI_READY', { uiType: 'sidebar' });
-    }
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!currentFile && appWindow.iina?.postMessage) {
-      appWindow.iina.postMessage('REQUEST_FILE_PATH');
-    }
-  }, [currentFile]);
+      },
+      SHOW_FILE_RECONCILIATION_DIALOG: (data: any) => {
+        if (data?.movedFiles) {
+          setMovedFiles(data.movedFiles);
+          setShowReconciliationDialog(true);
+        }
+      },
+      ERROR: (data: any) => {
+        showErrorRef.current('Error', data?.message || 'An unexpected error occurred');
+      },
+      CLOUD_SYNC_RESULT: (data: any) => {
+        window.postMessage({ type: 'CLOUD_SYNC_RESULT', data }, window.location.origin);
+      },
+      FILE_RECONCILIATION_RESULT: (data: any) => {
+        window.postMessage({ type: 'FILE_RECONCILIATION_RESULT', data }, window.location.origin);
+      },
+    },
+    'sidebar',
+  );
 
   const handleAddBookmark = () => {
-    appWindow.iina?.postMessage?.('ADD_BOOKMARK', {
-      title: `New Sidebar Bookmark ${new Date().toLocaleTimeString()}`,
-      timestamp: null,
-      description: 'Added from sidebar',
-    });
+    appWindow.iina?.postMessage?.('ADD_BOOKMARK', {});
   };
 
   const postMessage = (type: string, data?: any) => {
@@ -164,25 +127,30 @@ const App: React.FC = () => {
   };
 
   const handleDeleteBookmark = (id: string) => {
-    appWindow.iina?.postMessage?.('DELETE_BOOKMARK', { id });
+    setPendingDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (pendingDeleteId) {
+      appWindow.iina?.postMessage?.('DELETE_BOOKMARK', { id: pendingDeleteId });
+      setPendingDeleteId(null);
+    }
   };
 
   const handleJumpToBookmark = (id: string) => {
     appWindow.iina?.postMessage?.('JUMP_TO_BOOKMARK', { id });
   };
 
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString();
-
-  const formatTime = (seconds: number) =>
-    new Date((seconds || 0) * 1000).toISOString().substring(11, 19);
-
-  const handleAdvancedSearchChange = (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
-    setParsedQuery(parsedQuery);
-    setFilters((prev) => ({ ...prev, searchTerm }));
-    if (searchTerm.trim()) {
-      addRecentSearch(searchTerm);
-    }
-  };
+  const handleAdvancedSearchChange = useCallback(
+    (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
+      setParsedQuery(parsedQuery);
+      setFilters((prev) => ({ ...prev, searchTerm }));
+      if (searchTerm.trim()) {
+        addRecentSearch(searchTerm);
+      }
+    },
+    [addRecentSearch],
+  );
 
   return (
     <div className="bookmark-sidebar">
@@ -332,7 +300,7 @@ const App: React.FC = () => {
             {bookmark.tags && bookmark.tags.length > 0 && (
               <div className="bookmark-tags" role="group" aria-label="Tags">
                 {bookmark.tags.map((tag) => (
-                  <span key={tag} className="bookmark-tag" role="tag" aria-label={`Tag: ${tag}`}>
+                  <span key={tag} className="bookmark-tag" aria-label={`Tag: ${tag}`}>
                     {tag}
                   </span>
                 ))}
@@ -371,6 +339,7 @@ const App: React.FC = () => {
         onClose={() => setShowCloudSyncDialog(false)}
         postMessage={postMessage}
         bookmarkCount={bookmarks.length}
+        onBookmarksReceived={setBookmarks}
       />
 
       <FileReconciliationDialog
@@ -379,6 +348,27 @@ const App: React.FC = () => {
         postMessage={postMessage}
         movedFiles={movedFiles}
       />
+
+      {pendingDeleteId && (
+        <div
+          className="confirm-dialog-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Confirm deletion"
+        >
+          <div className="confirm-dialog">
+            <p>Delete this bookmark?</p>
+            <div className="confirm-dialog-actions">
+              <button className="confirm-btn" onClick={confirmDelete}>
+                Confirm
+              </button>
+              <button className="cancel-btn" onClick={() => setPendingDeleteId(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

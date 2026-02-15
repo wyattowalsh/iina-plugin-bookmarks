@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
+import { handleDialogKeyDown } from '../utils/focusTrap';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useWindowMessage } from '../hooks/useWindowMessage';
 
 interface ExportOptions {
   format: 'json' | 'csv';
@@ -67,23 +70,24 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
 
   const mediaTypes = ['Video', 'Audio', 'Movie', 'TV Show', 'Documentary'];
 
-  // Listen for export results
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'EXPORT_RESULT') {
-        setIsExporting(false);
-        setExportResult(event.data.data);
+  const handleClose = useCallback(() => {
+    if (isExporting) return;
+    setExportResult(null);
+    onClose();
+  }, [isExporting, onClose]);
 
-        // If successful and data is included, trigger download
-        if (event.data.data.success && event.data.data.data) {
-          downloadFile(event.data.data.data, event.data.data.filePath || 'export.txt');
-        }
-      }
-    };
+  useEscapeKey(isOpen, handleClose);
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+  const handleExportResult = useCallback((data: any) => {
+    setIsExporting(false);
+    setExportResult(data);
+
+    if (data.success && data.data) {
+      downloadFile(data.data, data.filePath || 'export.txt');
+    }
   }, []);
+
+  useWindowMessage('EXPORT_RESULT', handleExportResult);
 
   const downloadFile = (content: string, filename: string) => {
     const blob = new Blob([content], {
@@ -137,12 +141,6 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
     postMessage?.('EXPORT_BOOKMARKS', exportOptions);
   };
 
-  const handleClose = () => {
-    if (isExporting) return;
-    setExportResult(null);
-    onClose();
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -152,6 +150,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
       aria-modal="true"
       aria-labelledby="export-dialog-title"
       aria-describedby="export-dialog-description"
+      onKeyDown={handleDialogKeyDown}
     >
       <div className="dialog-content export-dialog">
         <div className="dialog-header">

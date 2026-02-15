@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
+import { formatTime } from '../utils/formatTime';
+import { handleDialogKeyDown } from '../utils/focusTrap';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useWindowMessage } from '../hooks/useWindowMessage';
 
 interface FileReconciliationDialogProps {
   isOpen: boolean;
@@ -35,48 +39,31 @@ const FileReconciliationDialog: React.FC<FileReconciliationDialogProps> = ({
   const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null);
   const [confirmingRemoveAll, setConfirmingRemoveAll] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen) return;
+  useEscapeKey(isOpen, onClose);
 
-    const handleMessage = (event: any) => {
-      let messageData = event.data;
-      if (typeof event.data === 'string') {
-        try {
-          messageData = JSON.parse(event.data);
-        } catch (e) {
-          return;
-        }
+  const handleReconciliationResult = useCallback((data: any) => {
+    const { success, action, bookmarkId, similarFiles: foundFiles } = data;
+
+    if (success) {
+      if (action === 'search_similar' && foundFiles) {
+        setSimilarFiles(
+          foundFiles.map((path: string) => ({
+            path,
+            name: path.split('/').pop() || path,
+            similarity: 0,
+          })),
+        );
+        setIsSearching(false);
+      } else if (action === 'update_path') {
+        setResolvedFiles((prev) => [...prev, bookmarkId]);
+        setSelectedFile(null);
+        setNewPath('');
+        setSimilarFiles([]);
       }
+    }
+  }, []);
 
-      if (messageData?.type === 'FILE_RECONCILIATION_RESULT') {
-        const { success, action, bookmarkId, similarFiles: foundFiles } = messageData.data;
-
-        if (success) {
-          if (action === 'search_similar' && foundFiles) {
-            setSimilarFiles(
-              foundFiles.map((path: string) => ({
-                path,
-                name: path.split('/').pop() || path,
-                similarity: Math.random() * 0.4 + 0.6,
-              })),
-            );
-            setIsSearching(false);
-          } else if (action === 'update_path') {
-            setResolvedFiles((prev) => [...prev, bookmarkId]);
-            setSelectedFile(null);
-            setNewPath('');
-            setSimilarFiles([]);
-          }
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [isOpen]);
+  useWindowMessage('FILE_RECONCILIATION_RESULT', handleReconciliationResult, isOpen);
 
   const handleSearchSimilar = (file: MovedFile) => {
     setSelectedFile(file);
@@ -124,17 +111,6 @@ const FileReconciliationDialog: React.FC<FileReconciliationDialogProps> = ({
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-
-    if (h > 0) {
-      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    }
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
   const getDirectoryPath = (path: string) => {
     const parts = path.split('/');
     return parts.slice(0, -1).join('/');
@@ -145,11 +121,16 @@ const FileReconciliationDialog: React.FC<FileReconciliationDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div
-        className="dialog-content file-reconciliation-dialog"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div
+      className="dialog-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+      onKeyDown={handleDialogKeyDown}
+    >
+      <div className="dialog-content file-reconciliation-dialog">
         <div className="dialog-header">
           <h3>File Reconciliation</h3>
           <button className="close-button" onClick={onClose} aria-label="Close dialog">

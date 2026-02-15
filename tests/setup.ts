@@ -1,60 +1,47 @@
+// Vitest global setup
+// All backend tests inject dependencies via createMockDeps().
+// This file only provides the bare minimum globalThis.iina stub
+// so that any transitive import of the 'iina' module doesn't crash.
+
 import { vi } from 'vitest';
 
-// Mock IINA global object for plugin backend tests
-const mockIINA = {
-  console: {
-    log: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-  },
-  preferences: {
-    get: vi.fn(),
-    set: vi.fn(),
-  },
-  core: {
-    status: {
-      path: '/test/video.mp4',
-      currentTime: 100,
-    },
-  },
-  event: {
-    on: vi.fn(),
-  },
-  menu: {
-    addItem: vi.fn(),
-    item: vi.fn(),
-  },
-  sidebar: {
-    loadFile: vi.fn(),
-    postMessage: vi.fn(),
-    onMessage: vi.fn(),
-  },
+// Centralized cloud-storage mock — prevents every backend test file from
+// duplicating the vi.hoisted() + vi.mock() boilerplate.
+// NOTE: vi.hoisted() runs before imports, so we inline the factory here.
+const cloudStorageMock = vi.hoisted(() => ({
+  getCloudStorageManager: vi.fn(() => ({
+    setProvider: vi.fn(),
+    uploadBookmarks: vi.fn(),
+    downloadBookmarks: vi.fn(),
+    listBackups: vi.fn(),
+    syncBookmarks: vi.fn(),
+  })),
+  resetCloudStorageManager: vi.fn(),
+  CloudStorageManager: vi.fn(),
+}));
+vi.mock('../src/cloud-storage', () => cloudStorageMock);
+
+const noop = vi.fn();
+
+const minimalIINA = {
+  console: { log: noop, error: noop, warn: noop },
+  preferences: { get: vi.fn().mockReturnValue(null), set: noop },
+  core: { status: { path: '', currentTime: 0 } },
+  event: { on: noop, off: noop },
+  menu: { addItem: noop, item: vi.fn(() => ({})) },
+  sidebar: { loadFile: noop, postMessage: noop, onMessage: noop },
   overlay: {
-    loadFile: vi.fn(),
-    postMessage: vi.fn(),
-    onMessage: vi.fn(),
-    setClickable: vi.fn(),
-    show: vi.fn(),
-    hide: vi.fn(),
+    loadFile: noop,
+    postMessage: noop,
+    onMessage: noop,
+    setClickable: noop,
+    show: noop,
+    hide: noop,
     isVisible: vi.fn().mockReturnValue(false),
   },
-  standaloneWindow: {
-    loadFile: vi.fn(),
-    postMessage: vi.fn(),
-    onMessage: vi.fn(),
-    show: vi.fn(),
-  },
+  standaloneWindow: { loadFile: noop, postMessage: noop, onMessage: noop, show: noop },
 };
 
-// Make IINA mocks available on globalThis (do NOT replace real console)
-(globalThis as any).iina = mockIINA;
-(globalThis as any).preferences = mockIINA.preferences;
-(globalThis as any).core = mockIINA.core;
-(globalThis as any).event = mockIINA.event;
-(globalThis as any).menu = mockIINA.menu;
-(globalThis as any).sidebar = mockIINA.sidebar;
-(globalThis as any).overlay = mockIINA.overlay;
-(globalThis as any).standaloneWindow = mockIINA.standaloneWindow;
+(globalThis as any).iina = minimalIINA;
 
-// Mock iina module
-vi.mock('iina', () => mockIINA);
+vi.mock('iina', () => minimalIINA);

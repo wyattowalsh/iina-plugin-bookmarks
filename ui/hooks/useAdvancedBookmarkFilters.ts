@@ -42,6 +42,18 @@ export const useAdvancedBookmarkFilters = ({
       result = applyDateRangeFilter(result, filters.dateRange);
     }
 
+    // Apply untagged filter
+    if (filters.showOnlyUntagged) {
+      result = result.filter((bookmark) => !bookmark.tags || bookmark.tags.length === 0);
+    }
+
+    // Apply no-description filter
+    if (filters.showOnlyNoDescription) {
+      result = result.filter(
+        (bookmark) => !bookmark.description || bookmark.description.trim() === '',
+      );
+    }
+
     // Apply sorting
     result = applySorting(
       result,
@@ -272,17 +284,18 @@ function applySorting(
   sortCriteria?: FilterState['sortCriteria'],
   enableMultiSort?: boolean,
 ): BookmarkData[] {
-  const sorted = [...bookmarks].sort((a, b) => {
-    // Use multi-criteria sorting if enabled and criteria are provided
-    if (enableMultiSort && sortCriteria && sortCriteria.length > 0) {
-      return applyMultiCriteriaSorting(a, b, sortCriteria);
-    }
+  // Pre-sort criteria once outside the comparator
+  const prioritizedCriteria =
+    enableMultiSort && sortCriteria && sortCriteria.length > 0
+      ? [...sortCriteria].sort((x, y) => x.priority - y.priority)
+      : null;
 
-    // Fall back to single-criteria sorting
+  return [...bookmarks].sort((a, b) => {
+    if (prioritizedCriteria) {
+      return applyMultiCriteriaSorting(a, b, prioritizedCriteria);
+    }
     return applySingleCriteriaSorting(a, b, sortBy, sortDirection);
   });
-
-  return sorted;
 }
 
 // Helper function for single-criteria sorting
@@ -332,20 +345,15 @@ function applySingleCriteriaSorting(
 function applyMultiCriteriaSorting(
   a: BookmarkData,
   b: BookmarkData,
-  sortCriteria: FilterState['sortCriteria'],
+  sortedCriteria: FilterState['sortCriteria'],
 ): number {
-  // Sort criteria by priority (lower number = higher priority)
-  const sortedCriteria = [...sortCriteria].sort((x, y) => x.priority - y.priority);
-
   for (const criterion of sortedCriteria) {
     const comparison = applySingleCriteriaSorting(a, b, criterion.field, criterion.direction);
     if (comparison !== 0) {
-      return comparison; // If this criterion produces a difference, use it
+      return comparison;
     }
-    // If comparison is 0, continue to next criterion
   }
-
-  return 0; // All criteria resulted in equality
+  return 0;
 }
 
 // Helper function to extract filename from filepath

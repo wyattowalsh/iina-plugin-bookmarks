@@ -53,8 +53,7 @@ const DEFAULT_PRESETS: FilterPreset[] = [
     name: 'Untagged',
     description: 'Bookmarks without any tags',
     filters: {
-      searchTerm: '',
-      tags: [],
+      showOnlyUntagged: true,
       sortBy: 'createdAt',
       sortDirection: 'desc',
     },
@@ -76,7 +75,7 @@ const DEFAULT_PRESETS: FilterPreset[] = [
     name: 'Need Description',
     description: 'Bookmarks missing descriptions',
     filters: {
-      searchTerm: '',
+      showOnlyNoDescription: true,
       sortBy: 'createdAt',
       sortDirection: 'desc',
     },

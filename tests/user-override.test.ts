@@ -1,53 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { IINARuntimeDependencies } from '../src/types';
-import { BookmarkManager } from '../src/bookmark-manager-modern';
+import { BookmarkManager } from '../src/bookmark-manager';
+import { createMockDeps as _createMockDeps } from './helpers/mock-deps';
 
-// Mock cloud-storage to prevent real imports
-vi.mock('../src/cloud-storage', () => ({
-  getCloudStorageManager: vi.fn(() => ({
-    setProvider: vi.fn(),
-    uploadBookmarks: vi.fn(),
-    downloadBookmarks: vi.fn(),
-    listBackups: vi.fn(),
-    syncBookmarks: vi.fn(),
-  })),
-  CloudStorageManager: vi.fn(),
-}));
-
+/** Wrapper with user-override-specific defaults (movie path + 30 min playback) */
 function createMockDeps(): IINARuntimeDependencies {
-  return {
-    console: { log: vi.fn(), error: vi.fn(), warn: vi.fn() },
-    preferences: { get: vi.fn().mockReturnValue(null), set: vi.fn() },
-    core: {
-      status: {
-        path: '/test/video/Sample.Movie.2023.1080p.BluRay.x264.mp4',
-        currentTime: 1800, // 30 minutes
-      },
-      seekTo: vi.fn(),
-      seek: vi.fn(),
-      osd: vi.fn(),
-    },
-    event: { on: vi.fn() },
-    menu: { addItem: vi.fn(), item: vi.fn(() => ({})) },
-    sidebar: { loadFile: vi.fn(), postMessage: vi.fn(), onMessage: vi.fn() },
-    overlay: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      setClickable: vi.fn(),
-      show: vi.fn(),
-      hide: vi.fn(),
-      isVisible: vi.fn(() => false),
-    },
-    standaloneWindow: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      show: vi.fn(),
-    },
-    utils: { ask: vi.fn(), prompt: vi.fn(), chooseFile: vi.fn() },
-    file: { read: vi.fn(), write: vi.fn(), exists: vi.fn() },
-  } as unknown as IINARuntimeDependencies;
+  const deps = _createMockDeps();
+  (deps.core.status as any).path = '/test/video/Sample.Movie.2023.1080p.BluRay.x264.mp4';
+  (deps.core.status as any).currentTime = 1800;
+  return deps;
 }
 
 describe('User Override Capabilities', () => {

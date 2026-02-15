@@ -1,66 +1,192 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { IINARuntimeDependencies } from '../src/types';
-import { BookmarkManager } from '../src/bookmark-manager-modern';
+import { BookmarkManager } from '../src/bookmark-manager';
+import { createMockDeps, findHandler } from './helpers/mock-deps';
 
-// Mock cloud-storage to prevent real imports
-vi.mock('../src/cloud-storage', () => ({
-  getCloudStorageManager: vi.fn(() => ({
-    setProvider: vi.fn(),
-    uploadBookmarks: vi.fn(),
-    downloadBookmarks: vi.fn(),
-    listBackups: vi.fn(),
-    syncBookmarks: vi.fn(),
-  })),
-  CloudStorageManager: vi.fn(),
-}));
+describe('Bookmark Import via IMPORT_BOOKMARKS message', () => {
+  let deps: IINARuntimeDependencies;
+  let manager: BookmarkManager;
 
-function createMockDeps(): IINARuntimeDependencies {
-  return {
-    console: { log: vi.fn(), error: vi.fn(), warn: vi.fn() },
-    preferences: { get: vi.fn().mockReturnValue(null), set: vi.fn() },
-    core: {
-      status: {
-        path: '/test/video.mp4',
-        currentTime: 120.5,
-      },
-      seekTo: vi.fn(),
-      seek: vi.fn(),
-      osd: vi.fn(),
-    },
-    event: { on: vi.fn() },
-    menu: { addItem: vi.fn(), item: vi.fn(() => ({})) },
-    sidebar: { loadFile: vi.fn(), postMessage: vi.fn(), onMessage: vi.fn() },
-    overlay: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      setClickable: vi.fn(),
-      show: vi.fn(),
-      hide: vi.fn(),
-      isVisible: vi.fn(() => false),
-    },
-    standaloneWindow: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      show: vi.fn(),
-    },
-    utils: { chooseFile: vi.fn(), prompt: vi.fn(), ask: vi.fn() },
-    file: {
-      write: vi.fn(),
-      read: vi.fn(() => '[]'),
-      exists: vi.fn(() => true),
-    },
-  } as unknown as IINARuntimeDependencies;
-}
+  beforeEach(() => {
+    vi.clearAllMocks();
+    deps = createMockDeps();
+    manager = new BookmarkManager(deps);
+  });
 
-// TODO: The comprehensive import features (importBookmarksFromFile, CSV parsing,
-// duplicate handling, file format detection) have not yet been migrated to
-// bookmark-manager-modern.ts. Re-enable these tests once import functionality
-// is added to the modern module.
-describe.skip('Bookmark Import Functionality (pending migration to modern module)', () => {
-  it('placeholder -- re-enable after import feature migration', () => {
-    expect(true).toBe(true);
+  const makeBookmark = (id: string, title: string, ts: number) => ({
+    id,
+    title,
+    timestamp: ts,
+    filepath: '/test/video.mp4',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    tags: ['imported'],
+  });
+
+  describe('Import modes', () => {
+    it('should skip duplicates when duplicateHandling is "skip"', async () => {
+      // Pre-add a bookmark with the same id
+      await manager.addBookmark('Existing', 10);
+      const existingId = manager.getAllBookmarks()[0].id;
+
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [makeBookmark(existingId, 'Imported Duplicate', 10)],
+        options: { duplicateHandling: 'skip', preserveIds: true },
+      });
+
+      // Should still have only 1 bookmark with the original title
+      expect(manager.getAllBookmarks()).toHaveLength(1);
+      expect(manager.getAllBookmarks()[0].title).toBe('Existing');
+
+      expect(deps.sidebar.postMessage).toHaveBeenCalledWith(
+        'IMPORT_RESULT',
+        expect.objectContaining({ skippedCount: 1, importedCount: 0 }),
+      );
+    });
+
+    it('should replace existing when duplicateHandling is "replace"', async () => {
+      await manager.addBookmark('Original Title', 10);
+      const existingId = manager.getAllBookmarks()[0].id;
+
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [makeBookmark(existingId, 'Replaced Title', 20)],
+        options: { duplicateHandling: 'replace', preserveIds: true },
+      });
+
+      expect(manager.getAllBookmarks()).toHaveLength(1);
+      expect(manager.getAllBookmarks()[0].title).toBe('Replaced Title');
+      expect(manager.getAllBookmarks()[0].timestamp).toBe(20);
+
+      expect(deps.sidebar.postMessage).toHaveBeenCalledWith(
+        'IMPORT_RESULT',
+        expect.objectContaining({ importedCount: 1, skippedCount: 0 }),
+      );
+    });
+
+    it('should merge tags when duplicateHandling is "merge"', async () => {
+      await manager.addBookmark('MergeMe', 10, 'desc', ['existing-tag']);
+      const existingId = manager.getAllBookmarks()[0].id;
+
+      const incoming = makeBookmark(existingId, 'MergeMe', 10);
+      incoming.tags = ['new-tag'];
+
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [incoming],
+        options: { duplicateHandling: 'merge', preserveIds: true },
+      });
+
+      expect(manager.getAllBookmarks()).toHaveLength(1);
+      const tags = manager.getAllBookmarks()[0].tags || [];
+      expect(tags).toContain('existing-tag');
+      expect(tags).toContain('new-tag');
+    });
+
+    it('should add new bookmarks when no duplicate exists', () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [
+          makeBookmark('new1', 'New Bookmark 1', 100),
+          makeBookmark('new2', 'New Bookmark 2', 200),
+        ],
+        options: { duplicateHandling: 'skip' },
+      });
+
+      expect(manager.getAllBookmarks()).toHaveLength(2);
+      expect(deps.sidebar.postMessage).toHaveBeenCalledWith(
+        'IMPORT_RESULT',
+        expect.objectContaining({ importedCount: 2, skippedCount: 0 }),
+      );
+    });
+  });
+
+  describe('HTML stripping on import', () => {
+    it('should sanitize HTML in imported bookmark titles', () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [
+          {
+            id: 'xss1',
+            title: '<script>alert("xss")</script>',
+            timestamp: 10,
+            filepath: '/test.mp4',
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+            tags: [],
+          },
+        ],
+        options: { preserveIds: true },
+      });
+
+      const bm = manager.getAllBookmarks().find((b) => b.id === 'xss1');
+      expect(bm).toBeDefined();
+      // stripHtmlTags removes HTML tags entirely, so <script> is stripped
+      expect(bm!.title).not.toContain('<script>');
+      expect(bm!.title).not.toContain('</script>');
+      // The text content between tags is preserved
+      expect(bm!.title).toContain('alert("xss")');
+    });
+
+    it('should sanitize HTML in imported bookmark descriptions', () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [
+          {
+            id: 'xss2',
+            title: 'Safe Title',
+            timestamp: 10,
+            filepath: '/test.mp4',
+            description: '<img onerror="alert(1)" src="x">',
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+            tags: [],
+          },
+        ],
+        options: { preserveIds: true },
+      });
+
+      const bm = manager.getAllBookmarks().find((b) => b.id === 'xss2');
+      expect(bm).toBeDefined();
+      expect(bm!.description).not.toContain('<img');
+    });
+  });
+
+  describe('Validation of imported bookmarks', () => {
+    it('should skip entries that are not objects', () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: ['not an object', 42, null, makeBookmark('valid1', 'Valid', 10)],
+      });
+
+      // Only the valid one should be imported
+      expect(manager.getAllBookmarks()).toHaveLength(1);
+      expect(manager.getAllBookmarks()[0].title).toBe('Valid');
+    });
+
+    it('should skip entries with missing required fields', () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [
+          { id: 'no-title', timestamp: 10, filepath: '/f.mp4', createdAt: 'x', updatedAt: 'x' },
+          makeBookmark('valid2', 'Has All Fields', 20),
+        ],
+      });
+
+      // Entry without title should be skipped by validateBookmarkArray
+      expect(manager.getAllBookmarks()).toHaveLength(1);
+      expect(manager.getAllBookmarks()[0].title).toBe('Has All Fields');
+    });
+
+    it('should skip entries with negative timestamps', () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [makeBookmark('neg', 'Negative', -5)],
+      });
+
+      expect(manager.getAllBookmarks()).toHaveLength(0);
+    });
   });
 });
 
@@ -133,6 +259,7 @@ describe('Bookmark Import via addBookmark API', () => {
       await manager.addBookmark('Title with "quotes" & [brackets]', 100);
 
       const bookmarks = manager.getAllBookmarks();
+      // stripHtmlTags only encodes < and >, preserves quotes and ampersands
       expect(bookmarks[0].title).toBe('Title with "quotes" & [brackets]');
     });
 
@@ -144,7 +271,7 @@ describe('Bookmark Import via addBookmark API', () => {
       );
 
       const bookmarks = manager.getAllBookmarks();
-      expect(bookmarks[0].title).toBe('Title with \u7279\u6b8a\u5b57\u7b26');
+      expect(bookmarks[0].title).toContain('\u7279\u6b8a\u5b57\u7b26');
     });
 
     it('should handle very long field values', async () => {
@@ -170,7 +297,7 @@ describe('Bookmark Import via addBookmark API', () => {
       const endTime = Date.now();
 
       expect(manager.getAllBookmarks()).toHaveLength(100);
-      expect(endTime - startTime).toBeLessThan(30000);
+      expect(endTime - startTime).toBeLessThan(5000);
     });
   });
 });

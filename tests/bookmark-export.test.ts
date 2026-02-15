@@ -1,51 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { IINARuntimeDependencies } from '../src/types';
-import { BookmarkManager } from '../src/bookmark-manager-modern';
-
-// Mock cloud-storage to prevent real imports
-vi.mock('../src/cloud-storage', () => ({
-  getCloudStorageManager: vi.fn(() => ({
-    setProvider: vi.fn(),
-    uploadBookmarks: vi.fn(),
-    downloadBookmarks: vi.fn(),
-    listBackups: vi.fn(),
-    syncBookmarks: vi.fn(),
-  })),
-  CloudStorageManager: vi.fn(),
-}));
-
-function createMockDeps(): IINARuntimeDependencies {
-  return {
-    console: { log: vi.fn(), error: vi.fn(), warn: vi.fn() },
-    preferences: { get: vi.fn().mockReturnValue(null), set: vi.fn() },
-    core: {
-      status: { path: '/test/video/sample.mp4', currentTime: 1800 },
-      seekTo: vi.fn(),
-      seek: vi.fn(),
-      osd: vi.fn(),
-    },
-    event: { on: vi.fn() },
-    menu: { addItem: vi.fn(), item: vi.fn(() => ({})) },
-    sidebar: { loadFile: vi.fn(), postMessage: vi.fn(), onMessage: vi.fn() },
-    overlay: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      setClickable: vi.fn(),
-      show: vi.fn(),
-      hide: vi.fn(),
-      isVisible: vi.fn(() => false),
-    },
-    standaloneWindow: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      show: vi.fn(),
-    },
-    utils: { chooseFile: vi.fn(), prompt: vi.fn(), ask: vi.fn() },
-    file: { write: vi.fn(), read: vi.fn(() => '[]'), exists: vi.fn(() => true) },
-  } as unknown as IINARuntimeDependencies;
-}
+import { BookmarkManager } from '../src/bookmark-manager';
+import { createMockDeps } from './helpers/mock-deps';
 
 describe('Bookmark Export Functionality', () => {
   let deps: IINARuntimeDependencies;
@@ -92,7 +48,7 @@ describe('Bookmark Export Functionality', () => {
       expect(bookmark.timestamp).toBe(3600);
       expect(bookmark.description).toBe('Full description');
       expect(bookmark.tags).toEqual(['a', 'b']);
-      expect(bookmark.filepath).toBe('/test/video/sample.mp4');
+      expect(bookmark.filepath).toBe('/test/video.mp4');
       expect(bookmark.createdAt).toBeTruthy();
     });
   });
@@ -103,7 +59,7 @@ describe('Bookmark Export Functionality', () => {
       (deps.core.status as any).path = '/other/movie.mp4';
       await manager.addBookmark('Video 2 BM', 200);
 
-      const filtered = manager.getBookmarksForFile('/test/video/sample.mp4');
+      const filtered = manager.getBookmarksForFile('/test/video.mp4');
       expect(filtered).toHaveLength(1);
       expect(filtered[0].title).toBe('Video 1 BM');
     });

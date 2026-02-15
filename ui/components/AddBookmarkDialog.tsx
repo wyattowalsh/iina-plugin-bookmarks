@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import TagInput from './TagInput';
-
-interface BookmarkDefaults {
-  title: string;
-  description: string;
-  tags: string[];
-  timestamp: number;
-  filepath: string;
-}
+import { formatTime } from '../utils/formatTime';
+import { handleDialogKeyDown } from '../utils/focusTrap';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useWindowMessage } from '../hooks/useWindowMessage';
+import { BookmarkDefaults } from '../types';
 
 interface AddBookmarkDialogProps {
   isOpen: boolean;
@@ -39,41 +36,28 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
     }
   }, [isOpen, postMessage]);
 
-  useEffect(() => {
-    const handleMessage = (event: any) => {
-      let messageData = event.data;
-      if (typeof event.data === 'string') {
-        try {
-          messageData = JSON.parse(event.data);
-        } catch (e) {
-          return;
-        }
-      }
+  const handleBookmarkDefaults = useCallback((data: any) => {
+    const defaults: BookmarkDefaults = data;
+    setTitle(defaults.title || '');
+    setDescription(defaults.description || '');
+    setTags(defaults.tags || []);
+    setTimestamp(defaults.timestamp || 0);
+    setLoadingDefaults(false);
+  }, []);
 
-      if (messageData?.type === 'BOOKMARK_DEFAULTS' && messageData.data) {
-        const defaults: BookmarkDefaults = messageData.data;
-        setTitle(defaults.title || '');
-        setDescription(defaults.description || '');
-        setTags(defaults.tags || []);
-        setTimestamp(defaults.timestamp || 0);
-        setLoadingDefaults(false);
-      }
-    };
+  useWindowMessage('BOOKMARK_DEFAULTS', handleBookmarkDefaults, isOpen);
 
-    if (isOpen) {
-      window.addEventListener('message', handleMessage);
-      return () => window.removeEventListener('message', handleMessage);
-    }
-  }, [isOpen]);
+  // Escape key handler for dialog a11y
+  const handleClose = useCallback(() => {
+    onClose();
+    setTitle('');
+    setDescription('');
+    setTags([]);
+    setTimestamp(0);
+    setLoadingDefaults(false);
+  }, [onClose]);
 
-  const formatTime = (seconds: number): string => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    return h > 0
-      ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-      : `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  useEscapeKey(isOpen, handleClose);
 
   const handleSave = async () => {
     if (!title.trim()) return;
@@ -94,20 +78,10 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
     }
   };
 
-  const handleClose = () => {
-    onClose();
-    // Reset form when closing
-    setTitle('');
-    setDescription('');
-    setTags([]);
-    setTimestamp(0);
-    setLoadingDefaults(false);
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div className="dialog-overlay">
+    <div className="dialog-overlay" role="dialog" aria-modal="true" onKeyDown={handleDialogKeyDown}>
       <div className="dialog-content add-bookmark-dialog">
         <div className="dialog-header">
           <h3>Add New Bookmark</h3>
@@ -139,6 +113,7 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Bookmark title"
                   disabled={isLoading}
+                  maxLength={255}
                   autoFocus
                 />
               </div>
@@ -169,6 +144,7 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
                   placeholder="Optional description"
                   rows={3}
                   disabled={isLoading}
+                  maxLength={2000}
                 />
               </div>
 

@@ -1,51 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { IINARuntimeDependencies } from '../src/types';
-import { BookmarkManager } from '../src/bookmark-manager-modern';
-
-// Mock cloud-storage to prevent real imports
-vi.mock('../src/cloud-storage', () => ({
-  getCloudStorageManager: vi.fn(() => ({
-    setProvider: vi.fn(),
-    uploadBookmarks: vi.fn(),
-    downloadBookmarks: vi.fn(),
-    listBackups: vi.fn(),
-    syncBookmarks: vi.fn(),
-  })),
-  CloudStorageManager: vi.fn(),
-}));
-
-function createMockDeps(): IINARuntimeDependencies {
-  return {
-    console: { log: vi.fn(), error: vi.fn(), warn: vi.fn() },
-    preferences: { get: vi.fn().mockReturnValue(null), set: vi.fn() },
-    core: {
-      status: { path: '/test/video.mp4', currentTime: 100 },
-      seekTo: vi.fn(),
-      seek: vi.fn(),
-      osd: vi.fn(),
-    },
-    event: { on: vi.fn() },
-    menu: { addItem: vi.fn(), item: vi.fn(() => ({})) },
-    sidebar: { loadFile: vi.fn(), postMessage: vi.fn(), onMessage: vi.fn() },
-    overlay: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      setClickable: vi.fn(),
-      show: vi.fn(),
-      hide: vi.fn(),
-      isVisible: vi.fn(),
-    },
-    standaloneWindow: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      show: vi.fn(),
-    },
-    utils: { ask: vi.fn(), prompt: vi.fn(), chooseFile: vi.fn() },
-    file: { read: vi.fn(), write: vi.fn(), exists: vi.fn() },
-  } as unknown as IINARuntimeDependencies;
-}
+import { BookmarkManager } from '../src/bookmark-manager';
+import { createMockDeps } from './helpers/mock-deps';
 
 describe('Tag Functionality', () => {
   let manager: BookmarkManager;
@@ -82,45 +37,7 @@ describe('Tag Functionality', () => {
     });
   });
 
-  describe('Tag Parsing and Validation', () => {
-    it('should handle comma-separated tags', () => {
-      const tagString = 'work, important, meeting';
-      const parsedTags = tagString.split(',').map((t) => t.trim());
-
-      expect(parsedTags).toEqual(['work', 'important', 'meeting']);
-    });
-
-    it('should handle semicolon-separated tags', () => {
-      const tagString = 'work; important; meeting';
-      const parsedTags = tagString.split(';').map((t) => t.trim());
-
-      expect(parsedTags).toEqual(['work', 'important', 'meeting']);
-    });
-
-    it('should handle space-separated tags', () => {
-      const tagString = 'work important meeting';
-      const parsedTags = tagString.split(/\s+/).filter((t) => t.length > 0);
-
-      expect(parsedTags).toEqual(['work', 'important', 'meeting']);
-    });
-
-    it('should remove duplicate tags', () => {
-      const tags = ['work', 'important', 'work', 'meeting', 'important'];
-      const uniqueTags = [...new Set(tags)];
-
-      expect(uniqueTags).toEqual(['work', 'important', 'meeting']);
-    });
-
-    it('should handle case-insensitive tag matching', () => {
-      const tags1 = ['Work', 'IMPORTANT'];
-      const tags2 = ['work', 'important'];
-
-      const normalized1 = tags1.map((t) => t.toLowerCase());
-      const normalized2 = tags2.map((t) => t.toLowerCase());
-
-      expect(normalized1).toEqual(normalized2);
-    });
-
+  describe('Tag Storage via BookmarkManager', () => {
     it('should handle special characters in tags', async () => {
       const tags = ['C++', 'Node.js', 'React-Native', '@urgent', '#todo'];
 
@@ -130,6 +47,24 @@ describe('Tag Functionality', () => {
       tags.forEach((tag) => {
         expect(bookmarks[0].tags).toContain(tag);
       });
+    });
+
+    it('should persist tags across addBookmark calls', async () => {
+      await manager.addBookmark('BM1', 10, 'desc', ['tag-a', 'tag-b']);
+      await manager.addBookmark('BM2', 20, 'desc', ['tag-c']);
+
+      const bookmarks = manager.getAllBookmarks();
+      expect(bookmarks[0].tags).toEqual(['tag-a', 'tag-b']);
+      expect(bookmarks[1].tags).toEqual(['tag-c']);
+    });
+
+    it('should preserve tags when updating bookmark title', async () => {
+      await manager.addBookmark('Original', 10, 'desc', ['keep-me']);
+      const id = manager.getAllBookmarks()[0].id;
+
+      manager.updateBookmark(id, { title: 'Updated' });
+
+      expect(manager.getAllBookmarks()[0].tags).toEqual(['keep-me']);
     });
   });
 
@@ -189,72 +124,45 @@ describe('Tag Functionality', () => {
     });
   });
 
-  describe('Tag Auto-Completion and Suggestions', () => {
+  describe('Tag Aggregation from Multiple Bookmarks', () => {
     beforeEach(async () => {
       await manager.addBookmark('Bookmark 1', 100, 'Desc', ['javascript', 'programming', 'web']);
       await manager.addBookmark('Bookmark 2', 200, 'Desc', ['java', 'programming', 'backend']);
       await manager.addBookmark('Bookmark 3', 300, 'Desc', ['python', 'data-science', 'ml']);
     });
 
-    it('should get all unique tags from bookmarks', () => {
+    it('should collect all unique tags across bookmarks via getAllBookmarks', () => {
       const allTags = new Set<string>();
       manager.getAllBookmarks().forEach((b) => {
         b.tags?.forEach((tag) => allTags.add(tag));
       });
 
       const uniqueTags = Array.from(allTags).sort();
-      expect(uniqueTags).toContain('backend');
-      expect(uniqueTags).toContain('data-science');
-      expect(uniqueTags).toContain('java');
-      expect(uniqueTags).toContain('javascript');
-      expect(uniqueTags).toContain('ml');
-      expect(uniqueTags).toContain('programming');
-      expect(uniqueTags).toContain('python');
-      expect(uniqueTags).toContain('web');
-    });
-
-    it('should suggest tags based on partial input', () => {
-      const allTags = [
-        'javascript',
+      expect(uniqueTags).toEqual([
+        'backend',
+        'data-science',
         'java',
+        'javascript',
+        'ml',
         'programming',
         'python',
         'web',
-        'backend',
-        'data-science',
-        'ml',
-      ];
-      const input = 'ja';
-
-      const suggestions = allTags.filter((tag) => tag.toLowerCase().includes(input.toLowerCase()));
-
-      expect(suggestions).toEqual(['javascript', 'java']);
+      ]);
     });
 
-    it('should prioritize exact matches in suggestions', () => {
-      const allTags = ['test', 'testing', 'tester', 'attestation'];
-      const input = 'test';
+    it('should allow filtering bookmarks by a shared tag', () => {
+      const programmingBookmarks = manager
+        .getAllBookmarks()
+        .filter((b) => b.tags?.includes('programming'));
 
-      const suggestions = allTags
-        .filter((tag) => tag.toLowerCase().includes(input.toLowerCase()))
-        .sort((a, b) => {
-          if (a.toLowerCase() === input.toLowerCase()) return -1;
-          if (b.toLowerCase() === input.toLowerCase()) return 1;
-          if (
-            a.toLowerCase().startsWith(input.toLowerCase()) &&
-            !b.toLowerCase().startsWith(input.toLowerCase())
-          )
-            return -1;
-          if (
-            b.toLowerCase().startsWith(input.toLowerCase()) &&
-            !a.toLowerCase().startsWith(input.toLowerCase())
-          )
-            return 1;
-          return a.localeCompare(b);
-        });
+      expect(programmingBookmarks).toHaveLength(2);
+      expect(programmingBookmarks.map((b) => b.title)).toEqual(['Bookmark 1', 'Bookmark 2']);
+    });
 
-      expect(suggestions[0]).toBe('test');
-      expect(suggestions.slice(1)).toEqual(['tester', 'testing', 'attestation']);
+    it('should find bookmarks with unique tags', () => {
+      const mlBookmarks = manager.getAllBookmarks().filter((b) => b.tags?.includes('ml'));
+      expect(mlBookmarks).toHaveLength(1);
+      expect(mlBookmarks[0].title).toBe('Bookmark 3');
     });
   });
 
@@ -275,7 +183,7 @@ describe('Tag Functionality', () => {
       const endTime = performance.now();
 
       // Should complete within reasonable time
-      expect(endTime - startTime).toBeLessThan(30000);
+      expect(endTime - startTime).toBeLessThan(5000);
       expect(manager.getAllBookmarks()).toHaveLength(500);
     });
 
@@ -289,7 +197,7 @@ describe('Tag Functionality', () => {
       const filtered = manager.getAllBookmarks().filter((b) => b.tags?.includes('category-5'));
       const endTime = performance.now();
 
-      expect(endTime - startTime).toBeLessThan(30000);
+      expect(endTime - startTime).toBeLessThan(5000);
       expect(filtered).toHaveLength(100);
     });
   });

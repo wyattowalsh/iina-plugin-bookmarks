@@ -8,12 +8,6 @@ importers:
 
   .:
     dependencies:
-      parcel:
-        specifier: ~2.16.0
-        version: 2.16.0(@swc/helpers@0.5.17)
-      parcel-optimizer-webview:
-        specifier: git+https://github.com/iina/parcel-optimizer-webview.git
-        version: https://codeload.github.com/iina/parcel-optimizer-webview/tar.gz/18412b22cbf27c6b49bc90b521e02fde80e47806(@parcel/core@2.16.0(@swc/helpers@0.5.17))
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -27,18 +21,9 @@ importers:
       '@parcel/config-default':
         specifier: ~2.16.0
         version: 2.16.0(@parcel/core@2.16.0(@swc/helpers@0.5.17))(@swc/helpers@0.5.17)
-      '@parcel/core':
-        specifier: ~2.16.0
-        version: 2.16.0(@swc/helpers@0.5.17)
-      '@parcel/transformer-js':
-        specifier: ~2.16.0
-        version: 2.16.0(@parcel/core@2.16.0(@swc/helpers@0.5.17))
       '@parcel/transformer-sass':
         specifier: ~2.16.0
         version: 2.16.0(@parcel/core@2.16.0(@swc/helpers@0.5.17))
-      '@parcel/transformer-typescript-types':
-        specifier: ~2.16.0
-        version: 2.16.0(@parcel/core@2.16.0(@swc/helpers@0.5.17))(typescript@5.9.2)
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.24
@@ -72,12 +57,15 @@ importers:
       lint-staged:
         specifier: ^16.0.0
         version: 16.2.7
+      parcel:
+        specifier: ~2.16.0
+        version: 2.16.0(@swc/helpers@0.5.17)
+      parcel-optimizer-webview:
+        specifier: git+https://github.com/iina/parcel-optimizer-webview.git#18412b22cbf27c6b49bc90b521e02fde80e47806
+        version: https://codeload.github.com/iina/parcel-optimizer-webview/tar.gz/18412b22cbf27c6b49bc90b521e02fde80e47806(@parcel/core@2.16.0(@swc/helpers@0.5.17))
       prettier:
         specifier: ^3.5.0
         version: 3.8.1
-      process:
-        specifier: ^0.11.10
-        version: 0.11.10
       typescript:
         specifier: ^5.8.0
         version: 5.9.2
@@ -715,18 +703,6 @@ packages:
   '@parcel/transformer-svg@2.16.0':
     resolution: {integrity: sha512-c4KpIqqbsvsh/ZxLTo0d7/IEVa/jR/+LZ1kFzBWXKvMBzbvqo63J6s3VGk61gPFV9JkSW3UI5LAMbJn/HDXycw==}
     engines: {node: '>= 16.0.0', parcel: ^2.16.0}
-
-  '@parcel/transformer-typescript-types@2.16.0':
-    resolution: {integrity: sha512-mIja/4m9nx/jykh5RU/k6wZfwISIh/zEqrMI9U+4wP8J/Ony8Ik/bQcRTTF49aUWgREdrLqj+d0EYEU/pkFWpQ==}
-    engines: {node: '>= 16.0.0', parcel: ^2.16.0}
-    peerDependencies:
-      typescript: '>=3.0.0'
-
-  '@parcel/ts-utils@2.16.0':
-    resolution: {integrity: sha512-xNdxa2ZOdasuoJENyN6BhtK7QSB9TDFXdnYwzEYqmL4WwbXBbpq9TiYlt+bQg9C7K1hCQ/rB9AGntLwUTeCRRw==}
-    engines: {node: '>= 16.0.0'}
-    peerDependencies:
-      typescript: '>=3.0.0'
 
   '@parcel/types-internal@2.16.0':
     resolution: {integrity: sha512-tibAjOY8iyMDzFp5B9jEZPfHYlNvXpw7/msUVebAE6gZ7A8ymWXG8YzMvin6gvWIVTCsYoOkkRsZARvpRcSspQ==}
@@ -2197,10 +2173,6 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
 
-  process@0.11.10:
-    resolution: {integrity: sha512-cdGef/drWFoydD1JsMzuFf8100nZl+GT+yacc2bEced5f9Rjk4z+WtFUTBu9PhOi9j/jfmBPu0mMEY4wIdAF8A==}
-    engines: {node: '>= 0.6.0'}
-
   prop-types@15.8.1:
     resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
 
@@ -3516,24 +3488,6 @@ snapshots:
     transitivePeerDependencies:
       - '@parcel/core'
       - napi-wasm
-
-  '@parcel/transformer-typescript-types@2.16.0(@parcel/core@2.16.0(@swc/helpers@0.5.17))(typescript@5.9.2)':
-    dependencies:
-      '@parcel/diagnostic': 2.16.0
-      '@parcel/plugin': 2.16.0(@parcel/core@2.16.0(@swc/helpers@0.5.17))
-      '@parcel/source-map': 2.1.1
-      '@parcel/ts-utils': 2.16.0(typescript@5.9.2)
-      '@parcel/utils': 2.16.0
-      nullthrows: 1.1.1
-      typescript: 5.9.2
-    transitivePeerDependencies:
-      - '@parcel/core'
-      - napi-wasm
-
-  '@parcel/ts-utils@2.16.0(typescript@5.9.2)':
-    dependencies:
-      nullthrows: 1.1.1
-      typescript: 5.9.2
 
   '@parcel/types-internal@2.16.0':
     dependencies:
@@ -5156,8 +5110,6 @@ snapshots:
   prelude-ls@1.2.1: {}
 
   prettier@3.8.1: {}
-
-  process@0.11.10: {}
 
   prop-types@15.8.1:
     dependencies:

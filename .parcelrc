@@ -1,8 +1,5 @@
 {
   "extends": "@parcel/config-default",
-  "transformers": {
-    "*.{ts,tsx}": ["@parcel/transformer-typescript-types", "@parcel/transformer-js"]
-  },
   "optimizers": {
     "dist/ui/**/*.{html,css,js}": ["parcel-optimizer-webview", "..."]
   }

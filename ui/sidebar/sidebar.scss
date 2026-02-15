@@ -92,53 +92,6 @@
     }
   }
 
-  .controls {
-    margin-bottom: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-
-    .search-input {
-      padding: 8px 12px;
-      border: 1px solid #444;
-      border-radius: 6px;
-      background: #2a2a2a;
-      color: white;
-      font-size: 13px;
-      outline: none;
-      transition: border-color 0.2s ease;
-
-      &:focus {
-        border-color: var(--focus-outline);
-        outline: 2px solid var(--focus-outline);
-        outline-offset: var(--focus-outline-offset);
-        box-shadow: var(--focus-shadow);
-      }
-
-      &::placeholder {
-        color: #888;
-      }
-    }
-
-    .sort-select {
-      padding: 6px 8px;
-      border: 1px solid #444;
-      border-radius: 6px;
-      background: #2a2a2a;
-      color: white;
-      font-size: 12px;
-      outline: none;
-      cursor: pointer;
-
-      &:focus {
-        border-color: var(--focus-outline);
-        outline: 2px solid var(--focus-outline);
-        outline-offset: var(--focus-outline-offset);
-        box-shadow: var(--focus-shadow);
-      }
-    }
-  }
-
   .bookmark-list {
     flex: 1;
     overflow-y: auto;

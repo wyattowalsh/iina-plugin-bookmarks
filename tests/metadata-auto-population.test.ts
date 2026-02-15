@@ -1,57 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { IINARuntimeDependencies } from '../src/types';
-import { BookmarkManager } from '../src/bookmark-manager-modern';
+import { BookmarkManager } from '../src/bookmark-manager';
+import { createMockDeps as _createMockDeps } from './helpers/mock-deps';
 
-// Mock cloud-storage to prevent real imports
-vi.mock('../src/cloud-storage', () => ({
-  getCloudStorageManager: vi.fn(() => ({
-    setProvider: vi.fn(),
-    uploadBookmarks: vi.fn(),
-    downloadBookmarks: vi.fn(),
-    listBackups: vi.fn(),
-    syncBookmarks: vi.fn(),
-  })),
-  CloudStorageManager: vi.fn(),
-}));
-
-/** Factory for mock IINARuntimeDependencies with a customisable file path */
+/** Wrapper that accepts path/time overrides for metadata tests */
 function createMockDeps(
   pathOverride?: string,
   currentTimeOverride?: number,
 ): IINARuntimeDependencies {
-  return {
-    console: { log: vi.fn(), error: vi.fn(), warn: vi.fn() },
-    preferences: { get: vi.fn().mockReturnValue(null), set: vi.fn() },
-    core: {
-      status: {
-        path: pathOverride ?? '/test/video.mp4',
-        currentTime: currentTimeOverride ?? 100,
-      },
-      seekTo: vi.fn(),
-      seek: vi.fn(),
-      osd: vi.fn(),
-    },
-    event: { on: vi.fn() },
-    menu: { addItem: vi.fn(), item: vi.fn(() => ({})) },
-    sidebar: { loadFile: vi.fn(), postMessage: vi.fn(), onMessage: vi.fn() },
-    overlay: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      setClickable: vi.fn(),
-      show: vi.fn(),
-      hide: vi.fn(),
-      isVisible: vi.fn(),
-    },
-    standaloneWindow: {
-      loadFile: vi.fn(),
-      postMessage: vi.fn(),
-      onMessage: vi.fn(),
-      show: vi.fn(),
-    },
-    utils: { ask: vi.fn(), prompt: vi.fn(), chooseFile: vi.fn() },
-    file: { read: vi.fn(), write: vi.fn(), exists: vi.fn() },
-  } as unknown as IINARuntimeDependencies;
+  const deps = _createMockDeps();
+  if (pathOverride !== undefined) {
+    (deps.core.status as any).path = pathOverride;
+  }
+  if (currentTimeOverride !== undefined) {
+    (deps.core.status as any).currentTime = currentTimeOverride;
+  }
+  return deps;
 }
 
 describe('Metadata Auto-Population', () => {
@@ -191,8 +155,7 @@ describe('Metadata Auto-Population', () => {
 
       const endTime = performance.now();
 
-      // Should complete within reasonable time (under 500ms)
-      expect(endTime - startTime).toBeLessThan(30000);
+      expect(endTime - startTime).toBeLessThan(5000);
 
       const bookmarks = manager.getAllBookmarks();
       expect(bookmarks).toHaveLength(50);

@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { handleDialogKeyDown } from '../utils/focusTrap';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useWindowMessage } from '../hooks/useWindowMessage';
+import { BookmarkData } from '../types';
 
 interface CloudSyncDialogProps {
   isOpen: boolean;
   onClose: () => void;
   postMessage: (type: string, data?: any) => void;
   bookmarkCount: number;
+  onBookmarksReceived?: (bookmarks: BookmarkData[]) => void;
 }
 
 interface CloudProvider {
@@ -19,68 +24,60 @@ const CloudSyncDialog: React.FC<CloudSyncDialogProps> = ({
   onClose,
   postMessage,
   bookmarkCount,
+  onBookmarksReceived,
 }) => {
   const [selectedProvider, setSelectedProvider] = useState<string>('gdrive');
   const [syncAction, setSyncAction] = useState<'upload' | 'download' | 'sync'>('sync');
   const [isLoading, setIsLoading] = useState(false);
-  const [credentials, setCredentials] = useState({
-    apiKey: '',
-    clientId: '',
-    clientSecret: '',
-  });
+  const apiKeyRef = useRef<HTMLInputElement>(null);
+  const clientIdRef = useRef<HTMLInputElement>(null);
+  const clientSecretRef = useRef<HTMLInputElement>(null);
+  const onBookmarksReceivedRef = useRef(onBookmarksReceived);
+  onBookmarksReceivedRef.current = onBookmarksReceived;
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error';
     text: string;
   } | null>(null);
 
   const cloudProviders: CloudProvider[] = [
-    { id: 'gdrive', name: 'Google Drive', icon: '&#128193;', supported: true },
-    { id: 'dropbox', name: 'Dropbox', icon: '&#128230;', supported: true },
-    { id: 'onedrive', name: 'OneDrive', icon: '&#9729;', supported: false },
-    { id: 'icloud', name: 'iCloud', icon: '&#9729;', supported: false },
+    { id: 'gdrive', name: 'Google Drive', icon: '\uD83D\uDCC1', supported: true },
+    { id: 'dropbox', name: 'Dropbox', icon: '\uD83D\uDCE6', supported: true },
+    { id: 'onedrive', name: 'OneDrive', icon: '\u2601', supported: false },
+    { id: 'icloud', name: 'iCloud', icon: '\u2601', supported: false },
   ];
 
+  useEscapeKey(isOpen, onClose);
+
   useEffect(() => {
-    if (!isOpen) {
-      setStatusMessage(null);
-      return;
-    }
-
-    const handleMessage = (event: any) => {
-      let messageData = event.data;
-      if (typeof event.data === 'string') {
-        try {
-          messageData = JSON.parse(event.data);
-        } catch (e) {
-          return;
-        }
-      }
-
-      if (messageData?.type === 'CLOUD_SYNC_RESULT') {
-        setIsLoading(false);
-        const { success, action, message, error } = messageData.data;
-        const actionLabel = action.charAt(0).toUpperCase() + action.slice(1);
-
-        if (success) {
-          setStatusMessage({
-            type: 'success',
-            text: `${actionLabel} successful: ${message}`,
-          });
-        } else {
-          setStatusMessage({
-            type: 'error',
-            text: `${actionLabel} failed: ${error}`,
-          });
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
+    if (!isOpen) setStatusMessage(null);
   }, [isOpen]);
+
+  const handleCloudSyncResult = useCallback((data: any) => {
+    setIsLoading(false);
+    const { success, action, message, error, bookmarks } = data;
+    const actionLabel = action.charAt(0).toUpperCase() + action.slice(1);
+
+    if (success) {
+      setStatusMessage({
+        type: 'success',
+        text: `${actionLabel} successful: ${message}`,
+      });
+      if (
+        (action === 'download' || action === 'sync') &&
+        bookmarks &&
+        onBookmarksReceivedRef.current
+      ) {
+        onBookmarksReceivedRef.current(bookmarks);
+      }
+    } else {
+      setStatusMessage({
+        type: 'error',
+        text: `${actionLabel} failed: ${error}`,
+      });
+    }
+  }, []);
+
+  useWindowMessage('CLOUD_SYNC_RESULT', handleCloudSyncResult, isOpen);
 
   const handleSync = () => {
     if (!selectedProvider) return;
@@ -100,11 +97,17 @@ const CloudSyncDialog: React.FC<CloudSyncDialogProps> = ({
     postMessage('CLOUD_SYNC_REQUEST', {
       action: syncAction,
       provider: selectedProvider,
-      credentials: credentials,
+      credentials: {
+        apiKey: apiKeyRef.current?.value || '',
+        clientId: clientIdRef.current?.value || '',
+        clientSecret: clientSecretRef.current?.value || '',
+      },
     });
 
-    // Clear credentials from state after sending
-    setCredentials({ apiKey: '', clientId: '', clientSecret: '' });
+    // Clear credential inputs after sending
+    if (apiKeyRef.current) apiKeyRef.current.value = '';
+    if (clientIdRef.current) clientIdRef.current.value = '';
+    if (clientSecretRef.current) clientSecretRef.current.value = '';
   };
 
   const getActionDescription = () => {
@@ -123,8 +126,16 @@ const CloudSyncDialog: React.FC<CloudSyncDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog-content cloud-sync-dialog" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="dialog-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+      onKeyDown={handleDialogKeyDown}
+    >
+      <div className="dialog-content cloud-sync-dialog">
         <div className="dialog-header">
           <h3>Cloud Backup &amp; Sync</h3>
           <button className="close-button" onClick={onClose} aria-label="Close dialog">
@@ -163,10 +174,7 @@ const CloudSyncDialog: React.FC<CloudSyncDialogProps> = ({
                   onClick={() => provider.supported && setSelectedProvider(provider.id)}
                   disabled={!provider.supported}
                 >
-                  <span
-                    className="provider-icon"
-                    dangerouslySetInnerHTML={{ __html: provider.icon }}
-                  />
+                  <span className="provider-icon">{provider.icon}</span>
                   <span className="provider-name">{provider.name}</span>
                   {!provider.supported && <span className="coming-soon">Soon</span>}
                 </button>
@@ -218,8 +226,7 @@ const CloudSyncDialog: React.FC<CloudSyncDialogProps> = ({
                 <label>API Key (optional for basic features):</label>
                 <input
                   type="password"
-                  value={credentials.apiKey}
-                  onChange={(e) => setCredentials({ ...credentials, apiKey: e.target.value })}
+                  ref={apiKeyRef}
                   placeholder="Enter Google Drive API key..."
                 />
               </div>
@@ -236,8 +243,7 @@ const CloudSyncDialog: React.FC<CloudSyncDialogProps> = ({
                 <label>Access Token:</label>
                 <input
                   type="password"
-                  value={credentials.apiKey}
-                  onChange={(e) => setCredentials({ ...credentials, apiKey: e.target.value })}
+                  ref={apiKeyRef}
                   placeholder="Enter Dropbox access token..."
                 />
               </div>

@@ -877,42 +877,6 @@ body {
   }
 }
 
-/* Alternative highlight styles for different contexts */
-.text-highlight-primary {
-  background-color: var(--accent-color);
-  color: white;
-  padding: 1px 3px;
-  border-radius: 3px;
-  font-weight: 500;
-}
-
-.text-highlight-subtle {
-  background-color: rgba(0, 122, 255, 0.15);
-  color: var(--text-primary);
-  padding: 1px 2px;
-  border-radius: 2px;
-
-  @media (prefers-color-scheme: dark) {
-    background-color: rgba(0, 122, 255, 0.25);
-  }
-}
-
-.text-highlight-multiple {
-  background-color: #4caf50;
-  color: white;
-  padding: 1px 2px;
-  border-radius: 2px;
-  font-weight: 500;
-
-  &:nth-child(even) {
-    background-color: #ff9800;
-  }
-
-  &:nth-child(3n) {
-    background-color: #9c27b0;
-  }
-}
-
 /* Advanced Search Component Styles */
 .advanced-search {
   position: relative;
@@ -1501,32 +1465,6 @@ body {
   .enable-multi-sort {
     padding: 4px 6px;
     font-size: 0.7em;
-  }
-}
-
-/* Performance indicators for sorting */
-.sort-performance-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.75em;
-  color: var(--text-muted);
-  margin-left: 8px;
-
-  &.fast {
-    color: var(--accent-color);
-  }
-
-  &.medium {
-    color: var(--warning-color);
-  }
-
-  &.slow {
-    color: var(--danger-color);
-  }
-
-  .performance-icon {
-    font-size: 0.8em;
   }
 }
 

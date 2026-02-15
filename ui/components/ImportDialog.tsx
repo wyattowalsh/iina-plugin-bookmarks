@@ -1,14 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { BookmarkData } from '../types';
-
-interface ImportResult {
-  success: boolean;
-  importedCount: number;
-  skippedCount: number;
-  errorCount: number;
-  errors?: string[];
-  duplicates?: number;
-}
+import React, { useState, useEffect, useCallback } from 'react';
+import { BookmarkData, ImportResult } from '../types';
+import { handleDialogKeyDown } from '../utils/focusTrap';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useWindowMessage } from '../hooks/useWindowMessage';
 
 interface ImportDialogProps {
   isOpen: boolean;
@@ -44,19 +38,21 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
     }
   }, [isOpen]);
 
-  // Handle message responses from backend
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'IMPORT_RESULT') {
-        setIsProcessing(false);
-        setImportResult(event.data.data);
-        setStep('results');
-      }
-    };
+  // Escape key handler for dialog a11y
+  const handleClose = useCallback(() => {
+    if (isProcessing) return;
+    onClose();
+  }, [isProcessing, onClose]);
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+  useEscapeKey(isOpen, handleClose);
+
+  const handleImportResult = useCallback((data: any) => {
+    setIsProcessing(false);
+    setImportResult(data);
+    setStep('results');
   }, []);
+
+  useWindowMessage('IMPORT_RESULT', handleImportResult);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -184,13 +180,15 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
         errors.push(`Bookmark ${index + 1}: Missing required fields (id, title, filepath)`);
       }
 
+      const now = new Date().toISOString();
       return {
         id: bookmark.id || `imported-${Date.now()}-${index}`,
         title: bookmark.title || 'Untitled',
         timestamp: bookmark.timestamp || 0,
         filepath: bookmark.filepath || '',
         description: bookmark.description || '',
-        createdAt: bookmark.createdAt || new Date().toISOString(),
+        createdAt: bookmark.createdAt || now,
+        updatedAt: bookmark.updatedAt || now,
         tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
       };
     });
@@ -236,13 +234,15 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
       }
 
       // Set defaults for missing optional fields
+      const now = new Date().toISOString();
       return {
         id: bookmark.id || `imported-${Date.now()}-${index}`,
         title: bookmark.title || 'Untitled',
         timestamp: bookmark.timestamp || 0,
         filepath: bookmark.filepath || '',
         description: bookmark.description || '',
-        createdAt: bookmark.createdAt || new Date().toISOString(),
+        createdAt: bookmark.createdAt || now,
+        updatedAt: bookmark.updatedAt || now,
         tags: bookmark.tags || [],
       };
     });
@@ -317,11 +317,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
     });
   };
 
-  const handleClose = () => {
-    if (isProcessing) return;
-    onClose();
-  };
-
   const handleRetry = () => {
     setStep('file-selection');
     setImportResult(null);
@@ -331,7 +326,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
   if (!isOpen) return null;
 
   return (
-    <div className="dialog-overlay">
+    <div className="dialog-overlay" role="dialog" aria-modal="true" onKeyDown={handleDialogKeyDown}>
       <div className="dialog-content import-dialog">
         <div className="dialog-header">
           <h3>Import Bookmarks</h3>

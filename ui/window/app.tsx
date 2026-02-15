@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import FilterComponent, { FilterState } from '../components/FilterComponent';
+import React, { useState, useRef, useCallback } from 'react';
+import FilterComponent, { FilterState, DEFAULT_FILTER_STATE } from '../components/FilterComponent';
 import AdvancedSearch, { ParsedSearchQuery } from '../components/AdvancedSearch';
 import FilterPresets from '../components/FilterPresets';
 import TextHighlighter from '../components/TextHighlighter';
@@ -9,7 +9,9 @@ import ExportDialog from '../components/ExportDialog';
 import ImportDialog from '../components/ImportDialog';
 import useAdvancedBookmarkFilters from '../hooks/useAdvancedBookmarkFilters';
 import useFilterHistory from '../hooks/useFilterHistory';
+import { useIinaMessages } from '../hooks/useIinaMessages';
 import { BookmarkData, AppWindow } from '../types';
+import { formatTime, formatDate } from '../utils/formatTime';
 
 const App: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
@@ -19,21 +21,13 @@ const App: React.FC = () => {
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState<string[]>([]);
   const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
-  const [filters, setFilters] = useState<FilterState>({
-    searchTerm: '',
-    dateRange: { start: '', end: '' },
-    tags: [],
-    sortBy: 'createdAt',
-    sortDirection: 'desc',
-    fileFilter: '',
-    sortCriteria: [{ field: 'createdAt', direction: 'desc', priority: 1 }],
-    enableMultiSort: false,
-  });
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const appWindow = window as unknown as AppWindow;
 
@@ -44,62 +38,38 @@ const App: React.FC = () => {
       parsedQuery: useAdvancedSearch ? parsedQuery : undefined,
     });
 
-  const {
-    recentSearches,
-    customPresets,
-    addRecentSearch,
-    clearRecentSearches,
-    saveFilterPreset,
-    deleteFilterPreset,
-    incrementPresetUsage,
-  } = useFilterHistory();
+  const { recentSearches, customPresets, addRecentSearch, clearRecentSearches, saveFilterPreset } =
+    useFilterHistory();
 
   // Use refs for mutable state accessed inside the message handler
   const selectedBookmarkRef = useRef(selectedBookmark);
   selectedBookmarkRef.current = selectedBookmark;
-  const handlerRegistered = useRef(false);
 
-  useEffect(() => {
-    if (handlerRegistered.current) return;
-    handlerRegistered.current = true;
-
-    const handleMessage = (event: any) => {
-      let messageData = event.data;
-      if (typeof event.data === 'string') {
-        try {
-          messageData = JSON.parse(event.data);
-        } catch (e) {
-          return;
-        }
-      }
-
-      if (messageData?.type === 'BOOKMARKS_UPDATED' && messageData.data) {
-        setBookmarks(messageData.data);
+  useIinaMessages(
+    {
+      BOOKMARKS_UPDATED: (data: BookmarkData[]) => {
+        setBookmarks(data);
         const current = selectedBookmarkRef.current;
-        if (current && !messageData.data.find((b: BookmarkData) => b.id === current.id)) {
+        if (current && !data.find((b: BookmarkData) => b.id === current.id)) {
           setSelectedBookmark(null);
           setIsEditing(false);
         }
-      } else if (messageData?.type === 'CURRENT_FILE_PATH' && messageData.data) {
-        setCurrentFile(messageData.data);
-      }
-    };
-
-    if (appWindow.iina?.onMessage) {
-      appWindow.iina.onMessage('message', handleMessage);
-    } else {
-      window.addEventListener('message', handleMessage);
-    }
-
-    if (appWindow.iina?.postMessage) {
-      appWindow.iina.postMessage('UI_READY', { uiType: 'window' });
-      appWindow.iina.postMessage('REQUEST_FILE_PATH');
-    }
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, []);
+      },
+      CURRENT_FILE_PATH: (data: string) => {
+        setCurrentFile(data);
+      },
+      IMPORT_RESULT: (data: any) => {
+        window.postMessage({ type: 'IMPORT_RESULT', data }, window.location.origin);
+      },
+      EXPORT_RESULT: (data: any) => {
+        window.postMessage({ type: 'EXPORT_RESULT', data }, window.location.origin);
+      },
+      BOOKMARK_DEFAULTS: (data: any) => {
+        window.postMessage({ type: 'BOOKMARK_DEFAULTS', data }, window.location.origin);
+      },
+    },
+    'window',
+  );
 
   const handleAddBookmark = () => {
     setShowAddDialog(true);
@@ -120,7 +90,14 @@ const App: React.FC = () => {
   };
 
   const handleDeleteBookmark = (id: string) => {
-    appWindow.iina?.postMessage?.('DELETE_BOOKMARK', { id });
+    setPendingDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (pendingDeleteId) {
+      appWindow.iina?.postMessage?.('DELETE_BOOKMARK', { id: pendingDeleteId });
+      setPendingDeleteId(null);
+    }
   };
 
   const handleJumpToBookmark = (id: string) => {
@@ -142,29 +119,19 @@ const App: React.FC = () => {
         data: { title: editTitle, description: editDescription, tags: editTags },
       });
       setIsEditing(false);
-      setSelectedBookmark((prev) =>
-        prev ? { ...prev, title: editTitle, description: editDescription, tags: editTags } : null,
-      );
-      setBookmarks((prevBks) =>
-        prevBks.map((b) =>
-          b.id === selectedBookmark.id
-            ? { ...b, title: editTitle, description: editDescription, tags: editTags }
-            : b,
-        ),
-      );
     }
   };
 
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
-  const formatTime = (seconds: number) => new Date(seconds * 1000).toISOString().substring(11, 19);
-
-  const handleAdvancedSearchChange = (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
-    setParsedQuery(parsedQuery);
-    setFilters((prev) => ({ ...prev, searchTerm }));
-    if (searchTerm.trim()) {
-      addRecentSearch(searchTerm);
-    }
-  };
+  const handleAdvancedSearchChange = useCallback(
+    (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
+      setParsedQuery(parsedQuery);
+      setFilters((prev) => ({ ...prev, searchTerm }));
+      if (searchTerm.trim()) {
+        addRecentSearch(searchTerm);
+      }
+    },
+    [addRecentSearch],
+  );
 
   const handleApplyPreset = (presetFilters: Partial<FilterState>) => {
     setFilters((prev) => ({ ...prev, ...presetFilters }));
@@ -300,7 +267,7 @@ const App: React.FC = () => {
                 }}
                 role="listitem"
                 tabIndex={0}
-                aria-selected={selectedBookmark?.id === bookmark.id}
+                aria-current={selectedBookmark?.id === bookmark.id ? 'true' : undefined}
                 aria-label={`Bookmark: ${bookmark.title}`}
               >
                 <h4>
@@ -345,6 +312,7 @@ const App: React.FC = () => {
                   onChange={(e) => setEditTitle(e.target.value)}
                   placeholder="Title"
                   aria-label="Title"
+                  maxLength={255}
                 />
                 <label htmlFor="edit-description" className="sr-only">
                   Description
@@ -355,6 +323,7 @@ const App: React.FC = () => {
                   onChange={(e) => setEditDescription(e.target.value)}
                   placeholder="Description"
                   aria-label="Description"
+                  maxLength={2000}
                 ></textarea>
                 <TagInput
                   tags={editTags}
@@ -406,15 +375,21 @@ const App: React.FC = () => {
                   <button
                     onClick={() => handleJumpToBookmark(selectedBookmark.id)}
                     className="jump-btn"
+                    aria-label={`Jump to bookmark: ${selectedBookmark.title}`}
                   >
                     Jump To
                   </button>
-                  <button onClick={() => handleEditBookmark(selectedBookmark)} className="edit-btn">
+                  <button
+                    onClick={() => handleEditBookmark(selectedBookmark)}
+                    className="edit-btn"
+                    aria-label={`Edit bookmark: ${selectedBookmark.title}`}
+                  >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDeleteBookmark(selectedBookmark.id)}
                     className="delete-btn-detail"
+                    aria-label={`Delete bookmark: ${selectedBookmark.title}`}
                   >
                     Delete
                   </button>
@@ -429,6 +404,27 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
+
+      {pendingDeleteId && (
+        <div
+          className="confirm-dialog-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Confirm deletion"
+        >
+          <div className="confirm-dialog">
+            <p>Delete this bookmark?</p>
+            <div className="confirm-dialog-actions">
+              <button className="confirm-btn" onClick={confirmDelete}>
+                Confirm
+              </button>
+              <button className="cancel-btn" onClick={() => setPendingDeleteId(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

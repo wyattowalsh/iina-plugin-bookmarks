@@ -1,25 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import AdvancedSearch, { ParsedSearchQuery } from '../components/AdvancedSearch';
 import TextHighlighter from '../components/TextHighlighter';
 import useAdvancedBookmarkFilters from '../hooks/useAdvancedBookmarkFilters';
-import { FilterState } from '../components/FilterComponent';
+import { FilterState, DEFAULT_FILTER_STATE } from '../components/FilterComponent';
+import { useIinaMessages } from '../hooks/useIinaMessages';
 import { BookmarkData, AppWindow } from '../types';
+import { formatTime } from '../utils/formatTime';
 
 const App: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
   const [isVisible, setIsVisible] = useState(true);
   const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [filters, setFilters] = useState<FilterState>({
-    searchTerm: '',
-    dateRange: { start: '', end: '' },
-    tags: [],
-    sortBy: 'createdAt',
-    sortDirection: 'desc',
-    fileFilter: '',
-    sortCriteria: [{ field: 'createdAt', direction: 'desc', priority: 1 }],
-    enableMultiSort: false,
-  });
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
   const appWindow = window as unknown as AppWindow;
@@ -31,57 +24,18 @@ const App: React.FC = () => {
     parsedQuery: useAdvancedSearch ? parsedQuery : undefined,
   });
 
-  // Use refs for mutable state accessed inside the message handler
-  const currentFileRef = useRef(currentFile);
-  currentFileRef.current = currentFile;
-  const handlerRegistered = useRef(false);
-
-  useEffect(() => {
-    if (handlerRegistered.current) return;
-    handlerRegistered.current = true;
-
-    const handleMessage = (event: any) => {
-      let messageData = event.data;
-      if (typeof event.data === 'string') {
-        try {
-          messageData = JSON.parse(event.data);
-        } catch (e) {
-          return;
-        }
-      }
-
-      if (messageData?.type === 'BOOKMARKS_UPDATED' && messageData.data) {
-        const file = currentFileRef.current;
-        setBookmarks(
-          file
-            ? messageData.data.filter((b: BookmarkData) => b.filepath === file)
-            : messageData.data,
-        );
-      } else if (messageData?.type === 'CURRENT_FILE_PATH' && messageData.data) {
-        setCurrentFile(messageData.data);
-        setBookmarks((prevBookmarks) =>
-          messageData.data
-            ? prevBookmarks.filter((b: BookmarkData) => b.filepath === messageData.data)
-            : prevBookmarks,
-        );
-      }
-    };
-
-    if (appWindow.iina?.onMessage) {
-      appWindow.iina.onMessage('message', handleMessage);
-    } else {
-      window.addEventListener('message', handleMessage);
-    }
-
-    if (appWindow.iina?.postMessage) {
-      appWindow.iina.postMessage('UI_READY', { uiType: 'overlay' });
-      appWindow.iina.postMessage('REQUEST_FILE_PATH');
-    }
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, []);
+  useIinaMessages(
+    {
+      BOOKMARKS_UPDATED: (data: BookmarkData[]) => {
+        setBookmarks(data);
+      },
+      CURRENT_FILE_PATH: (data: string) => {
+        setCurrentFile(data);
+        setFilters((prev) => ({ ...prev, fileFilter: data || '' }));
+      },
+    },
+    'overlay',
+  );
 
   const handleBookmarkClick = (id: string) => {
     appWindow.iina?.postMessage?.('JUMP_TO_BOOKMARK', { id });
@@ -92,19 +46,19 @@ const App: React.FC = () => {
     setIsVisible(false);
   };
 
-  const handleAdvancedSearchChange = (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
-    setParsedQuery(parsedQuery);
-    setFilters((prev) => ({ ...prev, searchTerm, fileFilter: currentFile || '' }));
-    setSearchTerm(searchTerm);
-  };
-
-  const formatTime = (seconds: number) =>
-    new Date((seconds || 0) * 1000).toISOString().substring(11, 19);
+  const handleAdvancedSearchChange = useCallback(
+    (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
+      setParsedQuery(parsedQuery);
+      setFilters((prev) => ({ ...prev, searchTerm, fileFilter: currentFile || '' }));
+      setSearchTerm(searchTerm);
+    },
+    [currentFile],
+  );
 
   // Overlay displays bookmarks for the current file only
   const displayedBookmarks = allFilteredBookmarks;
 
-  if (!isVisible || displayedBookmarks.length === 0) {
+  if (!isVisible) {
     return null;
   }
 
@@ -163,44 +117,48 @@ const App: React.FC = () => {
           )}
         </div>
       )}
-      <ul className="bookmark-list" role="list" aria-label="Bookmarks">
-        {displayedBookmarks.map((bookmark) => (
-          <li
-            key={bookmark.id}
-            className="bookmark-item"
-            onClick={() => handleBookmarkClick(bookmark.id)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleBookmarkClick(bookmark.id);
-              }
-            }}
-            title={`Click to jump to ${bookmark.title}`}
-            data-clickable="true"
-            tabIndex={0}
-            role="listitem"
-            aria-label={`Jump to ${bookmark.title} at ${formatTime(bookmark.timestamp)}`}
-          >
-            <span className="bookmark-title">
-              <TextHighlighter
-                text={bookmark.title}
-                searchTerms={searchTerm}
-                caseSensitive={false}
-              />
-            </span>
-            {bookmark.tags && bookmark.tags.length > 0 && (
-              <div className="bookmark-tags">
-                {bookmark.tags.map((tag) => (
-                  <span key={tag} className="bookmark-tag">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-            <span className="bookmark-time">{formatTime(bookmark.timestamp)}</span>
-          </li>
-        ))}
-      </ul>
+      {displayedBookmarks.length === 0 ? (
+        <p className="empty-state">No bookmarks for this file</p>
+      ) : (
+        <ul className="bookmark-list" role="list" aria-label="Bookmarks">
+          {displayedBookmarks.map((bookmark) => (
+            <li
+              key={bookmark.id}
+              className="bookmark-item"
+              onClick={() => handleBookmarkClick(bookmark.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleBookmarkClick(bookmark.id);
+                }
+              }}
+              title={`Click to jump to ${bookmark.title}`}
+              data-clickable="true"
+              tabIndex={0}
+              role="listitem"
+              aria-label={`Jump to ${bookmark.title} at ${formatTime(bookmark.timestamp)}`}
+            >
+              <span className="bookmark-title">
+                <TextHighlighter
+                  text={bookmark.title}
+                  searchTerms={searchTerm}
+                  caseSensitive={false}
+                />
+              </span>
+              {bookmark.tags && bookmark.tags.length > 0 && (
+                <div className="bookmark-tags">
+                  {bookmark.tags.map((tag) => (
+                    <span key={tag} className="bookmark-tag">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <span className="bookmark-time">{formatTime(bookmark.timestamp)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

@@ -1,38 +1,23 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2020"],
-    "target": "ES2020",
     "module": "es6",
-    "moduleResolution": "node",
+    "noEmit": false,
     "outDir": "./dist",
     "rootDir": "./src",
-    "allowJs": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "noEmit": false,
     "declaration": false,
     "sourceMap": false,
-    "removeComments": true,
-    "types": ["iina-plugin-definition"]
+    "removeComments": true
   },
   "include": [
-    "src/index-modern.ts",
-    "src/bookmark-manager-modern.ts",
-    "src/types.ts",
-    "src/cloud-storage.ts",
-    "src/metadata-detector.ts",
-    "src/bookmark-cache.ts",
-    "src/performance-utils.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "ui",
-    "tests",
-    "src/plugin-bundle.ts",
+    "src/index.ts",
     "src/bookmark-manager.ts",
-    "src/global.ts"
-  ]
+    "src/bookmark-persistence.ts",
+    "src/bookmark-import-export.ts",
+    "src/cloud-sync-handler.ts",
+    "src/types.ts",
+    "src/cloud-storage.ts"
+  ],
+  "exclude": ["node_modules", "dist", "ui", "tests"]
 }

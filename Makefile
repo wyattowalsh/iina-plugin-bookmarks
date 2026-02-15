@@ -39,6 +39,10 @@ help:
 	@echo "  $(GREEN)dev$(RESET)            - Start development servers for UI components"
 	@echo "  $(GREEN)test$(RESET)           - Run test suite"
 	@echo "  $(GREEN)test-watch$(RESET)     - Run tests in watch mode"
+	@echo "  $(GREEN)lint$(RESET)           - Run ESLint"
+	@echo "  $(GREEN)lint-fix$(RESET)       - Run ESLint with auto-fix"
+	@echo "  $(GREEN)format$(RESET)         - Format code with Prettier"
+	@echo "  $(GREEN)format-check$(RESET)   - Check code formatting"
 	@echo "  $(GREEN)type-check$(RESET)     - Run TypeScript type checking"
 	@echo "  $(GREEN)install$(RESET)        - Install dependencies"
 	@echo "  $(GREEN)validate$(RESET)       - Validate plugin structure and configuration"
@@ -49,13 +53,14 @@ help:
 .PHONY: install
 install:
 	@echo "$(BLUE)Installing dependencies...$(RESET)"
-	$(NPM) install
+	$(NPM) install --frozen-lockfile
 
 # Clean build artifacts
 .PHONY: clean
 clean:
 	@echo "$(YELLOW)Cleaning build artifacts...$(RESET)"
 	rm -rf $(BUILD_DIR)
+	rm -rf .parcel-cache
 	rm -rf $(PLUGIN_DIR)
 	rm -f $(PLUGIN_ARCHIVE)
 	@echo "$(GREEN)✓ Clean complete$(RESET)"
@@ -64,16 +69,7 @@ clean:
 .PHONY: build
 build:
 	@echo "$(BLUE)Building plugin...$(RESET)"
-	@echo "$(CYAN)  → Cleaning previous build...$(RESET)"
-	rm -rf $(BUILD_DIR)
-	mkdir -p $(BUILD_DIR)
-	
-	@echo "$(CYAN)  → Compiling TypeScript...$(RESET)"
-	$(TSC) --project tsconfig.build.json
-	
-	@echo "$(CYAN)  → Building UI components...$(RESET)"
-	$(PARCEL) build --target window --target overlay --target sidebar
-	
+	$(NPM) run build
 	@echo "$(GREEN)✓ Build complete$(RESET)"
 
 # Package the plugin into .iinaplgz format
@@ -89,9 +85,6 @@ package: build
 	cp -r $(BUILD_DIR)/* $(PLUGIN_DIR)/
 	cp Info.json $(PLUGIN_DIR)/
 	cp LICENSE $(PLUGIN_DIR)/
-	
-	@echo "$(CYAN)  → Copying UI assets...$(RESET)"
-	cp -r $(BUILD_DIR)/ui/* $(PLUGIN_DIR)/ui/ 2>/dev/null || true
 	
 	@echo "$(CYAN)  → Copying preferences page...$(RESET)"
 	cp preferences.html $(PLUGIN_DIR)/ 2>/dev/null || true
@@ -128,6 +121,30 @@ test-watch:
 	@echo "$(BLUE)Running tests in watch mode...$(RESET)"
 	$(NPM) run test
 
+# Lint
+.PHONY: lint
+lint:
+	@echo "$(BLUE)Running linter...$(RESET)"
+	$(NPM) run lint
+
+# Lint with auto-fix
+.PHONY: lint-fix
+lint-fix:
+	@echo "$(BLUE)Running linter with auto-fix...$(RESET)"
+	$(NPM) run lint:fix
+
+# Format
+.PHONY: format
+format:
+	@echo "$(BLUE)Formatting code...$(RESET)"
+	$(NPM) run format
+
+# Format check
+.PHONY: format-check
+format-check:
+	@echo "$(BLUE)Checking code formatting...$(RESET)"
+	$(NPM) run format:check
+
 # Type checking
 .PHONY: type-check
 type-check:
@@ -154,14 +171,14 @@ validate:
 		console.log('Info.json valid');"
 	
 	@echo "$(CYAN)  → Checking build artifacts...$(RESET)"
-	@test -f $(BUILD_DIR)/index-modern.js || (echo "$(RED)✗ Main entry file missing (expected index-modern.js)$(RESET)" && exit 1)
+	@test -f $(BUILD_DIR)/index.js || (echo "$(RED)✗ Main entry file missing (expected index.js)$(RESET)" && exit 1)
 	@test -d $(BUILD_DIR)/ui || (echo "$(RED)✗ UI build directory missing$(RESET)" && exit 1)
 	
 	@echo "$(GREEN)✓ Plugin structure validation passed$(RESET)"
 
 # Full release process
 .PHONY: release
-release: clean install type-check test build package validate
+release: clean install lint type-check test build package validate
 	@echo ""
 	@echo "$(GREEN)🎉 Release complete!$(RESET)"
 	@echo "$(CYAN)Plugin package: $(PLUGIN_ARCHIVE)$(RESET)"

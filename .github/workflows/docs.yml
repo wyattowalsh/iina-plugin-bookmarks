@@ -8,34 +8,50 @@ on:
     branches: [ main ]
     paths: [ 'docs/**' ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
       - name: Setup Node.js
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: 'docs/package-lock.json'
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: |
           cd docs
-          npm ci
+          pnpm install --frozen-lockfile
 
       - name: Build documentation
         run: |
           cd docs
-          npm run build
+          pnpm run build
 
       - name: Test build
         run: |
           cd docs
-          npm run start &
-          sleep 5
-          curl -f http://localhost:3000/docs || exit 1
+          pnpm run start &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/docs > /dev/null 2>&1; then
+              echo "Server is ready after $i attempts"
+              kill $SERVER_PID 2>/dev/null || true
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Server did not become ready in time"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1

@@ -8,7 +8,7 @@
     "email": "wyattowalsh@gmail.com",
     "url": "https://w4w.dev"
   },
-  "entry": "index-modern.js",
+  "entry": "index.js",
   "ghRepo": "wyattowalsh/iina-plugin-bookmarks",
   "ghVersion": 1,
   "permissions": ["show-osd", "video-overlay", "file-system", "network-request"],

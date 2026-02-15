@@ -21,6 +21,8 @@ export interface FilterState {
     priority: number;
   }>;
   enableMultiSort: boolean;
+  showOnlyUntagged?: boolean;
+  showOnlyNoDescription?: boolean;
 }
 
 interface FilterComponentProps {
@@ -34,7 +36,7 @@ interface FilterComponentProps {
   viewId?: string;
 }
 
-const defaultFilters: FilterState = {
+export const DEFAULT_FILTER_STATE: FilterState = {
   searchTerm: '',
   dateRange: { start: '', end: '' },
   tags: [],
@@ -56,7 +58,7 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
   viewId = 'default',
 }) => {
   // Use persistent state for filters, but merge with initial filters
-  const baseFilters = { ...defaultFilters, ...initialFilters };
+  const baseFilters = { ...DEFAULT_FILTER_STATE, ...initialFilters };
   const [persistentFilters, setPersistentFilters] = usePersistentFilterState(viewId, baseFilters);
 
   // Use persistent sort preferences
@@ -102,9 +104,10 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
   }, [debouncedSearchTerm, persistentFilters.searchTerm, updateFilters]);
 
   // Initialize parent component with persistent filters on mount
+
   React.useEffect(() => {
     onFilterChange(persistentFilters);
-  }, []); // Only run on mount
+  }, []);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
@@ -155,9 +158,9 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
   );
 
   const clearAllFilters = useCallback(() => {
-    setPersistentFilters(defaultFilters);
+    setPersistentFilters(DEFAULT_FILTER_STATE);
     setSearchInput('');
-    onFilterChange(defaultFilters);
+    onFilterChange(DEFAULT_FILTER_STATE);
   }, [onFilterChange]);
 
   const hasActiveFilters = useMemo(() => {
