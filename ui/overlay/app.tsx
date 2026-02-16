@@ -1,7 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import AdvancedSearch, { ParsedSearchQuery } from '../components/AdvancedSearch';
 import TextHighlighter from '../components/TextHighlighter';
+import { ToastContainer } from '../components/Toast';
 import useAdvancedBookmarkFilters from '../hooks/useAdvancedBookmarkFilters';
+import useToast from '../hooks/useToast';
 import { FilterState, DEFAULT_FILTER_STATE } from '../components/FilterComponent';
 import { useIinaMessages } from '../hooks/useIinaMessages';
 import { BookmarkData, AppWindow } from '../types';
@@ -16,6 +18,15 @@ const App: React.FC = () => {
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
   const appWindow = window as unknown as AppWindow;
+  const { toasts, showSuccess, showError, showInfo, dismissToast } = useToast();
+
+  // Stable refs for toast functions used inside message handlers
+  const showSuccessRef = useRef(showSuccess);
+  showSuccessRef.current = showSuccess;
+  const showErrorRef = useRef(showError);
+  showErrorRef.current = showError;
+  const showInfoRef = useRef(showInfo);
+  showInfoRef.current = showInfo;
 
   // Enhanced filtering
   const { filteredBookmarks: allFilteredBookmarks, availableTags } = useAdvancedBookmarkFilters({
@@ -32,6 +43,18 @@ const App: React.FC = () => {
       CURRENT_FILE_PATH: (data: string) => {
         setCurrentFile(data);
         setFilters((prev) => ({ ...prev, fileFilter: data || '' }));
+      },
+      BOOKMARK_ADDED: () => {
+        showSuccessRef.current('Bookmark Added', 'New bookmark created successfully');
+      },
+      BOOKMARK_DELETED: () => {
+        showSuccessRef.current('Bookmark Deleted', 'Bookmark removed successfully');
+      },
+      BOOKMARK_JUMPED: () => {
+        showInfoRef.current('Jumped to Bookmark', 'Playback position updated');
+      },
+      ERROR: (data: any) => {
+        showErrorRef.current('Error', data?.message || 'An unexpected error occurred');
       },
     },
     'overlay',
@@ -64,6 +87,7 @@ const App: React.FC = () => {
 
   return (
     <div className="bookmark-overlay">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="bookmark-overlay-header">
         <h3>Bookmarks ({displayedBookmarks.length})</h3>
         <button

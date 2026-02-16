@@ -38,6 +38,7 @@ help:
 	@echo "  $(GREEN)clean$(RESET)          - Remove build artifacts and packages"
 	@echo "  $(GREEN)dev$(RESET)            - Start development servers for UI components"
 	@echo "  $(GREEN)test$(RESET)           - Run test suite"
+	@echo "  $(GREEN)test-e2e$(RESET)       - Run E2E tests with Playwright"
 	@echo "  $(GREEN)test-watch$(RESET)     - Run tests in watch mode"
 	@echo "  $(GREEN)lint$(RESET)           - Run ESLint"
 	@echo "  $(GREEN)lint-fix$(RESET)       - Run ESLint with auto-fix"
@@ -115,6 +116,12 @@ test:
 	@echo "$(BLUE)Running tests...$(RESET)"
 	$(NPM) run test -- --run
 
+# Run E2E tests
+.PHONY: test-e2e
+test-e2e:
+	@echo "$(BLUE)Running E2E tests...$(RESET)"
+	$(NPM) run test:e2e
+
 # Run tests in watch mode
 .PHONY: test-watch
 test-watch:
@@ -178,7 +185,7 @@ validate:
 
 # Full release process
 .PHONY: release
-release: clean install lint type-check test build package validate
+release: clean install lint type-check test test-e2e build package validate
 	@echo ""
 	@echo "$(GREEN)🎉 Release complete!$(RESET)"
 	@echo "$(CYAN)Plugin package: $(PLUGIN_ARCHIVE)$(RESET)"

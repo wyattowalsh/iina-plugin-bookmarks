@@ -24,7 +24,7 @@ export function useWindowMessage(
       if (!messageData || typeof messageData !== 'object') return;
 
       if (messageData.type === messageType) {
-        handlerRef.current(messageData.data);
+        handlerRef.current(messageData.data ?? {});
       }
     };
 

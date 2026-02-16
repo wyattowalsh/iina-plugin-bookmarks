@@ -432,7 +432,8 @@ export class BookmarkManager {
       try {
         return !this.deps.file.exists(b.filepath);
       } catch {
-        return false;
+        // Fail-safe: flag for reconciliation when we can't check file existence
+        return true;
       }
     });
 

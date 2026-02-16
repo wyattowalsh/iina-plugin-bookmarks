@@ -20,7 +20,7 @@ const App: React.FC = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState<string[]>([]);
-  const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
+  const [_currentFile, setCurrentFile] = useState<string | undefined>(undefined);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
@@ -66,6 +66,12 @@ const App: React.FC = () => {
       },
       BOOKMARK_DEFAULTS: (data: any) => {
         window.postMessage({ type: 'BOOKMARK_DEFAULTS', data }, window.location.origin);
+      },
+      CLOUD_SYNC_RESULT: (data: any) => {
+        window.postMessage({ type: 'CLOUD_SYNC_RESULT', data }, window.location.origin);
+      },
+      FILE_RECONCILIATION_RESULT: (data: any) => {
+        window.postMessage({ type: 'FILE_RECONCILIATION_RESULT', data }, window.location.origin);
       },
     },
     'window',
@@ -150,13 +156,25 @@ const App: React.FC = () => {
       <div className="window-header">
         <h1>Manage All Bookmarks</h1>
         <div className="header-actions">
-          <button onClick={handleAddBookmark} className="add-bookmark-btn">
+          <button
+            onClick={handleAddBookmark}
+            className="add-bookmark-btn"
+            aria-label="Add new bookmark at current time"
+          >
             Add Bookmark to Current Video
           </button>
-          <button onClick={() => setShowImportDialog(true)} className="import-btn">
+          <button
+            onClick={() => setShowImportDialog(true)}
+            className="import-btn"
+            aria-label="Import bookmarks from file"
+          >
             Import Bookmarks
           </button>
-          <button onClick={() => setShowExportDialog(true)} className="export-btn">
+          <button
+            onClick={() => setShowExportDialog(true)}
+            className="export-btn"
+            aria-label="Export bookmarks to file"
+          >
             Export Bookmarks
           </button>
         </div>
@@ -257,7 +275,7 @@ const App: React.FC = () => {
             filteredBookmarks.map((bookmark) => (
               <div
                 key={bookmark.id}
-                className={`bookmark-entry ${selectedBookmark?.id === bookmark.id ? 'selected' : ''}`}
+                className={`bookmark-item ${selectedBookmark?.id === bookmark.id ? 'selected' : ''}`}
                 onClick={() => setSelectedBookmark(bookmark)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {

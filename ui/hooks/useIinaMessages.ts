@@ -45,8 +45,8 @@ export function useIinaMessages(
         if (!messageData || typeof messageData !== 'object') return;
 
         const handler = handlersRef.current[messageData.type];
-        if (handler && messageData.data !== undefined) {
-          handler(messageData.data);
+        if (handler) {
+          handler(messageData.data ?? {});
         }
       };
       window.addEventListener('message', handleMessage);

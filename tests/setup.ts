@@ -5,21 +5,9 @@
 
 import { vi } from 'vitest';
 
-// Centralized cloud-storage mock — prevents every backend test file from
-// duplicating the vi.hoisted() + vi.mock() boilerplate.
-// NOTE: vi.hoisted() runs before imports, so we inline the factory here.
-const cloudStorageMock = vi.hoisted(() => ({
-  getCloudStorageManager: vi.fn(() => ({
-    setProvider: vi.fn(),
-    uploadBookmarks: vi.fn(),
-    downloadBookmarks: vi.fn(),
-    listBackups: vi.fn(),
-    syncBookmarks: vi.fn(),
-  })),
-  resetCloudStorageManager: vi.fn(),
-  CloudStorageManager: vi.fn(),
-}));
-vi.mock('../src/cloud-storage', () => cloudStorageMock);
+// Cloud-storage mock — imported from extracted module for explicit control.
+// Integration tests that need the real module should use a separate setup.
+import './mocks/cloud-storage';
 
 const noop = vi.fn();
 

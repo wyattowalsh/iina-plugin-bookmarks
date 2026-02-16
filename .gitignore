@@ -1,6 +1,12 @@
 **/mcp.json
 .playwright-mcp/
 
+# E2E / Playwright
+e2e-results/
+e2e-report/
+test-results/
+playwright-report/
+
 # Build output & packaging
 dist/
 packaging/*.iinaplugin
