@@ -7,8 +7,10 @@ import TagInput from '../components/TagInput';
 import AddBookmarkDialog from '../components/AddBookmarkDialog';
 import ExportDialog from '../components/ExportDialog';
 import ImportDialog from '../components/ImportDialog';
+import { ToastContainer } from '../components/Toast';
 import useAdvancedBookmarkFilters from '../hooks/useAdvancedBookmarkFilters';
 import useFilterHistory from '../hooks/useFilterHistory';
+import useToast from '../hooks/useToast';
 import { useIinaMessages } from '../hooks/useIinaMessages';
 import { BookmarkData, AppWindow } from '../types';
 import { formatTime, formatDate } from '../utils/formatTime';
@@ -20,7 +22,7 @@ const App: React.FC = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState<string[]>([]);
-  const [_currentFile, setCurrentFile] = useState<string | undefined>(undefined);
+
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
@@ -30,6 +32,10 @@ const App: React.FC = () => {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const appWindow = window as unknown as AppWindow;
+  const { toasts, showError, dismissToast } = useToast();
+
+  const showErrorRef = useRef(showError);
+  showErrorRef.current = showError;
 
   const { filteredBookmarks, resultsCount, availableFiles, availableTags, analytics } =
     useAdvancedBookmarkFilters({
@@ -55,9 +61,7 @@ const App: React.FC = () => {
           setIsEditing(false);
         }
       },
-      CURRENT_FILE_PATH: (data: string) => {
-        setCurrentFile(data);
-      },
+
       IMPORT_RESULT: (data: any) => {
         window.postMessage({ type: 'IMPORT_RESULT', data }, window.location.origin);
       },
@@ -66,6 +70,9 @@ const App: React.FC = () => {
       },
       BOOKMARK_DEFAULTS: (data: any) => {
         window.postMessage({ type: 'BOOKMARK_DEFAULTS', data }, window.location.origin);
+      },
+      ERROR: (data: any) => {
+        showErrorRef.current('Error', data?.message || 'An unexpected error occurred');
       },
       CLOUD_SYNC_RESULT: (data: any) => {
         window.postMessage({ type: 'CLOUD_SYNC_RESULT', data }, window.location.origin);
@@ -153,6 +160,7 @@ const App: React.FC = () => {
 
   return (
     <div className="bookmark-window">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="window-header">
         <h1>Manage All Bookmarks</h1>
         <div className="header-actions">

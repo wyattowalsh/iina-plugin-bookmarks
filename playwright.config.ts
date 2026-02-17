@@ -18,6 +18,7 @@ export default defineConfig({
   projects: [
     {
       name: 'sidebar',
+      testMatch: /sidebar|shared|visual/,
       use: {
         ...devices['Desktop Safari'],
         baseURL: 'http://localhost:1234',
@@ -26,6 +27,7 @@ export default defineConfig({
     },
     {
       name: 'overlay',
+      testMatch: /overlay|shared|visual/,
       use: {
         ...devices['Desktop Safari'],
         baseURL: 'http://localhost:1235',
@@ -34,6 +36,7 @@ export default defineConfig({
     },
     {
       name: 'window',
+      testMatch: /window|shared|visual/,
       use: {
         ...devices['Desktop Safari'],
         baseURL: 'http://localhost:1236',

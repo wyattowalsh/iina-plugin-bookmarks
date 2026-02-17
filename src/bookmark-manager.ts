@@ -127,6 +127,7 @@ export class BookmarkManager {
           })
           .catch((error) => {
             this.deps.console.error(`Failed to add bookmark: ${errorMessage(error)}`);
+            this.getUITarget(uiSource).postMessage('ERROR', { message: errorMessage(error) });
           });
         break;
 
@@ -311,58 +312,51 @@ export class BookmarkManager {
     description?: string,
     tags?: string[],
   ): Promise<void> {
-    try {
-      const maxBookmarks =
-        parseInt(this.deps.preferences.get('maxBookmarks') || '1000', 10) || 1000;
-      if (this.bookmarks.length >= maxBookmarks) {
-        this.deps.console.warn(`Maximum bookmark limit (${maxBookmarks}) reached`);
-        if (this.deps.core.osd) {
-          this.deps.core.osd(`Maximum bookmark limit (${maxBookmarks}) reached`);
-        }
-        return;
+    const maxBookmarks = parseInt(this.deps.preferences.get('maxBookmarks') || '1000', 10) || 1000;
+    if (this.bookmarks.length >= maxBookmarks) {
+      this.deps.console.warn(`Maximum bookmark limit (${maxBookmarks}) reached`);
+      if (this.deps.core.osd) {
+        this.deps.core.osd(`Maximum bookmark limit (${maxBookmarks}) reached`);
       }
-
-      const currentPath = this.deps.core.status.path || '/unknown/file.mp4';
-      const currentTime =
-        timestamp !== undefined ? timestamp : this.deps.core.status.currentTime || 0;
-
-      if (!Number.isFinite(currentTime) || currentTime < 0 || currentTime > MAX_TIMESTAMP) {
-        this.deps.console.error(
-          `Invalid timestamp: ${currentTime}. Must be finite, >= 0, and <= ${MAX_TIMESTAMP}`,
-        );
-        return;
-      }
-
-      const filename = currentPath.split('/').pop() || currentPath;
-      const cleanFilename = filename.replace(/\.[^/.]+$/, '') || 'Unknown Media';
-
-      const safeTitle = title
-        ? stripHtmlTags(title)
-        : `${cleanFilename} - ${formatTime(currentTime)}`;
-      const safeDescription = description
-        ? stripHtmlTags(description)
-        : `Bookmark at ${formatTime(currentTime)}`;
-
-      const now = new Date().toISOString();
-      const bookmark: BookmarkData = {
-        id: this.generateId(),
-        title: safeTitle,
-        timestamp: currentTime,
-        filepath: currentPath,
-        description: safeDescription,
-        createdAt: now,
-        updatedAt: now,
-        tags: tags ? tags.map((t) => stripHtmlTags(t)) : [],
-      };
-
-      this.bookmarks.push(bookmark);
-      this.saveBookmarks();
-
-      this.deps.console.log(`Bookmark added: ${bookmark.title}`);
-    } catch (error) {
-      this.deps.console.error(`Error adding bookmark: ${errorMessage(error)}`);
-      throw error;
+      return;
     }
+
+    const currentPath = this.deps.core.status.path || '/unknown/file.mp4';
+    const currentTime =
+      timestamp !== undefined ? timestamp : this.deps.core.status.currentTime || 0;
+
+    if (!Number.isFinite(currentTime) || currentTime < 0 || currentTime > MAX_TIMESTAMP) {
+      throw new Error(
+        `Invalid timestamp: ${currentTime}. Must be finite, >= 0, and <= ${MAX_TIMESTAMP}`,
+      );
+    }
+
+    const filename = currentPath.split('/').pop() || currentPath;
+    const cleanFilename = filename.replace(/\.[^/.]+$/, '') || 'Unknown Media';
+
+    const safeTitle = title
+      ? stripHtmlTags(title)
+      : `${cleanFilename} - ${formatTime(currentTime)}`;
+    const safeDescription = description
+      ? stripHtmlTags(description)
+      : `Bookmark at ${formatTime(currentTime)}`;
+
+    const now = new Date().toISOString();
+    const bookmark: BookmarkData = {
+      id: this.generateId(),
+      title: safeTitle,
+      timestamp: currentTime,
+      filepath: currentPath,
+      description: safeDescription,
+      createdAt: now,
+      updatedAt: now,
+      tags: tags ? tags.map((t) => stripHtmlTags(t)) : [],
+    };
+
+    this.bookmarks.push(bookmark);
+    this.saveBookmarks();
+
+    this.deps.console.log(`Bookmark added: ${bookmark.title}`);
   }
 
   removeBookmark(id: string): void {

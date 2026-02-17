@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createTestHarness, makeBookmark } from './helpers';
-import { BookmarkManager } from '../../src/bookmark-manager';
-import { createMockDeps } from '../helpers/mock-deps';
 
 describe('Persistence and Recovery Flow', () => {
   beforeEach(() => {
@@ -9,25 +7,22 @@ describe('Persistence and Recovery Flow', () => {
   });
 
   it('should recover from backup when primary storage is corrupt', () => {
-    const deps = createMockDeps();
-
     const validBookmarks = [
       makeBookmark('1', 'Backup Bookmark', 100),
       makeBookmark('2', 'Another One', 200),
     ];
 
     // Primary is corrupt, backup is valid
-    deps.preferences.get = vi.fn((key: string) => {
-      if (key === 'bookmarks') return 'CORRUPT{JSON';
-      if (key === 'bookmarks_backup') return JSON.stringify(validBookmarks);
-      return null;
-    });
+    const preferences = {
+      get: vi.fn((key: string) => {
+        if (key === 'bookmarks') return 'CORRUPT{JSON';
+        if (key === 'bookmarks_backup') return JSON.stringify(validBookmarks);
+        return null;
+      }),
+      set: vi.fn(),
+    };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- construction triggers recovery
-    const _manager = new BookmarkManager(deps);
-
-    // Trigger UI_READY to get bookmarks
-    const { send, getLastMessage } = createTestHarness({ preferences: deps.preferences });
+    const { send, getLastMessage } = createTestHarness({ preferences });
     send('sidebar', 'UI_READY', { uiType: 'sidebar' });
 
     const bookmarks = getLastMessage('sidebar', 'BOOKMARKS_UPDATED');
@@ -36,18 +31,16 @@ describe('Persistence and Recovery Flow', () => {
   });
 
   it('should start empty when both primary and backup are corrupt', () => {
-    const deps = createMockDeps();
+    const preferences = {
+      get: vi.fn((key: string) => {
+        if (key === 'bookmarks') return 'CORRUPT{';
+        if (key === 'bookmarks_backup') return 'ALSO{CORRUPT';
+        return null;
+      }),
+      set: vi.fn(),
+    };
 
-    deps.preferences.get = vi.fn((key: string) => {
-      if (key === 'bookmarks') return 'CORRUPT{';
-      if (key === 'bookmarks_backup') return 'ALSO{CORRUPT';
-      return null;
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- construction triggers recovery
-    const _manager = new BookmarkManager(deps);
-
-    const { send, getLastMessage } = createTestHarness({ preferences: deps.preferences });
+    const { send, getLastMessage } = createTestHarness({ preferences });
     send('sidebar', 'UI_READY', { uiType: 'sidebar' });
 
     const bookmarks = getLastMessage('sidebar', 'BOOKMARKS_UPDATED');
@@ -55,15 +48,16 @@ describe('Persistence and Recovery Flow', () => {
   });
 
   it('should rotate backups after adding a bookmark', async () => {
-    const deps = createMockDeps();
-
     const existingBookmarks = [makeBookmark('1', 'Existing', 100)];
-    deps.preferences.get = vi.fn((key: string) => {
-      if (key === 'bookmarks') return JSON.stringify(existingBookmarks);
-      return null;
-    });
+    const preferences = {
+      get: vi.fn((key: string) => {
+        if (key === 'bookmarks') return JSON.stringify(existingBookmarks);
+        return null;
+      }),
+      set: vi.fn(),
+    };
 
-    const { send } = createTestHarness({ preferences: deps.preferences });
+    const { send, deps } = createTestHarness({ preferences });
 
     deps.core.status.path = '/test/video.mp4';
     deps.core.status.currentTime = 200;
@@ -116,17 +110,16 @@ describe('Persistence and Recovery Flow', () => {
 
   it('should round-trip sort preferences correctly', () => {
     const sortPrefs = { sortBy: 'title', sortDirection: 'asc' as const };
-    const deps = createMockDeps();
 
-    deps.preferences.get = vi.fn((key: string) => {
-      if (key === 'sortPreferences') return JSON.stringify(sortPrefs);
-      return null;
-    });
+    const preferences = {
+      get: vi.fn((key: string) => {
+        if (key === 'sortPreferences') return JSON.stringify(sortPrefs);
+        return null;
+      }),
+      set: vi.fn(),
+    };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- construction triggers broadcast
-    const _manager = new BookmarkManager(deps);
-
-    const { getMessages } = createTestHarness({ preferences: deps.preferences });
+    const { getMessages } = createTestHarness({ preferences });
 
     // On init, BookmarkManager should broadcast sort preferences to all UIs
     const sidebarMessages = getMessages('sidebar', 'SORT_PREFERENCES');
@@ -143,18 +136,15 @@ describe('Persistence and Recovery Flow', () => {
   });
 
   it('should handle corrupt sort preferences gracefully', () => {
-    const deps = createMockDeps();
+    const preferences = {
+      get: vi.fn((key: string) => {
+        if (key === 'sortPreferences') return 'CORRUPT{JSON';
+        return null;
+      }),
+      set: vi.fn(),
+    };
 
-    deps.preferences.get = vi.fn((key: string) => {
-      if (key === 'sortPreferences') return 'CORRUPT{JSON';
-      return null;
-    });
-
-    // Should not crash during construction
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- construction triggers recovery path
-    const _manager = new BookmarkManager(deps);
-
-    const { getMessages } = createTestHarness({ preferences: deps.preferences });
+    const { getMessages, deps } = createTestHarness({ preferences });
 
     // Should not broadcast invalid preferences — just verify no crash
     getMessages('sidebar', 'SORT_PREFERENCES');
@@ -168,16 +158,15 @@ describe('Persistence and Recovery Flow', () => {
       makeBookmark('3', 'Saved Bookmark 3', 300),
     ];
 
-    const deps = createMockDeps();
-    deps.preferences.get = vi.fn((key: string) => {
-      if (key === 'bookmarks') return JSON.stringify(savedBookmarks);
-      return null;
-    });
+    const preferences = {
+      get: vi.fn((key: string) => {
+        if (key === 'bookmarks') return JSON.stringify(savedBookmarks);
+        return null;
+      }),
+      set: vi.fn(),
+    };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- construction loads from prefs
-    const _manager = new BookmarkManager(deps);
-
-    const { send, getLastMessage } = createTestHarness({ preferences: deps.preferences });
+    const { send, getLastMessage } = createTestHarness({ preferences });
     send('sidebar', 'UI_READY', { uiType: 'sidebar' });
 
     const bookmarks = getLastMessage('sidebar', 'BOOKMARKS_UPDATED');

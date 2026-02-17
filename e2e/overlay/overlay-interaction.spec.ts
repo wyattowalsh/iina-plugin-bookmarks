@@ -20,22 +20,20 @@ test.describe('Overlay Interaction Tests', () => {
     await expect(page.locator('.bookmark-item').first()).toContainText(fileABookmarks[0].title);
   });
 
-  test('clicking bookmark provides visual feedback', async ({ page, harness }) => {
+  test('clicking bookmark sends jump message', async ({ page, harness }) => {
     const bookmarks = makeBookmarksForFile(TEST_FILE_A, 2);
     await harness.sendCurrentFile(TEST_FILE_A);
     await harness.sendBookmarks(bookmarks);
 
-    const firstItem = page.locator('.bookmark-item').first();
+    await harness.clearOutbound();
 
-    // Click and check for active/selected state
+    const firstItem = page.locator('.bookmark-item').first();
     await firstItem.click();
 
-    // Visual feedback could be active class, aria-selected, or style change
-    const hasActiveClass = await firstItem.evaluate((el) => el.classList.contains('active'));
-    const hasSelectedClass = await firstItem.evaluate((el) => el.classList.contains('selected'));
-    const ariaSelected = await firstItem.getAttribute('aria-selected');
-
-    expect(hasActiveClass || hasSelectedClass || ariaSelected === 'true').toBe(true);
+    // Verify the outbound JUMP_TO_BOOKMARK message was captured
+    const outbound = await harness.getLastOutbound('JUMP_TO_BOOKMARK');
+    expect(outbound).toBeDefined();
+    expect(outbound!.data).toEqual({ id: bookmarks[0].id });
   });
 
   test('close button hides overlay', async ({ page }) => {

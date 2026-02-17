@@ -271,6 +271,24 @@ describe('Cloud sync E2E', () => {
     // No additional CLOUD_SYNC_RESULT should be sent
     const newMessageCount = harness.getMessages('sidebar', 'CLOUD_SYNC_RESULT').length;
     expect(newMessageCount).toBe(messageCount);
+
+    // Verify lock was released: a retry sync should succeed (not be rejected as "already in progress")
+    cloudMock.setProvider.mockResolvedValue(true);
+    cloudMock.uploadBookmarks.mockResolvedValue('backup-retry');
+
+    harness.send('sidebar', 'CLOUD_SYNC_REQUEST', {
+      action: 'upload',
+      provider: 'gdrive',
+      credentials: { accessToken: 'test-token' },
+    });
+
+    // Flush microtasks for the retry sync to complete
+    await vi.advanceTimersByTimeAsync(0);
+
+    const retryResult = harness.getLastMessage('sidebar', 'CLOUD_SYNC_RESULT');
+    expect(retryResult).toBeDefined();
+    expect(retryResult.success).toBe(true);
+    expect(retryResult.action).toBe('upload');
   });
 
   it('handles download when no backups exist', async () => {

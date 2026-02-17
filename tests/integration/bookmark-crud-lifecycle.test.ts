@@ -165,14 +165,21 @@ describe('Bookmark CRUD Lifecycle', () => {
     send('sidebar', 'ADD_BOOKMARK', { title: 'Invalid', timestamp: -10 });
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Should log an error
-    expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('Invalid timestamp'));
+    // Should log an error via the catch handler
+    expect(deps.console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to add bookmark'),
+    );
 
-    // Should still send BOOKMARK_ADDED (current behavior: promise resolves even on early return)
+    // Should NOT send BOOKMARK_ADDED (the throw skips .then())
     const confirmation = getLastMessage('sidebar', 'BOOKMARK_ADDED');
-    expect(confirmation).toBeDefined();
+    expect(confirmation).toBeUndefined();
 
-    // But should NOT broadcast BOOKMARKS_UPDATED (no bookmark was actually added)
+    // Should send ERROR to the originating UI
+    const errorMsg = getLastMessage('sidebar', 'ERROR');
+    expect(errorMsg).toBeDefined();
+    expect(errorMsg.message).toContain('Invalid timestamp');
+
+    // Should NOT broadcast BOOKMARKS_UPDATED (no bookmark was actually added)
     const updated = getLastMessage('sidebar', 'BOOKMARKS_UPDATED');
     expect(updated).toBeUndefined();
   });
@@ -192,14 +199,21 @@ describe('Bookmark CRUD Lifecycle', () => {
     send('sidebar', 'ADD_BOOKMARK', { title: 'Too Long', timestamp: MAX_TIMESTAMP + 1 });
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Should log an error
-    expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('Invalid timestamp'));
+    // Should log an error via the catch handler
+    expect(deps.console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to add bookmark'),
+    );
 
-    // Should still send BOOKMARK_ADDED (current behavior: promise resolves even on early return)
+    // Should NOT send BOOKMARK_ADDED (the throw skips .then())
     const confirmation = getLastMessage('sidebar', 'BOOKMARK_ADDED');
-    expect(confirmation).toBeDefined();
+    expect(confirmation).toBeUndefined();
 
-    // But should NOT broadcast BOOKMARKS_UPDATED (no bookmark was actually added)
+    // Should send ERROR to the originating UI
+    const errorMsg = getLastMessage('sidebar', 'ERROR');
+    expect(errorMsg).toBeDefined();
+    expect(errorMsg.message).toContain('Invalid timestamp');
+
+    // Should NOT broadcast BOOKMARKS_UPDATED (no bookmark was actually added)
     const updated = getLastMessage('sidebar', 'BOOKMARKS_UPDATED');
     expect(updated).toBeUndefined();
   });

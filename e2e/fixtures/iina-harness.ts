@@ -4,33 +4,36 @@ import type { Page } from '@playwright/test';
 /**
  * IinaHarness — simulates IINA backend messages for Playwright E2E tests.
  *
- * Does NOT set `window.iina` — forces the `useIinaMessages` dev-mode fallback path
- * which uses `window.postMessage` for message delivery.
- *
- * Intercepts outbound messages by monkey-patching `window.postMessage` and recording
- * calls to `window.__iinaOutbound`.
+ * Sets `window.iina` with a stub `postMessage` (captures outbound UI→backend calls)
+ * but deliberately omits `onMessage` so that `useIinaMessages` falls through to the
+ * dev-mode `window.postMessage` path for inbound (backend→UI) message injection.
  */
 export class IinaHarness {
   constructor(private page: Page) {}
 
   /**
    * Install the harness init script. Must be called BEFORE page.goto().
-   * Sets up outbound message interception.
+   * Sets up `window.iina.postMessage` stub for outbound message capture.
    */
   async install(): Promise<void> {
     await this.page.addInitScript(() => {
       // Record outbound messages for test assertion
       (window as any).__iinaOutbound = [] as Array<{ type: string; data: any }>;
-      const originalPostMessage = window.postMessage.bind(window);
-      window.postMessage = function (message: any, targetOrigin: any, transfer?: any) {
-        if (message && typeof message === 'object' && message.type) {
-          (window as any).__iinaOutbound.push({
-            type: message.type,
-            data: message.data,
-          });
-        }
-        return originalPostMessage(message, targetOrigin, transfer);
+
+      // Stub window.iina with postMessage only (NO onMessage).
+      // UI code calls `appWindow.iina?.postMessage?.('TYPE', data)` for outbound
+      // messages — this stub captures those calls.
+      // onMessage is intentionally omitted so useIinaMessages falls back to
+      // window.addEventListener('message', ...) for inbound injection.
+      (window as any).iina = {
+        postMessage(type: string, data?: any) {
+          (window as any).__iinaOutbound.push({ type, data });
+        },
       };
+
+      // window.postMessage is used by the harness send() method for inbound
+      // (backend→UI) injection — no need to patch it for outbound capture now
+      // that window.iina.postMessage handles that.
     });
   }
 

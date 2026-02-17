@@ -120,6 +120,8 @@ test:
 .PHONY: test-e2e
 test-e2e:
 	@echo "$(BLUE)Running E2E tests...$(RESET)"
+	@pnpm exec playwright --version >/dev/null 2>&1 || \
+		(echo "$(YELLOW)Playwright not installed. Run 'pnpm exec playwright install --with-deps webkit' first.$(RESET)" && exit 1)
 	$(NPM) run test:e2e
 
 # Run tests in watch mode

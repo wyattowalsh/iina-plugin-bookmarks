@@ -67,8 +67,8 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright WebKit
+        run: pnpm exec playwright install --with-deps webkit
         timeout-minutes: 5
       - name: Run E2E tests
         run: pnpm exec playwright test
