@@ -9,6 +9,7 @@ import FileReconciliationDialog from '../components/FileReconciliationDialog';
 import { ToastContainer } from '../components/Toast';
 import Loading from '../components/Loading';
 import useAdvancedBookmarkFilters from '../hooks/useAdvancedBookmarkFilters';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import useFilterHistory from '../hooks/useFilterHistory';
 import useToast from '../hooks/useToast';
 import { useIinaMessages } from '../hooks/useIinaMessages';
@@ -52,7 +53,9 @@ const App: React.FC = () => {
   useIinaMessages(
     {
       BOOKMARKS_UPDATED: (data: BookmarkData[]) => {
-        setBookmarks(data);
+        if (Array.isArray(data)) {
+          setBookmarks(data);
+        }
       },
       CURRENT_FILE_PATH: (data: string) => {
         setCurrentFile(data);
@@ -117,6 +120,8 @@ const App: React.FC = () => {
     },
     'sidebar',
   );
+
+  useEscapeKey(!!pendingDeleteId, () => setPendingDeleteId(null));
 
   const handleAddBookmark = () => {
     appWindow.iina?.postMessage?.('ADD_BOOKMARK', {});

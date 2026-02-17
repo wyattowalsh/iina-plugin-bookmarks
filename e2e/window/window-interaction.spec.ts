@@ -16,7 +16,7 @@ test.describe('Window Interaction Tests', () => {
     const bookmarks = makeBookmarksForFile(TEST_FILE_A, 5);
     await harness.sendBookmarks(bookmarks);
 
-    const listPanel = page.locator('.bookmark-list').or(page.locator('.list-panel'));
+    const listPanel = page.locator('.bookmark-list-panel');
     await expect(listPanel).toBeVisible();
     await expect(page.locator('.bookmark-item')).toHaveCount(5);
   });
@@ -35,11 +35,11 @@ test.describe('Window Interaction Tests', () => {
     await firstItem.click();
 
     // Verify detail panel shows bookmark info
-    const detailPanel = page.locator('.detail-panel').or(page.locator('.bookmark-detail'));
+    const detailPanel = page.locator('.bookmark-detail-panel');
     await expect(detailPanel).toBeVisible();
     await expect(detailPanel).toContainText('Test Bookmark');
     await expect(detailPanel).toContainText(TEST_FILE_A);
-    await expect(detailPanel).toContainText('02:00'); // 120s formatted
+    await expect(detailPanel).toContainText('2:00'); // 120s formatted
     await expect(detailPanel).toContainText('Test description');
   });
 
@@ -61,7 +61,7 @@ test.describe('Window Interaction Tests', () => {
     await expect(editForm).toBeVisible();
 
     // Verify input fields populated
-    const titleInput = page.locator('input[name="title"]').or(page.locator('#title'));
+    const titleInput = page.locator('#edit-title');
     await expect(titleInput).toHaveValue('Original Title');
   });
 
@@ -77,7 +77,7 @@ test.describe('Window Interaction Tests', () => {
     await editButton.click();
 
     // Change title
-    const titleInput = page.locator('input[name="title"]').or(page.locator('#title'));
+    const titleInput = page.locator('#edit-title');
     await titleInput.fill('Updated Title');
 
     // Save
@@ -89,7 +89,7 @@ test.describe('Window Interaction Tests', () => {
     await harness.sendBookmarks([updatedBookmark]);
 
     // Verify detail view shows updated title
-    const detailPanel = page.locator('.detail-panel').or(page.locator('.bookmark-detail'));
+    const detailPanel = page.locator('.bookmark-detail-panel');
     await expect(detailPanel).toContainText('Updated Title');
   });
 
@@ -109,7 +109,7 @@ test.describe('Window Interaction Tests', () => {
     await cancelButton.click();
 
     // Verify back to detail view
-    const detailPanel = page.locator('.detail-panel').or(page.locator('.bookmark-detail'));
+    const detailPanel = page.locator('.bookmark-detail-panel');
     await expect(detailPanel).toBeVisible();
     await expect(detailPanel).toContainText('Original Title');
 
@@ -154,10 +154,20 @@ test.describe('Window Interaction Tests', () => {
       .or(page.locator('[aria-label*="Jump"]'));
     await jumpButton.click();
 
+    // Wait for outbound message
+    await page.waitForFunction(
+      (msgType: string) => {
+        const w = window as Window & { __iinaOutbound?: Array<{ type: string }> };
+        return w.__iinaOutbound?.some((m) => m.type === msgType);
+      },
+      'JUMP_TO_BOOKMARK',
+      { timeout: 5000 },
+    );
+
     // Verify outbound message
     const jumpMessages = await harness.getOutboundByType('JUMP_TO_BOOKMARK');
     expect(jumpMessages).toHaveLength(1);
-    expect(jumpMessages[0].data.bookmarkId).toBe(bookmark.id);
+    expect(jumpMessages[0].data.id).toBe(bookmark.id);
   });
 
   test('add dialog opens on add button click', async ({ page }) => {
@@ -183,12 +193,10 @@ test.describe('Window Interaction Tests', () => {
 
     // Verify form populated
     const dialog = page.locator('[role="dialog"]');
-    const titleInput = dialog.locator('input[name="title"]').or(dialog.locator('#title'));
+    const titleInput = dialog.locator('#bookmark-title');
     await expect(titleInput).toHaveValue('Default Title');
 
-    const descInput = dialog
-      .locator('textarea[name="description"]')
-      .or(dialog.locator('#description'));
+    const descInput = dialog.locator('#bookmark-description');
     await expect(descInput).toHaveValue('Default description');
   });
 
@@ -256,10 +264,8 @@ test.describe('Window Interaction Tests', () => {
     const bookmarks = makeBookmarksForFile(TEST_FILE_A, 2);
     await harness.sendBookmarks(bookmarks);
 
-    // Verify placeholder visible initially
-    const placeholder = page
-      .locator('.placeholder-panel')
-      .or(page.locator(':has-text("Select a bookmark")'));
+    // Verify placeholder visible initially — use the specific class only to avoid strict mode violation
+    const placeholder = page.locator('.placeholder-panel');
 
     const count = await placeholder.count();
     if (count > 0) {
@@ -267,7 +273,7 @@ test.describe('Window Interaction Tests', () => {
       await expect(placeholder).toContainText(/select/i);
     } else {
       // If no placeholder, detail panel should not be visible
-      const detailPanel = page.locator('.detail-panel').or(page.locator('.bookmark-detail'));
+      const detailPanel = page.locator('.bookmark-detail-panel');
       const detailCount = await detailPanel.count();
       expect(detailCount === 0 || !(await detailPanel.isVisible())).toBe(true);
     }

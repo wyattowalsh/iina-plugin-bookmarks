@@ -6,6 +6,7 @@ import useAdvancedBookmarkFilters from '../hooks/useAdvancedBookmarkFilters';
 import useToast from '../hooks/useToast';
 import { FilterState, DEFAULT_FILTER_STATE } from '../components/FilterComponent';
 import { useIinaMessages } from '../hooks/useIinaMessages';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { BookmarkData, AppWindow } from '../types';
 import { formatTime } from '../utils/formatTime';
 
@@ -68,6 +69,8 @@ const App: React.FC = () => {
     appWindow.iina?.postMessage?.('HIDE_OVERLAY');
     setIsVisible(false);
   };
+
+  useEscapeKey(isVisible, handleClose);
 
   const handleAdvancedSearchChange = useCallback(
     (searchTerm: string, parsedQuery: ParsedSearchQuery) => {

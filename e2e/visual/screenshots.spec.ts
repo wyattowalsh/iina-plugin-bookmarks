@@ -3,6 +3,7 @@ import { SAMPLE_BOOKMARKS, TEST_FILE_A } from '../fixtures/bookmark-data';
 
 test.describe('Visual Regression — Sidebar', () => {
   test.beforeEach(async ({ page }) => {
+    test.skip(!!process.env.CI, 'Screenshot baselines not yet generated');
     await page.goto('/');
     await page.waitForLoadState('networkidle');
   });
@@ -27,6 +28,7 @@ test.describe('Visual Regression — Sidebar', () => {
 
 test.describe('Visual Regression — Overlay', () => {
   test.beforeEach(async ({ page }) => {
+    test.skip(!!process.env.CI, 'Screenshot baselines not yet generated');
     await page.goto('/');
     await page.waitForLoadState('networkidle');
   });
@@ -50,6 +52,7 @@ test.describe('Visual Regression — Overlay', () => {
 
 test.describe('Visual Regression — Window', () => {
   test.beforeEach(async ({ page }) => {
+    test.skip(!!process.env.CI, 'Screenshot baselines not yet generated');
     await page.goto('/');
     await page.waitForLoadState('networkidle');
   });

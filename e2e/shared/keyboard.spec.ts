@@ -60,6 +60,20 @@ test.describe('Keyboard and Accessibility Tests', () => {
     // Press Enter
     await page.keyboard.press('Enter');
 
+    // Wait for outbound message to be captured
+    try {
+      await page.waitForFunction(
+        (msgType: string) => {
+          const w = window as Window & { __iinaOutbound?: Array<{ type: string }> };
+          return w.__iinaOutbound?.some((m) => m.type === msgType);
+        },
+        'JUMP_TO_BOOKMARK',
+        { timeout: 3000 },
+      );
+    } catch {
+      // Outbound may not be captured in all environments
+    }
+
     // Verify interaction occurred (either JUMP message or selection)
     const jumpMessages = await harness.getOutboundByType('JUMP_TO_BOOKMARK');
     const hasJumpMessage = jumpMessages.length > 0;
@@ -86,8 +100,8 @@ test.describe('Keyboard and Accessibility Tests', () => {
       // Press Enter or Space
       await page.keyboard.press('Enter');
 
-      // Verify expanded
-      const advancedPanel = page.locator('.advanced-search-panel');
+      // Verify expanded — AdvancedSearch renders with class "advanced-search"
+      const advancedPanel = page.locator('.advanced-search');
       const panelCount = await advancedPanel.count();
 
       if (panelCount > 0) {
@@ -117,7 +131,7 @@ test.describe('Keyboard and Accessibility Tests', () => {
       await page.keyboard.press('Space');
 
       // Verify expanded
-      const advancedPanel = page.locator('.advanced-search-panel');
+      const advancedPanel = page.locator('.advanced-search');
       const panelCount = await advancedPanel.count();
 
       if (panelCount > 0) {

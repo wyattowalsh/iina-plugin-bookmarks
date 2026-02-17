@@ -30,6 +30,16 @@ test.describe('Overlay Interaction Tests', () => {
     const firstItem = page.locator('.bookmark-item').first();
     await firstItem.click();
 
+    // Wait for outbound message to be captured
+    await page.waitForFunction(
+      (msgType: string) => {
+        const w = window as Window & { __iinaOutbound?: Array<{ type: string }> };
+        return w.__iinaOutbound?.some((m) => m.type === msgType);
+      },
+      'JUMP_TO_BOOKMARK',
+      { timeout: 5000 },
+    );
+
     // Verify the outbound JUMP_TO_BOOKMARK message was captured
     const outbound = await harness.getLastOutbound('JUMP_TO_BOOKMARK');
     expect(outbound).toBeDefined();

@@ -20,7 +20,10 @@ test.describe('Sidebar Dialog Interactions', () => {
     await importButton.click();
 
     const dialog = page.locator('[role="dialog"]');
-    const closeButton = dialog.locator('[aria-label*="Close"]').or(dialog.locator('.close-button'));
+    await expect(dialog).toBeVisible();
+
+    // ImportDialog uses className="close-btn"
+    const closeButton = dialog.locator('.close-btn');
     await closeButton.click();
 
     await expect(dialog).not.toBeVisible();
@@ -98,16 +101,21 @@ test.describe('Sidebar Dialog Interactions', () => {
   });
 
   test('reconciliation dialog displays moved files', async ({ page, harness }) => {
+    // FileReconciliationDialog expects MovedFile objects with: id, title, filepath, timestamp, createdAt
     const movedFiles = [
       {
-        bookmarkId: 'bk-1',
-        oldPath: '/old/video.mp4',
-        newPath: '/new/video.mp4',
+        id: 'bk-1',
+        title: 'Opening Scene',
+        filepath: '/old/video.mp4',
+        timestamp: 120,
+        createdAt: '2024-01-01T00:00:00Z',
       },
       {
-        bookmarkId: 'bk-2',
-        oldPath: '/old/movie.mkv',
-        newPath: '/new/movie.mkv',
+        id: 'bk-2',
+        title: 'Key Moment',
+        filepath: '/old/movie.mkv',
+        timestamp: 300,
+        createdAt: '2024-01-02T00:00:00Z',
       },
     ];
 
@@ -115,8 +123,8 @@ test.describe('Sidebar Dialog Interactions', () => {
 
     const dialog = page.locator('[role="dialog"]');
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText('/old/video.mp4');
-    await expect(dialog).toContainText('/new/video.mp4');
+    await expect(dialog).toContainText('Opening Scene');
+    await expect(dialog).toContainText('Key Moment');
   });
 
   test('error toast displays error message', async ({ page, harness }) => {

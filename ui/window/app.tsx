@@ -12,6 +12,7 @@ import useAdvancedBookmarkFilters from '../hooks/useAdvancedBookmarkFilters';
 import useFilterHistory from '../hooks/useFilterHistory';
 import useToast from '../hooks/useToast';
 import { useIinaMessages } from '../hooks/useIinaMessages';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { BookmarkData, AppWindow } from '../types';
 import { formatTime, formatDate } from '../utils/formatTime';
 
@@ -83,6 +84,8 @@ const App: React.FC = () => {
     },
     'window',
   );
+
+  useEscapeKey(!!pendingDeleteId, () => setPendingDeleteId(null));
 
   const handleAddBookmark = () => {
     setShowAddDialog(true);

@@ -30,7 +30,8 @@ test.describe('Sidebar Error State Tests', () => {
     // Send a non-array value where an array is expected
     await harness.send('BOOKMARKS_UPDATED', 'not-an-array');
 
-    // Page should not crash — either shows empty state or ignores the bad data
+    // Page should not crash — sidebar container should still be visible
+    // (Array.isArray guard in the handler ignores non-array data)
     await expect(page.locator('.bookmark-sidebar')).toBeVisible();
 
     // Now send valid bookmarks to confirm the UI still works
