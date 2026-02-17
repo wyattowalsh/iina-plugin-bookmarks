@@ -5,3 +5,4 @@ packaging/
 .parcel-cache/
 coverage/
 docs/.next/
+docs/.source/
