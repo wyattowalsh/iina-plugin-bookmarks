@@ -181,24 +181,13 @@ test.describe('Window Interaction Tests', () => {
       filepath: TEST_FILE_A,
     });
 
-    // Try to save with empty title (use dialog-scoped selector to avoid strict mode)
+    // Verify the Save button is disabled when title is empty (validation prevents save)
     const dialog = page.locator('[role="dialog"]');
-    await dialog.locator('.save-btn').click();
+    const saveBtn = dialog.locator('.save-btn');
+    await expect(saveBtn).toBeDisabled();
 
-    // Verify error message or form validation
-    const errorMessage = page
-      .locator('.error-message')
-      .or(page.locator('[role="alert"]'))
-      .or(page.locator('.validation-error'));
-
-    // Check if validation prevents submission
-    const errorCount = await errorMessage.count();
-    if (errorCount > 0) {
-      await expect(errorMessage).toBeVisible();
-    } else {
-      // Check if dialog is still open (submission blocked)
-      await expect(dialog).toBeVisible();
-    }
+    // Dialog should still be open
+    await expect(dialog).toBeVisible();
   });
 
   test('file filter shows only matching bookmarks', async ({ page, harness }) => {
