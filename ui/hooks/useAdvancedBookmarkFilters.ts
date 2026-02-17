@@ -305,7 +305,7 @@ function applySingleCriteriaSorting(
   sortBy: FilterState['sortBy'],
   sortDirection: FilterState['sortDirection'],
 ): number {
-  let comparison = 0;
+  let comparison: number;
 
   switch (sortBy) {
     case 'title':

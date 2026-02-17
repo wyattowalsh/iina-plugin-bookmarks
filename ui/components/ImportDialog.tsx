@@ -130,7 +130,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
 
   const parseFileContent = (content: string, format: 'json' | 'csv') => {
     const errors: string[] = [];
-    let data: BookmarkData[] = [];
+    let data: BookmarkData[];
 
     try {
       if (format === 'json') {
@@ -163,7 +163,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
     const parsed = JSON.parse(content);
 
     // Handle both direct array format and wrapped format with metadata
-    let bookmarks: any[] = [];
+    let bookmarks: any[];
 
     if (Array.isArray(parsed)) {
       bookmarks = parsed;

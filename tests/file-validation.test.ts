@@ -21,25 +21,27 @@ describe('Input Validation via BookmarkManager', () => {
   // -------------------------------------------------------------------
   describe('Timestamp validation', () => {
     it('should reject negative timestamps', async () => {
-      await manager.addBookmark('Negative TS', -1);
+      await expect(manager.addBookmark('Negative TS', -1)).rejects.toThrow('Invalid timestamp');
       expect(manager.getAllBookmarks()).toHaveLength(0);
-      expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('Invalid timestamp'));
     });
 
     it('should reject NaN timestamps', async () => {
-      await manager.addBookmark('NaN TS', NaN);
+      await expect(manager.addBookmark('NaN TS', NaN)).rejects.toThrow('Invalid timestamp');
       expect(manager.getAllBookmarks()).toHaveLength(0);
-      expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('Invalid timestamp'));
     });
 
     it('should reject Infinity timestamps', async () => {
-      await manager.addBookmark('Infinity TS', Infinity);
+      await expect(manager.addBookmark('Infinity TS', Infinity)).rejects.toThrow(
+        'Invalid timestamp',
+      );
       expect(manager.getAllBookmarks()).toHaveLength(0);
     });
 
     it('should reject timestamps exceeding 365 days', async () => {
       const overLimit = 86400 * 365 + 1;
-      await manager.addBookmark('Over limit', overLimit);
+      await expect(manager.addBookmark('Over limit', overLimit)).rejects.toThrow(
+        'Invalid timestamp',
+      );
       expect(manager.getAllBookmarks()).toHaveLength(0);
     });
 
