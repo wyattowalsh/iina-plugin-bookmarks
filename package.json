@@ -51,7 +51,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
-    "eslint": "^10.0.0",
+    "eslint": "^10.0.1",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "husky": "^9.1.7",
@@ -62,7 +62,7 @@
     "parcel-optimizer-webview": "git+https://github.com/iina/parcel-optimizer-webview.git#18412b22cbf27c6b49bc90b521e02fde80e47806",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.55.0",
+    "typescript-eslint": "^8.56.0",
     "vitest": "^4.0.18"
   },
   "dependencies": {
