@@ -35,7 +35,11 @@ describe('Import/Export Round-trip', () => {
     expect(exportResult.format).toBe('json');
     expect(exportResult.content).toBeDefined();
 
-    const exported = JSON.parse(exportResult.content);
+    const parsed = JSON.parse(exportResult.content);
+    // v2 format: { version: 2, bookmarks: [...], collections: [...], smartCollections: [...] }
+    expect(parsed.version).toBe(2);
+    expect(Array.isArray(parsed.bookmarks)).toBe(true);
+    const exported = parsed.bookmarks;
     expect(exported.length).toBe(5);
 
     // Test fidelity: verify all expected fields are present in export
@@ -196,7 +200,7 @@ describe('Import/Export Round-trip', () => {
     expect(bookmarks.find((b: any) => b.title === 'Valid 3')).toBeDefined();
   });
 
-  it('should export empty JSON array when no bookmarks exist', () => {
+  it('should export empty v2 JSON when no bookmarks exist', () => {
     const { send, getLastMessage } = createTestHarness();
 
     send('sidebar', 'EXPORT_BOOKMARKS', { format: 'json' });
@@ -206,8 +210,9 @@ describe('Import/Export Round-trip', () => {
     expect(exportResult.format).toBe('json');
 
     const parsed = JSON.parse(exportResult.content);
-    expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.length).toBe(0);
+    expect(parsed.version).toBe(2);
+    expect(Array.isArray(parsed.bookmarks)).toBe(true);
+    expect(parsed.bookmarks.length).toBe(0);
   });
 
   it('should skip duplicates when re-importing the same bookmarks', async () => {
@@ -230,7 +235,8 @@ describe('Import/Export Round-trip', () => {
     // Export
     send('sidebar', 'EXPORT_BOOKMARKS', { format: 'json' });
     const exportResult = getLastMessage('sidebar', 'EXPORT_RESULT');
-    const exported = JSON.parse(exportResult.content);
+    const parsed = JSON.parse(exportResult.content);
+    const exported = parsed.bookmarks; // v2 format
 
     // Re-import with skip (default behavior)
     const options: ImportOptions = { duplicateHandling: 'skip', preserveIds: true };

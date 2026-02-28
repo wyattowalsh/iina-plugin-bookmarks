@@ -13,23 +13,14 @@
   "ghVersion": 1,
   "permissions": ["show-osd", "video-overlay", "file-system", "network-request"],
   "sidebarTab": {
-    "name": "Bookmarks",
-    "file": "ui/sidebar/index.html"
+    "name": "Bookmarks"
   },
   "preferencesPage": "preferences.html",
-  "allowedDomains": [
-    "www.googleapis.com",
-    "content.googleapis.com",
-    "api.dropboxapi.com",
-    "content.dropboxapi.com"
-  ],
   "preferenceDefaults": {
     "autoSave": true,
     "showTimestamps": true,
     "defaultSortBy": "timestamp",
     "maxBookmarks": 1000,
-    "cloudBackupEnabled": false,
-    "cloudProvider": "gdrive",
     "autoReconcileFiles": true
   }
 }

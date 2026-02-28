@@ -181,7 +181,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
       }
 
       const now = new Date().toISOString();
-      return {
+      const result: BookmarkData = {
         id: bookmark.id || `imported-${Date.now()}-${index}`,
         title: bookmark.title || 'Untitled',
         timestamp: bookmark.timestamp || 0,
@@ -191,6 +191,14 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
         updatedAt: bookmark.updatedAt || now,
         tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
       };
+      // Preserve annotation fields from v2 exports
+      if (bookmark.color) result.color = bookmark.color;
+      if (typeof bookmark.endTimestamp === 'number') result.endTimestamp = bookmark.endTimestamp;
+      if (typeof bookmark.pinned === 'boolean') result.pinned = bookmark.pinned;
+      if (bookmark.chapterTitle) result.chapterTitle = bookmark.chapterTitle;
+      if (bookmark.subtitleText) result.subtitleText = bookmark.subtitleText;
+      if (typeof bookmark.scratchpad === 'boolean') result.scratchpad = bookmark.scratchpad;
+      return result;
     });
   };
 

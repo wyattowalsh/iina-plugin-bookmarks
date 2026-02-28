@@ -1,7 +1,7 @@
 // IINA Plugin Bookmarks - Entry Point
 // ES6 Module implementation following IINA plugin guidelines (Sept 2025)
 
-import { errorMessage, type IINARuntimeDependencies, type HttpAdapter } from './types';
+import { errorMessage, type IINARuntimeDependencies } from './types';
 import { BookmarkManager } from './bookmark-manager';
 
 // Plugin initialization function
@@ -21,38 +21,6 @@ export function plugin(): void {
   log.log('IINA Plugin Bookmarks - Starting initialization');
 
   try {
-    // Build the HTTP adapter from iina.http to match our HttpAdapter interface
-    const http: HttpAdapter = {
-      get: (url, options) =>
-        iina.http.get(url, {
-          headers: options?.headers ?? {},
-          params: options?.params ?? {},
-        }),
-      post: (url, options) =>
-        iina.http.post(url, {
-          headers: options?.headers ?? {},
-          params: options?.params ?? {},
-          data: options?.data,
-        }),
-      put: (url, options) =>
-        iina.http.put(url, {
-          headers: options?.headers ?? {},
-          params: options?.params ?? {},
-          data: options?.data,
-        }),
-      patch: (url, options) =>
-        iina.http.patch(url, {
-          headers: options?.headers ?? {},
-          params: options?.params ?? {},
-          data: options?.data,
-        }),
-      delete: (url, options) =>
-        iina.http.delete(url, {
-          headers: options?.headers ?? {},
-          params: options?.params ?? {},
-        }),
-    };
-
     const deps: IINARuntimeDependencies = {
       console: iina.console,
       core: iina.core,
@@ -64,7 +32,8 @@ export function plugin(): void {
       standaloneWindow: iina.standaloneWindow,
       utils: iina.utils,
       file: iina.file,
-      http,
+      mpv: iina.mpv,
+      playlist: iina.playlist,
     };
 
     const bookmarkManager = new BookmarkManager(deps);
@@ -74,7 +43,8 @@ export function plugin(): void {
     // Store reference globally for debugging
     (globalThis as any).bookmarkManager = bookmarkManager;
   } catch (error) {
-    log.error(`IINA Plugin Bookmarks - Initialization failed: ${errorMessage(error)}`);
+    const errMsg = errorMessage(error);
+    log.error(`IINA Plugin Bookmarks - Initialization failed: ${errMsg}`);
     throw error;
   }
 }

@@ -23,9 +23,22 @@ export const TagInput: React.FC<TagInputProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filteredSuggestions = availableTags.filter(
-    (tag) => !tags.includes(tag) && tag.toLowerCase().includes(inputValue.toLowerCase()),
-  );
+  const filteredSuggestions = availableTags
+    .filter((tag) => !tags.includes(tag) && tag.toLowerCase().includes(inputValue.toLowerCase()))
+    .sort((a, b) => {
+      const lowerInput = inputValue.toLowerCase();
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      // Prioritize tags that start with the input over those that merely contain it
+      const aStarts = aLower.startsWith(lowerInput) ? 0 : 1;
+      const bStarts = bLower.startsWith(lowerInput) ? 0 : 1;
+      if (aStarts !== bStarts) return aStarts - bStarts;
+      // Among equal prefix-match rank, sort parent tags before children (fewer separators first)
+      const aDepth = (a.match(/\//g) || []).length;
+      const bDepth = (b.match(/\//g) || []).length;
+      if (aDepth !== bDepth) return aDepth - bDepth;
+      return a.localeCompare(b);
+    });
 
   const addTag = useCallback(
     (tag: string) => {
@@ -126,16 +139,20 @@ export const TagInput: React.FC<TagInputProps> = ({
 
       {showSuggestions && filteredSuggestions.length > 0 && (
         <div className="tag-suggestions">
-          {filteredSuggestions.slice(0, 5).map((suggestion) => (
-            <button
-              key={suggestion}
-              type="button"
-              className="tag-suggestion"
-              onClick={() => handleSuggestionClick(suggestion)}
-            >
-              {suggestion}
-            </button>
-          ))}
+          {filteredSuggestions.slice(0, 5).map((suggestion) => {
+            const depth = (suggestion.match(/\//g) || []).length;
+            return (
+              <button
+                key={suggestion}
+                type="button"
+                className="tag-suggestion"
+                style={depth > 0 ? { paddingLeft: `${8 + depth * 12}px` } : undefined}
+                onClick={() => handleSuggestionClick(suggestion)}
+              >
+                {suggestion}
+              </button>
+            );
+          })}
         </div>
       )}
 

@@ -374,9 +374,9 @@ describe('Input Validation via BookmarkManager', () => {
       );
       const m = new BookmarkManager(deps);
 
-      await m.addBookmark('B1', 1);
-      await m.addBookmark('B2', 2);
-      await m.addBookmark('B3', 3); // should be rejected
+      await m.addBookmark('B1', 10);
+      await m.addBookmark('B2', 20);
+      await m.addBookmark('B3', 30); // should be rejected
 
       expect(m.getAllBookmarks()).toHaveLength(2);
       expect(deps.console.warn).toHaveBeenCalledWith(
@@ -529,8 +529,10 @@ describe('Input Validation via BookmarkManager', () => {
       expect(exportCall![1].format).toBe('json');
 
       const parsed = JSON.parse(exportCall![1].content);
-      expect(parsed).toHaveLength(1);
-      expect(parsed[0]).toMatchObject({
+      // v2 format: { version: 2, bookmarks: [...], ... }
+      expect(parsed.version).toBe(2);
+      expect(parsed.bookmarks).toHaveLength(1);
+      expect(parsed.bookmarks[0]).toMatchObject({
         title: 'JSON Export',
         timestamp: 42,
         description: 'Test desc',

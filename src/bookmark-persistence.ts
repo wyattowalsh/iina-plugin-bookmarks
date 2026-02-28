@@ -1,7 +1,13 @@
 // Bookmark Persistence Layer
 // Handles loading, saving, and recovering bookmarks from IINA preferences
 
-import { errorMessage, type BookmarkData, type IINAConsole, type IINAPreferences } from './types';
+import {
+  errorMessage,
+  type BookmarkData,
+  type IINAConsole,
+  type IINAFile,
+  type IINAPreferences,
+} from './types';
 import { validateBookmarkArray } from './utils/validation';
 
 export class BookmarkPersistence {
@@ -10,6 +16,7 @@ export class BookmarkPersistence {
   constructor(
     private preferences: IINAPreferences,
     private console: IINAConsole,
+    private file?: IINAFile,
   ) {}
 
   load(): BookmarkData[] {
@@ -44,6 +51,15 @@ export class BookmarkPersistence {
       this.console.log('Bookmarks saved');
     } catch (error) {
       this.console.error(`Error saving bookmarks: ${errorMessage(error)}`);
+    }
+  }
+
+  saveAutoBackup(bookmarks: BookmarkData[]): void {
+    if (!this.file) return;
+    try {
+      this.file.write('@data/bookmarks-backup.json', JSON.stringify(bookmarks, null, 2));
+    } catch (error) {
+      this.console.warn(`[BookmarkPersistence] Auto-backup write failed: ${errorMessage(error)}`);
     }
   }
 

@@ -15,9 +15,7 @@
     "src/bookmark-manager.ts",
     "src/bookmark-persistence.ts",
     "src/bookmark-import-export.ts",
-    "src/cloud-sync-handler.ts",
-    "src/types.ts",
-    "src/cloud-storage.ts"
+    "src/types.ts"
   ],
   "exclude": ["node_modules", "dist", "ui", "tests"]
 }

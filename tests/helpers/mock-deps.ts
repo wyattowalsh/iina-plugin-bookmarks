@@ -30,10 +30,13 @@ export function createMockDeps(overrides: Record<string, any> = {}): IINARuntime
     console: { log: vi.fn(), error: vi.fn(), warn: vi.fn() },
     preferences: { get: vi.fn().mockReturnValue(null), set: vi.fn() },
     core: {
-      status: { path: '/test/video.mp4', currentTime: 120 },
+      status: { path: '/test/video.mp4', currentTime: 120, duration: 3600, position: 120 },
+      window: { loaded: true },
       seekTo: vi.fn(),
       seek: vi.fn(),
       osd: vi.fn(),
+      open: vi.fn(),
+      getChapters: vi.fn().mockReturnValue([]),
     },
     event: { on: vi.fn(), off: vi.fn() },
     menu: { addItem: vi.fn(), item: vi.fn(() => ({})) },
@@ -53,18 +56,23 @@ export function createMockDeps(overrides: Record<string, any> = {}): IINARuntime
       onMessage: vi.fn(),
       show: vi.fn(),
     },
-    utils: { ask: vi.fn(), prompt: vi.fn(), chooseFile: vi.fn() },
+    utils: {
+      ask: vi.fn(),
+      prompt: vi.fn(),
+      chooseFile: vi.fn(),
+      exec: vi.fn(),
+    },
     file: {
       read: vi.fn().mockReturnValue('[]'),
       write: vi.fn(),
       exists: vi.fn().mockReturnValue(true),
     },
-    http: {
-      get: vi.fn(),
-      post: vi.fn(),
-      put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
+    mpv: {
+      set: vi.fn(),
+      getString: vi.fn(),
+    },
+    playlist: {
+      registerMenuBuilder: vi.fn(),
     },
     ...overrides,
   } as unknown as IINARuntimeDependencies;

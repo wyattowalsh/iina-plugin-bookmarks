@@ -47,6 +47,8 @@ help:
 	@echo "  $(GREEN)type-check$(RESET)     - Run TypeScript type checking"
 	@echo "  $(GREEN)install$(RESET)        - Install dependencies"
 	@echo "  $(GREEN)validate$(RESET)       - Validate plugin structure and configuration"
+	@echo "  $(GREEN)link$(RESET)           - Build and symlink plugin for IINA dev loading"
+	@echo "  $(GREEN)unlink$(RESET)         - Remove dev plugin symlink"
 	@echo "  $(GREEN)release$(RESET)        - Clean, build, package, test, and validate"
 	@echo "  $(GREEN)help$(RESET)           - Show this help message"
 
@@ -71,6 +73,7 @@ clean:
 build:
 	@echo "$(BLUE)Building plugin...$(RESET)"
 	$(NPM) run build
+	@grep -rl 'type=module' dist/ui/*/index.html 2>/dev/null && { echo "$(RED)ERROR: type=module not stripped from HTML$(RESET)"; exit 1; } || true
 	@echo "$(GREEN)✓ Build complete$(RESET)"
 
 # Package the plugin into .iinaplgz format
@@ -228,3 +231,24 @@ info:
 	else \
 		echo "$(YELLOW)Package not found - run 'make package' first$(RESET)"; \
 	fi
+
+# IINA plugin directory for dev linking
+IINA_PLUGINS_DIR := $(HOME)/Library/Application Support/com.colliderli.iina/plugins
+DEV_LINK := $(IINA_PLUGINS_DIR)/$(PLUGIN_NAME).iinaplugin-dev
+
+# Link plugin for IINA dev loading
+.PHONY: link
+link: build
+	@echo "$(BLUE)Linking plugin for development...$(RESET)"
+	@mkdir -p "$(IINA_PLUGINS_DIR)"
+	@rm -rf "$(DEV_LINK)"
+	@ln -s "$(CURDIR)/dist" "$(DEV_LINK)"
+	@echo "$(GREEN)✓ Dev plugin linked: $(DEV_LINK) → $(CURDIR)/dist$(RESET)"
+	@echo "$(YELLOW)Restart IINA to load the plugin. Use 'make unlink' to remove.$(RESET)"
+
+# Remove dev plugin symlink
+.PHONY: unlink
+unlink:
+	@echo "$(YELLOW)Unlinking dev plugin...$(RESET)"
+	@rm -f "$(DEV_LINK)"
+	@echo "$(GREEN)✓ Dev plugin unlinked$(RESET)"

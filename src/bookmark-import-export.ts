@@ -4,6 +4,8 @@
 import {
   MAX_TIMESTAMP,
   type BookmarkData,
+  type BookmarkCollection,
+  type SmartCollection,
   type ImportOptions,
   type ImportResult,
   type IINAConsole,
@@ -26,7 +28,7 @@ function sanitizeImportedBookmark(
   createdAt: string,
   now: string,
 ): BookmarkData {
-  return {
+  const bookmark: BookmarkData = {
     id,
     title: stripHtmlTags(String(raw.title || 'Imported Bookmark')),
     timestamp: ts,
@@ -36,6 +38,15 @@ function sanitizeImportedBookmark(
     updatedAt: now,
     tags: Array.isArray(raw.tags) ? raw.tags.map((t: unknown) => stripHtmlTags(String(t))) : [],
   };
+  // Preserve annotation fields
+  if (raw.color) bookmark.color = raw.color;
+  if (typeof raw.endTimestamp === 'number') bookmark.endTimestamp = raw.endTimestamp;
+  if (typeof raw.pinned === 'boolean') bookmark.pinned = raw.pinned;
+  if (raw.chapterTitle) bookmark.chapterTitle = raw.chapterTitle;
+  if (raw.subtitleText) bookmark.subtitleText = raw.subtitleText;
+  if (typeof raw.scratchpad === 'boolean') bookmark.scratchpad = raw.scratchpad;
+  if (raw.thumbnailPath) bookmark.thumbnailPath = raw.thumbnailPath;
+  return bookmark;
 }
 
 export class BookmarkImportExport {
@@ -118,6 +129,49 @@ export class BookmarkImportExport {
 
   exportJSON(bookmarks: BookmarkData[]): string {
     return JSON.stringify(bookmarks, null, 2);
+  }
+
+  exportJSONv2(
+    bookmarks: BookmarkData[],
+    collections: BookmarkCollection[],
+    smartCollections: SmartCollection[],
+  ): string {
+    return JSON.stringify({ version: 2, bookmarks, collections, smartCollections }, null, 2);
+  }
+
+  /**
+   * Detect whether parsed JSON is a v2 export (object with version: 2)
+   * or a v1 export (plain bookmark array). Returns a normalized structure.
+   */
+  static parseExport(data: unknown): {
+    version: 1 | 2;
+    bookmarks: unknown[];
+    collections?: BookmarkCollection[];
+    smartCollections?: SmartCollection[];
+  } {
+    if (
+      data !== null &&
+      typeof data === 'object' &&
+      !Array.isArray(data) &&
+      (data as Record<string, unknown>).version === 2
+    ) {
+      const obj = data as Record<string, unknown>;
+      return {
+        version: 2,
+        bookmarks: Array.isArray(obj.bookmarks) ? obj.bookmarks : [],
+        collections: Array.isArray(obj.collections)
+          ? (obj.collections as BookmarkCollection[])
+          : [],
+        smartCollections: Array.isArray(obj.smartCollections)
+          ? (obj.smartCollections as SmartCollection[])
+          : [],
+      };
+    }
+    // v1: plain array of bookmarks
+    return {
+      version: 1,
+      bookmarks: Array.isArray(data) ? data : [],
+    };
   }
 
   exportCSV(bookmarks: BookmarkData[]): string {

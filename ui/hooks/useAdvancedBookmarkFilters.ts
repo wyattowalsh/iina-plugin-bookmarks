@@ -1,21 +1,52 @@
 import { useMemo } from 'react';
 import { FilterState } from '../components/FilterComponent';
 import { ParsedSearchQuery } from '../components/AdvancedSearch';
-import { BookmarkData } from '../types';
+import { BookmarkData, BookmarkCollection } from '../types';
 
 interface UseAdvancedBookmarkFiltersProps {
   bookmarks: BookmarkData[];
   filters: FilterState;
   parsedQuery?: ParsedSearchQuery;
+  collectionFilter?: string;
+  collections?: BookmarkCollection[];
+}
+
+export function groupBookmarksByFile(bookmarks: BookmarkData[]): Map<string, BookmarkData[]> {
+  const groups = new Map<string, BookmarkData[]>();
+  for (const bookmark of bookmarks) {
+    const key = bookmark.filepath;
+    const group = groups.get(key);
+    if (group) {
+      group.push(bookmark);
+    } else {
+      groups.set(key, [bookmark]);
+    }
+  }
+  // Sort bookmarks within each group by timestamp
+  for (const group of groups.values()) {
+    group.sort((a, b) => a.timestamp - b.timestamp);
+  }
+  return groups;
 }
 
 export const useAdvancedBookmarkFilters = ({
   bookmarks,
   filters,
   parsedQuery,
+  collectionFilter,
+  collections,
 }: UseAdvancedBookmarkFiltersProps) => {
   const filteredAndSortedBookmarks = useMemo(() => {
     let result = [...bookmarks];
+
+    // Apply collection filter
+    if (collectionFilter && collections) {
+      const collection = collections.find((c) => c.id === collectionFilter);
+      if (collection) {
+        const idSet = new Set(collection.bookmarkIds);
+        result = result.filter((b) => idSet.has(b.id));
+      }
+    }
 
     // Apply advanced search if available, otherwise fall back to basic search
     if (parsedQuery) {
@@ -180,7 +211,9 @@ function applyBasicSearch(bookmarks: BookmarkData[], searchTerm: string): Bookma
       bookmark.title.toLowerCase().includes(term) ||
       (bookmark.description || '').toLowerCase().includes(term) ||
       bookmark.filepath.toLowerCase().includes(term) ||
-      (bookmark.tags || []).some((tag) => tag.toLowerCase().includes(term)),
+      (bookmark.tags || []).some((tag) => tag.toLowerCase().includes(term)) ||
+      (bookmark.subtitleText || '').toLowerCase().includes(term) ||
+      (bookmark.chapterTitle || '').toLowerCase().includes(term),
   );
 }
 
@@ -191,7 +224,9 @@ function matchesBookmarkContent(bookmark: BookmarkData, term: string): boolean {
     bookmark.title.toLowerCase().includes(searchTerm) ||
     (bookmark.description || '').toLowerCase().includes(searchTerm) ||
     bookmark.filepath.toLowerCase().includes(searchTerm) ||
-    (bookmark.tags || []).some((tag) => tag.toLowerCase().includes(searchTerm))
+    (bookmark.tags || []).some((tag) => tag.toLowerCase().includes(searchTerm)) ||
+    (bookmark.subtitleText || '').toLowerCase().includes(searchTerm) ||
+    (bookmark.chapterTitle || '').toLowerCase().includes(searchTerm)
   );
 }
 

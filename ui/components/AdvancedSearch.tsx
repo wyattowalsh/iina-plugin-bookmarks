@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useId } from 'react';
 import useDebounce from '../hooks/useDebounce';
 
 interface SearchSuggestion {
@@ -52,8 +52,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [caretPosition, setCaretPosition] = useState(0);
+  const helpId = useId();
 
   const inputRef = useRef<HTMLInputElement>(null);
   const onSearchChangeRef = useRef(onSearchChange);
@@ -335,6 +337,18 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           aria-label="Advanced search for bookmarks with filters and operators"
         />
 
+        <button
+          className="search-help-btn"
+          onClick={() => setShowHelp((v) => !v)}
+          aria-expanded={showHelp}
+          aria-controls={helpId}
+          aria-label="Show search syntax help"
+          title="Search syntax help"
+          type="button"
+        >
+          ?
+        </button>
+
         {showSuggestions && suggestions.length > 0 && (
           <div
             id="search-suggestions"
@@ -363,6 +377,40 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           </div>
         )}
       </div>
+
+      {showHelp && (
+        <div
+          id={helpId}
+          className="search-help-panel"
+          role="region"
+          aria-label="Search syntax help"
+        >
+          <div className="search-help-row">
+            <code>tag:work</code>
+            <span>filter by tag</span>
+          </div>
+          <div className="search-help-row">
+            <code>title:meeting</code>
+            <span>filter by title</span>
+          </div>
+          <div className="search-help-row">
+            <code>description:notes</code>
+            <span>filter by description</span>
+          </div>
+          <div className="search-help-row">
+            <code>created:today</code>
+            <span>today / this-week / this-month</span>
+          </div>
+          <div className="search-help-row">
+            <code>tag:work AND title:intro</code>
+            <span>combine with AND / OR / NOT</span>
+          </div>
+          <div className="search-help-row">
+            <code>title:&quot;exact phrase&quot;</code>
+            <span>quote multi-word values</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

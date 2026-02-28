@@ -1,5 +1,6 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import AdvancedSearch, { ParsedSearchQuery } from '../components/AdvancedSearch';
+import BookmarkTimeline from '../components/BookmarkTimeline';
 import TextHighlighter from '../components/TextHighlighter';
 import { ToastContainer } from '../components/Toast';
 import useAdvancedBookmarkFilters from '../hooks/useAdvancedBookmarkFilters';
@@ -7,8 +8,10 @@ import useToast from '../hooks/useToast';
 import { FilterState, DEFAULT_FILTER_STATE } from '../components/FilterComponent';
 import { useIinaMessages } from '../hooks/useIinaMessages';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import { BookmarkData, AppWindow } from '../types';
+import { BookmarkData, PlaybackStatus, ChapterInfo, AppWindow } from '../types';
 import { formatTime } from '../utils/formatTime';
+
+const BOTTOM_PROXIMITY_THRESHOLD = 0.7; // Show timeline when cursor is in bottom 30%
 
 const App: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
@@ -17,7 +20,10 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
-  const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentPosition, setCurrentPosition] = useState(0);
+  const [chapters, setChapters] = useState<ChapterInfo[]>([]);
+  const [showTimeline, setShowTimeline] = useState(false);
   const appWindow = window as unknown as AppWindow;
   const { toasts, showSuccess, showError, showInfo, dismissToast } = useToast();
 
@@ -33,7 +39,7 @@ const App: React.FC = () => {
   const { filteredBookmarks: allFilteredBookmarks, availableTags } = useAdvancedBookmarkFilters({
     bookmarks,
     filters,
-    parsedQuery: useAdvancedSearch ? parsedQuery : undefined,
+    parsedQuery,
   });
 
   useIinaMessages(
@@ -57,6 +63,11 @@ const App: React.FC = () => {
       ERROR: (data: any) => {
         showErrorRef.current('Error', data?.message || 'An unexpected error occurred');
       },
+      PLAYBACK_STATUS: (data: PlaybackStatus) => {
+        setDuration(data.duration);
+        setCurrentPosition(data.position);
+        setChapters(data.chapters);
+      },
     },
     'overlay',
   );
@@ -71,6 +82,29 @@ const App: React.FC = () => {
   };
 
   useEscapeKey(isVisible, handleClose);
+
+  // Proximity-based timeline visibility: show when cursor is in the bottom 30%
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const ratio = e.clientY / window.innerHeight;
+      setShowTimeline(ratio >= BOTTOM_PROXIMITY_THRESHOLD);
+    };
+    const handleMouseLeave = () => setShowTimeline(false);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseleave', handleMouseLeave);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseleave', handleMouseLeave);
+    };
+  }, []);
+
+  const handleTimelineSeek = useCallback(
+    (timestamp: number) => {
+      appWindow.iina?.postMessage?.('SEEK_TO_TIMESTAMP', { timestamp });
+    },
+    [appWindow],
+  );
 
   const handleAdvancedSearchChange = useCallback(
     (searchTerm: string, parsedQuery: ParsedSearchQuery) => {
@@ -102,46 +136,14 @@ const App: React.FC = () => {
           &times;
         </button>
       </div>
-      {bookmarks.length > 3 && (
+      {bookmarks.length > 0 && (
         <div className="overlay-search">
-          {useAdvancedSearch ? (
-            <AdvancedSearch
-              onSearchChange={handleAdvancedSearchChange}
-              availableTags={availableTags}
-              placeholder="Search... (try: tag:work)"
-              className="overlay-compact"
-            />
-          ) : (
-            <div className="search-with-toggle">
-              <label htmlFor="overlay-search-input" className="sr-only">
-                Search bookmarks
-              </label>
-              <input
-                id="overlay-search-input"
-                type="text"
-                placeholder="Search bookmarks..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setFilters((prev) => ({
-                    ...prev,
-                    searchTerm: e.target.value,
-                    fileFilter: currentFile || '',
-                  }));
-                }}
-                className="overlay-search-input"
-                aria-label="Search bookmarks"
-              />
-              <button
-                onClick={() => setUseAdvancedSearch(true)}
-                className="advanced-toggle-btn"
-                title="Enable advanced search"
-                aria-label="Enable advanced search"
-              >
-                +
-              </button>
-            </div>
-          )}
+          <AdvancedSearch
+            onSearchChange={handleAdvancedSearchChange}
+            availableTags={availableTags}
+            placeholder="Search... (try: tag:work)"
+            className="overlay-compact"
+          />
         </div>
       )}
       {displayedBookmarks.length === 0 ? (
@@ -165,6 +167,7 @@ const App: React.FC = () => {
               role="listitem"
               aria-label={`Jump to ${bookmark.title} at ${formatTime(bookmark.timestamp)}`}
             >
+              <span className="bookmark-time">{formatTime(bookmark.timestamp)}</span>
               <span className="bookmark-title">
                 <TextHighlighter
                   text={bookmark.title}
@@ -181,10 +184,22 @@ const App: React.FC = () => {
                   ))}
                 </div>
               )}
-              <span className="bookmark-time">{formatTime(bookmark.timestamp)}</span>
             </li>
           ))}
         </ul>
+      )}
+      {showTimeline && duration > 0 && bookmarks.length > 0 && (
+        <div className="overlay-timeline-strip">
+          <BookmarkTimeline
+            bookmarks={displayedBookmarks}
+            duration={duration}
+            currentPosition={currentPosition}
+            chapters={chapters}
+            onBookmarkClick={handleBookmarkClick}
+            onSeek={handleTimelineSeek}
+            ultraCompact
+          />
+        </div>
       )}
     </div>
   );

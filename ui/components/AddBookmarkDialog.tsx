@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TagInput from './TagInput';
+import Loading from './Loading';
+import BookmarkColorPicker from './BookmarkColorPicker';
 import { formatTime } from '../utils/formatTime';
 import { handleDialogKeyDown } from '../utils/focusTrap';
 import { useEscapeKey } from '../hooks/useEscapeKey';
@@ -9,9 +11,38 @@ import { BookmarkDefaults } from '../types';
 interface AddBookmarkDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (title: string, description: string, tags: string[], timestamp: number) => void;
+  onSave: (
+    title: string,
+    description: string,
+    tags: string[],
+    timestamp: number,
+    color?: string,
+    endTimestamp?: number,
+  ) => void;
   availableTags: string[];
   postMessage?: (type: string, data?: any) => void;
+}
+
+/** Parse a time string like "1:23:45" or "12:34" or "45" into seconds, or return null. */
+function parseTimeInput(input: string): number | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const parts = trimmed.split(':').map(Number);
+  if (parts.some(isNaN)) return null;
+
+  let seconds: number;
+  if (parts.length === 3) {
+    seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    seconds = parts[0] * 60 + parts[1];
+  } else if (parts.length === 1) {
+    seconds = parts[0];
+  } else {
+    return null;
+  }
+
+  return seconds >= 0 ? seconds : null;
 }
 
 const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
@@ -25,13 +56,16 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [timestamp, setTimestamp] = useState(0);
+  const [color, setColor] = useState<string | undefined>(undefined);
+  const [endTimeInput, setEndTimeInput] = useState('');
+  const [chapterTitle, setChapterTitle] = useState<string | undefined>(undefined);
+  const [subtitleText, setSubtitleText] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingDefaults, setLoadingDefaults] = useState(false);
 
   useEffect(() => {
     if (isOpen && postMessage) {
       setLoadingDefaults(true);
-      // Request default values from the plugin
       postMessage('REQUEST_BOOKMARK_DEFAULTS');
     }
   }, [isOpen, postMessage]);
@@ -42,18 +76,24 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
     setDescription(defaults.description || '');
     setTags(defaults.tags || []);
     setTimestamp(defaults.timestamp || 0);
+    // Pick up chapter/subtitle context if provided by backend
+    if ((data as any).chapterTitle) setChapterTitle((data as any).chapterTitle);
+    if ((data as any).subtitleText) setSubtitleText((data as any).subtitleText);
     setLoadingDefaults(false);
   }, []);
 
   useWindowMessage('BOOKMARK_DEFAULTS', handleBookmarkDefaults, isOpen);
 
-  // Escape key handler for dialog a11y
   const handleClose = useCallback(() => {
     onClose();
     setTitle('');
     setDescription('');
     setTags([]);
     setTimestamp(0);
+    setColor(undefined);
+    setEndTimeInput('');
+    setChapterTitle(undefined);
+    setSubtitleText(undefined);
     setLoadingDefaults(false);
   }, [onClose]);
 
@@ -64,13 +104,25 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
 
     setIsLoading(true);
     try {
-      onSave(title.trim(), description.trim(), tags, timestamp);
+      const parsedEnd = parseTimeInput(endTimeInput);
+      // Extract inline #hashtags from the description and merge with explicit tags
+      const hashtagRegex = /#(\w[\w/-]*)/g;
+      const extractedTags: string[] = [];
+      let match;
+      while ((match = hashtagRegex.exec(description)) !== null) {
+        extractedTags.push(match[1]);
+      }
+      const allTags = [...new Set([...tags, ...extractedTags])];
+      onSave(title.trim(), description.trim(), allTags, timestamp, color, parsedEnd ?? undefined);
       onClose();
-      // Reset form
       setTitle('');
       setDescription('');
       setTags([]);
       setTimestamp(0);
+      setColor(undefined);
+      setEndTimeInput('');
+      setChapterTitle(undefined);
+      setSubtitleText(undefined);
     } catch (error) {
       console.error('Error saving bookmark:', error);
     } finally {
@@ -79,6 +131,9 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const parsedEnd = parseTimeInput(endTimeInput);
+  const endTimeValid = endTimeInput.trim() === '' || parsedEnd !== null;
 
   return (
     <div className="dialog-overlay" role="dialog" aria-modal="true" onKeyDown={handleDialogKeyDown}>
@@ -95,17 +150,11 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
 
         <div className="dialog-body">
           {loadingDefaults ? (
-            <div className="loading-defaults">
-              <span className="loading-spinner">⏳</span>
-              <span>Loading metadata...</span>
-            </div>
+            <Loading size="small" message="Loading metadata..." />
           ) : (
             <>
               <div className="form-field">
-                <label htmlFor="bookmark-title">
-                  Title
-                  <span className="field-hint">✏️ Editable</span>
-                </label>
+                <label htmlFor="bookmark-title">Title</label>
                 <input
                   id="bookmark-title"
                   type="text"
@@ -133,10 +182,36 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
               </div>
 
               <div className="form-field">
-                <label htmlFor="bookmark-description">
-                  Description
-                  <span className="field-hint">✏️ Editable</span>
-                </label>
+                <label htmlFor="bookmark-end-time">End Time (optional)</label>
+                <div className="timestamp-field">
+                  <input
+                    id="bookmark-end-time"
+                    type="text"
+                    value={endTimeInput}
+                    onChange={(e) => setEndTimeInput(e.target.value)}
+                    placeholder="e.g. 1:30 or 90"
+                    disabled={isLoading}
+                    style={!endTimeValid ? { borderColor: '#FF3B30', outline: 'none' } : undefined}
+                  />
+                  {parsedEnd !== null && (
+                    <span className="timestamp-note">{formatTime(parsedEnd)}</span>
+                  )}
+                </div>
+                {!endTimeValid && (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: '#FF3B30',
+                      marginTop: '2px',
+                    }}
+                  >
+                    Invalid format. Use H:MM:SS, MM:SS, or seconds.
+                  </span>
+                )}
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="bookmark-description">Description</label>
                 <textarea
                   id="bookmark-description"
                   value={description}
@@ -146,13 +221,20 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
                   disabled={isLoading}
                   maxLength={2000}
                 />
+                <span
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--text-secondary, #888)',
+                    marginTop: '2px',
+                    display: 'block',
+                  }}
+                >
+                  Tip: Use #tagname in the description to auto-add tags.
+                </span>
               </div>
 
               <div className="form-field">
-                <label>
-                  Tags
-                  <span className="field-hint">✏️ Editable</span>
-                </label>
+                <label>Tags</label>
                 <TagInput
                   tags={tags}
                   onTagsChange={setTags}
@@ -160,6 +242,44 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
                   disabled={isLoading}
                 />
               </div>
+
+              <div className="form-field">
+                <label>Color</label>
+                <BookmarkColorPicker selectedColor={color} onColorChange={setColor} />
+              </div>
+
+              {/* Chapter context */}
+              {chapterTitle && (
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--text-secondary, #666)',
+                    padding: '6px 8px',
+                    background: 'var(--background-secondary, #f5f5f5)',
+                    borderRadius: '4px',
+                    marginTop: '4px',
+                  }}
+                >
+                  Chapter: {chapterTitle}
+                </div>
+              )}
+
+              {/* Subtitle context */}
+              {subtitleText && (
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--text-secondary, #666)',
+                    padding: '6px 8px',
+                    background: 'var(--background-secondary, #f5f5f5)',
+                    borderRadius: '4px',
+                    marginTop: '4px',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  Subtitle: {subtitleText}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -168,7 +288,7 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
           <button
             onClick={handleSave}
             className="save-btn"
-            disabled={!title.trim() || isLoading || loadingDefaults}
+            disabled={!title.trim() || !endTimeValid || isLoading || loadingDefaults}
           >
             {isLoading ? 'Saving...' : 'Save Bookmark'}
           </button>

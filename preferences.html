@@ -1,242 +1,381 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bookmarks Preferences</title>
-  <style>
-    /* IINA Theme Variables */
-    :root {
-      --background-color: var(--system-background-color, #1e1e1e);
-      --secondary-background-color: var(--system-secondary-background-color, #262626);
-      --tertiary-background-color: var(--system-tertiary-background-color, #2d2d2d);
-      --text-color: var(--system-text-color, #ffffff);
-      --secondary-text-color: var(--system-secondary-text-color, #999999);
-      --accent-color: var(--system-accent-color, #007AFF);
-      --separator-color: var(--system-separator-color, #404040);
-    }
-
-    @media (prefers-color-scheme: light) {
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bookmarks Preferences</title>
+    <style>
+      /* IINA Theme Variables */
       :root {
-        --background-color: #ffffff;
-        --secondary-background-color: #f5f5f5;
-        --tertiary-background-color: #e5e5e5;
-        --text-color: #000000;
-        --secondary-text-color: #666666;
-        --accent-color: #007AFF;
-        --separator-color: #d1d1d1;
+        --background-color: var(--system-background-color, #1e1e1e);
+        --secondary-background-color: var(--system-secondary-background-color, #262626);
+        --tertiary-background-color: var(--system-tertiary-background-color, #2d2d2d);
+        --text-color: var(--system-text-color, #ffffff);
+        --secondary-text-color: var(--system-secondary-text-color, #999999);
+        --accent-color: var(--system-accent-color, #007aff);
+        --separator-color: var(--system-separator-color, #404040);
       }
-    }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-      margin: 0;
-      padding: 24px;
-      background-color: var(--background-color);
-      color: var(--text-color);
-      font-size: 13px;
-      line-height: 1.4;
-    }
-    
-    h1 {
-      font-size: 16px;
-      font-weight: 600;
-      margin: 0 0 20px 0;
-      color: var(--text-color);
-    }
-    
-    .pref-section {
-      margin-bottom: 24px;
-    }
-    
-    .pref-label {
-      display: block;
-      margin-bottom: 12px;
-      font-weight: 500;
-      color: var(--text-color);
-      cursor: pointer;
-    }
-    
-    .pref-label:hover {
-      color: var(--accent-color);
-    }
-    
-    input[type="checkbox"] {
-      margin-right: 8px;
-      accent-color: var(--accent-color);
-      width: 16px;
-      height: 16px;
-    }
-    
-    input[type="number"], select {
-      padding: 6px 10px;
-      border: 1px solid var(--separator-color);
-      border-radius: 6px;
-      background-color: var(--tertiary-background-color);
-      color: var(--text-color);
-      font-size: 13px;
-      margin-left: 8px;
-      min-width: 120px;
-    }
-    
-    input[type="number"]:focus, select:focus {
-      outline: none;
-      border-color: var(--accent-color);
-      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
-    }
-    
-    select option {
-      background-color: var(--tertiary-background-color);
-      color: var(--text-color);
-    }
-    
-    .pref-group {
-      background-color: var(--secondary-background-color);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-    
-    .pref-group-title {
-      font-weight: 600;
-      margin-bottom: 12px;
-      color: var(--text-color);
-      font-size: 14px;
-    }
-    
-    .pref-description {
-      font-size: 11px;
-      color: var(--secondary-text-color);
-      margin-top: 4px;
-      margin-left: 24px;
-    }
-  </style>
-</head>
-<body>
-  <h1>Bookmarks Plugin Settings</h1>
-  
-  <div class="pref-group">
-    <div class="pref-group-title">General Settings</div>
-    
-    <div class="pref-section">
-      <label class="pref-label">
-        <input type="checkbox" id="autoSave" checked>
-        Auto-save bookmarks
-      </label>
-      <div class="pref-description">Automatically save bookmarks when they are created or modified</div>
-    </div>
-    
-    <div class="pref-section">
-      <label class="pref-label">
-        <input type="checkbox" id="showTimestamps" checked>
-        Show timestamps in bookmark list
-      </label>
-      <div class="pref-description">Display the playback time for each bookmark</div>
-    </div>
-  </div>
-  
-  <div class="pref-group">
-    <div class="pref-group-title">Display Options</div>
-
-    <div class="pref-section">
-      <label class="pref-label" for="defaultSort">
-        Default sort by:
-        <select id="defaultSort">
-          <option value="timestamp">Timestamp</option>
-          <option value="title">Title</option>
-          <option value="createdAt">Created Date</option>
-        </select>
-      </label>
-      <div class="pref-description">How bookmarks should be sorted by default</div>
-    </div>
-
-    <div class="pref-section">
-      <label class="pref-label" for="maxBookmarks">
-        Maximum bookmarks:
-        <input type="number" id="maxBookmarks" value="1000" min="10" max="10000">
-      </label>
-      <div class="pref-description">Maximum number of bookmarks to store per media file</div>
-    </div>
-  </div>
-
-  <div class="pref-group">
-    <div class="pref-group-title">Cloud Backup</div>
-
-    <div class="pref-section">
-      <label class="pref-label">
-        <input type="checkbox" id="cloudBackupEnabled">
-        Enable cloud backup
-      </label>
-      <div class="pref-description">Back up bookmarks to a cloud storage provider</div>
-    </div>
-
-    <div class="pref-section">
-      <label class="pref-label" for="cloudProvider">
-        Cloud provider:
-        <select id="cloudProvider">
-          <option value="gdrive">Google Drive</option>
-          <option value="dropbox">Dropbox</option>
-        </select>
-      </label>
-      <div class="pref-description">Which cloud service to use for backup</div>
-    </div>
-  </div>
-
-  <div class="pref-group">
-    <div class="pref-group-title">File Management</div>
-
-    <div class="pref-section">
-      <label class="pref-label">
-        <input type="checkbox" id="autoReconcileFiles" checked>
-        Auto-reconcile moved files
-      </label>
-      <div class="pref-description">Automatically detect and prompt to fix bookmarks pointing to moved files</div>
-    </div>
-  </div>
-
-  <script>
-    console.log("Bookmarks preferences page loaded");
-
-    // Load current preference values if available
-    if (window.iina && window.iina.preferences) {
-      try {
-        document.getElementById('autoSave').checked = window.iina.preferences.get('autoSave') !== false;
-        document.getElementById('showTimestamps').checked = window.iina.preferences.get('showTimestamps') !== false;
-        document.getElementById('defaultSort').value = window.iina.preferences.get('defaultSortBy') || 'timestamp';
-        document.getElementById('maxBookmarks').value = window.iina.preferences.get('maxBookmarks') || 1000;
-        document.getElementById('cloudBackupEnabled').checked = window.iina.preferences.get('cloudBackupEnabled') === true;
-        document.getElementById('cloudProvider').value = window.iina.preferences.get('cloudProvider') || 'gdrive';
-        document.getElementById('autoReconcileFiles').checked = window.iina.preferences.get('autoReconcileFiles') !== false;
-      } catch (e) {
-        console.log("Could not load preferences:", e);
-      }
-    }
-
-    // Save preferences when changed
-    function savePreferences() {
-      if (window.iina && window.iina.preferences) {
-        try {
-          window.iina.preferences.set('autoSave', document.getElementById('autoSave').checked);
-          window.iina.preferences.set('showTimestamps', document.getElementById('showTimestamps').checked);
-          window.iina.preferences.set('defaultSortBy', document.getElementById('defaultSort').value);
-          window.iina.preferences.set('maxBookmarks', parseInt(document.getElementById('maxBookmarks').value));
-          window.iina.preferences.set('cloudBackupEnabled', document.getElementById('cloudBackupEnabled').checked);
-          window.iina.preferences.set('cloudProvider', document.getElementById('cloudProvider').value);
-          window.iina.preferences.set('autoReconcileFiles', document.getElementById('autoReconcileFiles').checked);
-        } catch (e) {
-          console.log("Could not save preferences:", e);
+      @media (prefers-color-scheme: light) {
+        :root {
+          --background-color: #ffffff;
+          --secondary-background-color: #f5f5f5;
+          --tertiary-background-color: #e5e5e5;
+          --text-color: #000000;
+          --secondary-text-color: #666666;
+          --accent-color: #007aff;
+          --separator-color: #d1d1d1;
         }
       }
-    }
 
-    // Add event listeners
-    document.getElementById('autoSave').addEventListener('change', savePreferences);
-    document.getElementById('showTimestamps').addEventListener('change', savePreferences);
-    document.getElementById('defaultSort').addEventListener('change', savePreferences);
-    document.getElementById('maxBookmarks').addEventListener('change', savePreferences);
-    document.getElementById('cloudBackupEnabled').addEventListener('change', savePreferences);
-    document.getElementById('cloudProvider').addEventListener('change', savePreferences);
-    document.getElementById('autoReconcileFiles').addEventListener('change', savePreferences);
-  </script>
-</body>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+        margin: 0;
+        padding: 24px;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      h1 {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 20px 0;
+        color: var(--text-color);
+      }
+
+      .pref-section {
+        margin-bottom: 24px;
+      }
+
+      .pref-label {
+        display: block;
+        margin-bottom: 12px;
+        font-weight: 500;
+        color: var(--text-color);
+        cursor: pointer;
+      }
+
+      .pref-label:hover {
+        color: var(--accent-color);
+      }
+
+      input[type='checkbox'] {
+        margin-right: 8px;
+        accent-color: var(--accent-color);
+        width: 16px;
+        height: 16px;
+      }
+
+      input[type='number'],
+      select {
+        padding: 6px 10px;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        background-color: var(--tertiary-background-color);
+        color: var(--text-color);
+        font-size: 13px;
+        margin-left: 8px;
+        min-width: 120px;
+      }
+
+      input[type='number']:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+      }
+
+      select option {
+        background-color: var(--tertiary-background-color);
+        color: var(--text-color);
+      }
+
+      .pref-group {
+        background-color: var(--secondary-background-color);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+
+      .pref-group-title {
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: var(--text-color);
+        font-size: 14px;
+      }
+
+      .pref-description {
+        font-size: 11px;
+        color: var(--secondary-text-color);
+        margin-top: 4px;
+        margin-left: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Bookmarks Plugin Settings</h1>
+
+    <div class="pref-group">
+      <div class="pref-group-title">General Settings</div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input type="checkbox" id="autoSave" data-type="bool" data-pref-key="autoSave" checked />
+          Auto-save bookmarks
+        </label>
+        <div class="pref-description">
+          Automatically save bookmarks when they are created or modified
+        </div>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="showTimestamps"
+            data-type="bool"
+            data-pref-key="showTimestamps"
+            checked
+          />
+          Show timestamps in bookmark list
+        </label>
+        <div class="pref-description">Display the playback time for each bookmark</div>
+      </div>
+    </div>
+
+    <div class="pref-group">
+      <div class="pref-group-title">Display Options</div>
+
+      <div class="pref-section">
+        <label class="pref-label" for="defaultSort">
+          Default sort by:
+          <select id="defaultSort">
+            <option value="timestamp">Timestamp</option>
+            <option value="title">Title</option>
+            <option value="createdAt">Created Date</option>
+          </select>
+        </label>
+        <div class="pref-description">How bookmarks should be sorted by default</div>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label" for="maxBookmarks">
+          Maximum bookmarks:
+          <input
+            type="number"
+            id="maxBookmarks"
+            data-type="int"
+            data-pref-key="maxBookmarks"
+            value="1000"
+            min="10"
+            max="10000"
+          />
+        </label>
+        <div class="pref-description">Maximum number of bookmarks to store per media file</div>
+      </div>
+    </div>
+
+    <div class="pref-group">
+      <div class="pref-group-title">File Management</div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="autoReconcileFiles"
+            data-type="bool"
+            data-pref-key="autoReconcileFiles"
+            checked
+          />
+          Auto-reconcile moved files
+        </label>
+        <div class="pref-description">
+          Automatically detect and prompt to fix bookmarks pointing to moved files
+        </div>
+      </div>
+    </div>
+
+    <div class="pref-group">
+      <div class="pref-group-title">Timeline & Display</div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="showTimeline"
+            data-type="bool"
+            data-pref-key="showTimeline"
+            checked
+          />
+          Show timeline in sidebar and overlay
+        </label>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="showThumbnails"
+            data-type="bool"
+            data-pref-key="showThumbnails"
+          />
+          Show thumbnails in bookmark list
+        </label>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="relativeTimeDisplay"
+            data-type="bool"
+            data-pref-key="relativeTimeDisplay"
+            checked
+          />
+          Show relative timestamps (e.g., "2h ago")
+        </label>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label" for="defaultViewMode">
+          Default view mode:
+          <select id="defaultViewMode">
+            <option value="grouped" selected>Grouped by File</option>
+            <option value="flat">Flat List</option>
+            <option value="gallery">Gallery</option>
+            <option value="timeline">Timeline</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="pref-group">
+      <div class="pref-group-title">Quick Bookmark</div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="scratchpadMode"
+            data-type="bool"
+            data-pref-key="scratchpadMode"
+            checked
+          />
+          Mark quick bookmarks as scratchpad (temporary until promoted)
+        </label>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="quickNotePrompt"
+            data-type="bool"
+            data-pref-key="quickNotePrompt"
+            checked
+          />
+          Show "Add a note?" prompt after quick bookmark
+        </label>
+      </div>
+    </div>
+
+    <div class="pref-group">
+      <div class="pref-group-title">Behavior</div>
+
+      <div class="pref-section">
+        <label class="pref-label" for="duplicateDetectionThreshold">
+          Duplicate detection threshold (seconds):
+          <input
+            type="number"
+            id="duplicateDetectionThreshold"
+            data-type="int"
+            data-pref-key="duplicateDetectionThreshold"
+            value="5"
+            min="0"
+            max="60"
+            style="width: 60px; min-width: 60px"
+          />
+        </label>
+        <div class="pref-description">
+          Bookmarks within this many seconds of each other are considered duplicates
+        </div>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="autoResume"
+            data-type="bool"
+            data-pref-key="autoResume"
+            checked
+          />
+          Save and restore last playback position per file
+        </label>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="chapterEnrichment"
+            data-type="bool"
+            data-pref-key="chapterEnrichment"
+            checked
+          />
+          Auto-populate chapter context for new bookmarks
+        </label>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="subtitleCapture"
+            data-type="bool"
+            data-pref-key="subtitleCapture"
+            checked
+          />
+          Capture subtitle text when creating bookmarks
+        </label>
+      </div>
+
+      <div class="pref-section">
+        <label class="pref-label">
+          <input
+            type="checkbox"
+            id="proximityOverlay"
+            data-type="bool"
+            data-pref-key="proximityOverlay"
+            checked
+          />
+          Show overlay only when cursor is near seekbar
+        </label>
+      </div>
+    </div>
+
+    <script>
+      const prefs = iina.preferences;
+
+      // Select elements need manual callback-based binding
+      // (data-pref-key handles checkboxes and number inputs automatically)
+
+      prefs.get('defaultSortBy', (value) => {
+        if (value) document.getElementById('defaultSort').value = value;
+      });
+      document.getElementById('defaultSort').addEventListener('change', (e) => {
+        prefs.set('defaultSortBy', e.target.value);
+      });
+
+      prefs.get('defaultViewMode', (value) => {
+        if (value) document.getElementById('defaultViewMode').value = value;
+      });
+      document.getElementById('defaultViewMode').addEventListener('change', (e) => {
+        prefs.set('defaultViewMode', e.target.value);
+      });
+
+    </script>
+  </body>
 </html>

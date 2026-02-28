@@ -41,7 +41,7 @@ export function validateBookmarkArray(data: unknown, logger?: IINAConsole): Book
       logger?.warn(`Bookmark entry ${i} has invalid timestamp, skipping`);
       continue;
     }
-    valid.push({
+    const bookmark: BookmarkData = {
       id: obj.id,
       title: obj.title,
       timestamp: ts,
@@ -52,7 +52,16 @@ export function validateBookmarkArray(data: unknown, logger?: IINAConsole): Book
       tags: Array.isArray(obj.tags)
         ? obj.tags.filter((t): t is string => typeof t === 'string')
         : [],
-    });
+    };
+    // Preserve annotation fields
+    if (typeof obj.color === 'string') bookmark.color = obj.color as BookmarkData['color'];
+    if (typeof obj.endTimestamp === 'number') bookmark.endTimestamp = obj.endTimestamp;
+    if (typeof obj.pinned === 'boolean') bookmark.pinned = obj.pinned;
+    if (typeof obj.chapterTitle === 'string') bookmark.chapterTitle = obj.chapterTitle;
+    if (typeof obj.subtitleText === 'string') bookmark.subtitleText = obj.subtitleText;
+    if (typeof obj.scratchpad === 'boolean') bookmark.scratchpad = obj.scratchpad;
+    if (typeof obj.thumbnailPath === 'string') bookmark.thumbnailPath = obj.thumbnailPath;
+    valid.push(bookmark);
   }
   return valid;
 }

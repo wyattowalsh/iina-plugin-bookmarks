@@ -5,10 +5,6 @@
 
 import { vi } from 'vitest';
 
-// Cloud-storage mock — imported from extracted module for explicit control.
-// Integration tests that need the real module should use a separate setup.
-import './mocks/cloud-storage';
-
 const noop = vi.fn();
 
 const minimalIINA = {

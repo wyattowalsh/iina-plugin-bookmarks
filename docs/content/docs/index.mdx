@@ -9,12 +9,9 @@ import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
+import { ProjectStats } from '@/components/ProjectStats';
 
 # IINA Plugin Bookmarks
-
-<Callout type="info" title="Latest Release">
-  **Version 1.0.0** - Production-ready bookmark management with advanced filtering, batch operations, and performance optimizations.
-</Callout>
 
 **IINA Plugin Bookmarks** is a bookmark management system for the IINA media player. It provides bookmark creation, organization with tags and filtering, data import/export, and cloud sync capabilities.
 
@@ -80,7 +77,7 @@ import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
 
 <Steps>
   <Step>
-    ### Installation & Setup
+    **Installation & Setup**
     
     <Tabs items={['macOS', 'Manual Install']}>
       <Tab value="macOS">
@@ -107,7 +104,7 @@ import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
   </Step>
   
   <Step>
-    ### Configuration
+    **Configuration**
     
     Access plugin settings through multiple interfaces:
     
@@ -123,7 +120,7 @@ import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
   </Step>
   
   <Step>
-    ### Start Bookmarking
+    **Start Bookmarking**
     
     Create your first bookmark with any of these methods:
     
@@ -141,7 +138,7 @@ import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
   </Step>
   
   <Step>
-    ### Explore Advanced Features
+    **Explore Advanced Features**
     
     Once you have bookmarks, explore powerful features:
     - **Search & Filter** by title, tags, or date range
@@ -298,24 +295,7 @@ class BookmarkManager {
 
 ## 📊 Project Stats
 
-<div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
-  <div className="p-4 border rounded-lg text-center">
-    <div className="text-2xl font-bold text-primary">1.0.0</div>
-    <div className="text-sm text-muted-foreground">Current Version</div>
-  </div>
-  <div className="p-4 border rounded-lg text-center">
-    <div className="text-2xl font-bold text-primary">95%+</div>
-    <div className="text-sm text-muted-foreground">Test Coverage</div>
-  </div>
-  <div className="p-4 border rounded-lg text-center">
-    <div className="text-2xl font-bold text-primary">TypeScript</div>
-    <div className="text-sm text-muted-foreground">Language</div>
-  </div>
-  <div className="p-4 border rounded-lg text-center">
-    <div className="text-2xl font-bold text-primary">MIT</div>
-    <div className="text-sm text-muted-foreground">License</div>
-  </div>
-</div>
+<ProjectStats />
 
 <Callout type="tip" title="Quick Links">
   - **[GitHub Repository](https://github.com/wyattowalsh/iina-plugin-bookmarks)** - Source code and releases

@@ -18,11 +18,21 @@ export function errorMessage(e: unknown): string {
 // ---------------------------------------------------------------------------
 
 export type UISource = 'sidebar' | 'overlay' | 'window';
-export type CloudProviderId = 'gdrive' | 'dropbox';
-export type CloudSyncAction = 'upload' | 'download' | 'sync';
 export type ExportFormat = 'json' | 'csv';
 export type ReconciliationAction = 'update_path' | 'remove_bookmark' | 'search_similar';
 export type DuplicateHandling = 'skip' | 'replace' | 'merge';
+export type BookmarkColor =
+  | 'red'
+  | 'orange'
+  | 'yellow'
+  | 'green'
+  | 'blue'
+  | 'purple'
+  | 'pink'
+  | 'grey';
+export type BatchTagAction = 'add' | 'remove';
+export type CollectionAssignAction = 'add' | 'remove';
+export type BookmarkNavigationScope = 'file' | 'all';
 
 // ---------------------------------------------------------------------------
 // Core data interfaces
@@ -37,14 +47,58 @@ export interface BookmarkData {
   createdAt: string;
   updatedAt: string;
   tags: string[];
+  color?: BookmarkColor;
+  endTimestamp?: number;
+  pinned?: boolean;
+  thumbnailPath?: string;
+  chapterTitle?: string;
+  subtitleText?: string;
+  scratchpad?: boolean;
 }
 
-export interface CloudCredentials {
-  apiKey?: string;
-  accessToken?: string;
-  clientId?: string;
-  clientSecret?: string;
-  refreshToken?: string;
+export interface ChapterInfo {
+  title: string;
+  time: number;
+}
+
+export interface BookmarkCollection {
+  id: string;
+  name: string;
+  description?: string;
+  bookmarkIds: string[];
+  color?: BookmarkColor;
+  icon?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SmartCollectionFilters {
+  searchTerm?: string;
+  fileFilter?: string;
+  tags?: string[];
+  showOnlyUntagged?: boolean;
+  showOnlyPinned?: boolean;
+  showOnlyRangeBookmarks?: boolean;
+  showOnlyScratchpad?: boolean;
+  dateRange?: { start: string; end: string };
+}
+
+export interface SmartCollection {
+  id: string;
+  name: string;
+  description?: string;
+  filters: SmartCollectionFilters;
+  color?: BookmarkColor;
+  icon?: string;
+  createdAt: string;
+  usageCount: number;
+  builtin?: boolean;
+}
+
+export interface PlaybackStatus {
+  duration: number;
+  position: number;
+  chapters: ChapterInfo[];
 }
 
 export interface SortPreferences {
@@ -78,21 +132,10 @@ export interface BookmarkUpdatableFields {
   title?: string;
   description?: string;
   tags?: string[];
-}
-
-export interface SyncStats {
-  added: number;
-  updated: number;
-  conflicts: number;
-  total: number;
-}
-
-export interface BackupMetadata {
-  version: string;
-  createdAt: string;
-  totalBookmarks: number;
-  device: string;
-  userAgent: string;
+  color?: BookmarkColor;
+  endTimestamp?: number;
+  pinned?: boolean;
+  scratchpad?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,18 +152,20 @@ export interface UIMessage {
 export interface UIToBackendPayloadMap {
   UI_READY: { uiType: UISource };
   REQUEST_FILE_PATH: undefined;
-  ADD_BOOKMARK: { title?: string; timestamp?: number; description?: string; tags?: string[] };
+  ADD_BOOKMARK: {
+    title?: string;
+    timestamp?: number;
+    description?: string;
+    tags?: string[];
+    color?: BookmarkColor;
+    endTimestamp?: number;
+  };
   DELETE_BOOKMARK: { id: string };
   JUMP_TO_BOOKMARK: { id: string };
   UPDATE_BOOKMARK: { id: string; data: BookmarkUpdatableFields };
   HIDE_OVERLAY: undefined;
   IMPORT_BOOKMARKS: { bookmarks: unknown[]; options?: ImportOptions };
   EXPORT_BOOKMARKS: { format?: ExportFormat };
-  CLOUD_SYNC_REQUEST: {
-    action: CloudSyncAction;
-    provider: CloudProviderId;
-    credentials: CloudCredentials;
-  };
   FILE_RECONCILIATION_REQUEST: {
     action: ReconciliationAction;
     bookmarkId: string;
@@ -130,6 +175,64 @@ export interface UIToBackendPayloadMap {
   RECONCILE_FILES: undefined;
   REQUEST_BOOKMARK_DEFAULTS: undefined;
   SAVE_SORT_PREFERENCES: { preferences: SortPreferences };
+
+  // Collections
+  CREATE_COLLECTION: { name: string; description?: string; color?: BookmarkColor; icon?: string };
+  UPDATE_COLLECTION: { id: string; data: Partial<Omit<BookmarkCollection, 'id' | 'createdAt'>> };
+  DELETE_COLLECTION: { id: string };
+  CREATE_SMART_COLLECTION: {
+    name: string;
+    description?: string;
+    filters: SmartCollectionFilters;
+    color?: BookmarkColor;
+    icon?: string;
+  };
+  UPDATE_SMART_COLLECTION: {
+    id: string;
+    data: Partial<Omit<SmartCollection, 'id' | 'createdAt' | 'builtin'>>;
+  };
+  DELETE_SMART_COLLECTION: { id: string };
+  ADD_TO_COLLECTION: { bookmarkIds: string[]; collectionId: string };
+  REMOVE_FROM_COLLECTION: { bookmarkIds: string[]; collectionId: string };
+
+  // Batch operations
+  BATCH_DELETE: { ids: string[] };
+  BATCH_TAG: { ids: string[]; tags: string[]; action: BatchTagAction };
+  BATCH_ASSIGN_COLLECTION: { ids: string[]; collectionId: string; action: CollectionAssignAction };
+  BATCH_PIN: { ids: string[]; pinned: boolean };
+  BATCH_COLOR: { ids: string[]; color: BookmarkColor };
+
+  // Navigation
+  NEXT_BOOKMARK: { currentId: string; scope: BookmarkNavigationScope };
+  PREV_BOOKMARK: { currentId: string; scope: BookmarkNavigationScope };
+
+  // Range & loop
+  SET_AB_LOOP: { bookmarkId: string };
+  CLEAR_AB_LOOP: undefined;
+
+  // Thumbnails
+  REQUEST_THUMBNAIL: { bookmarkId: string };
+
+  // Scratchpad
+  PROMOTE_SCRATCHPAD: { ids: string[] };
+  DISCARD_SCRATCHPAD: { ids: string[] };
+
+  // Duplicate resolution
+  CONFIRM_BOOKMARK: {
+    title?: string;
+    timestamp?: number;
+    description?: string;
+    tags?: string[];
+    color?: BookmarkColor;
+  };
+  MERGE_BOOKMARK: { existingId: string; mergeData: BookmarkUpdatableFields };
+
+  // Range bookmark I/O marking
+  SET_IN_POINT: undefined;
+  SET_OUT_POINT: undefined;
+
+  // Direct seek (from timeline click on empty space)
+  SEEK_TO_TIMESTAMP: { timestamp: number };
 }
 
 /** Payload map for messages sent from Backend → UI (via target.postMessage). */
@@ -144,17 +247,6 @@ export interface BackendToUIPayloadMap {
   IMPORT_RESULT: ImportResult;
   IMPORT_STARTED: undefined;
   EXPORT_RESULT: { format: ExportFormat; content: string };
-  CLOUD_SYNC_RESULT: {
-    success: boolean;
-    action: CloudSyncAction;
-    message?: string;
-    error?: string;
-    bookmarks?: BookmarkData[];
-    backupId?: string;
-    metadata?: BackupMetadata;
-    syncStats?: SyncStats;
-  };
-  SHOW_CLOUD_SYNC_DIALOG: undefined;
   SHOW_FILE_RECONCILIATION_DIALOG: { movedFiles: BookmarkData[] };
   FILE_RECONCILIATION_RESULT: {
     success: boolean;
@@ -167,6 +259,29 @@ export interface BackendToUIPayloadMap {
     message?: string;
   };
   ERROR: { message: string };
+
+  // Collections
+  COLLECTIONS_UPDATED: BookmarkCollection[];
+  SMART_COLLECTIONS_UPDATED: SmartCollection[];
+
+  // Playback
+  PLAYBACK_STATUS: PlaybackStatus;
+
+  // Auto-resume
+  RESUME_POSITION: { filepath: string; timestamp: number };
+
+  // Duplicate detection
+  BOOKMARK_NEAR_DUPLICATE: {
+    existingBookmark: BookmarkData;
+    proposedTimestamp: number;
+    distance: number;
+  };
+
+  // Thumbnails
+  THUMBNAIL_READY: { bookmarkId: string; path: string };
+
+  // Quick bookmark
+  QUICK_BOOKMARK_CREATED: { bookmarkId: string; timestamp: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -177,13 +292,18 @@ export interface IINACore {
   status: {
     path?: string;
     currentTime?: number;
+    duration?: number;
+    position?: number;
     metadata?: {
       title?: string;
     };
   };
+  window?: { loaded: boolean };
   seek?: (time: number, exact?: boolean) => void;
   seekTo?: (seconds: number) => void;
   osd?: (message: string) => void;
+  open?: (url: string) => void;
+  getChapters?: () => ChapterInfo[];
 }
 
 export interface IINAConsole {
@@ -199,7 +319,7 @@ export interface IINAPreferences {
 
 export interface IINAMenu {
   addItem: (item: any) => void;
-  item: (title: string, action: () => void) => any;
+  item: (title: string, action: () => void, options?: { keyBinding?: string }) => any;
 }
 
 export interface IINAEvent {
@@ -226,55 +346,26 @@ export interface IINAStandaloneWindow extends IINAUIAPI {
   show: () => void;
 }
 
+export interface IINAMpv {
+  set?: (property: string, value: string | number) => void;
+  getString?: (property: string) => string | undefined;
+}
+
+export interface IINAPlaylist {
+  registerMenuBuilder?: (builder: (items: any[]) => any[]) => void;
+}
+
 export interface IINAUtils {
   ask: (question: string) => boolean;
   prompt: (question: string) => string | null;
   chooseFile: (title: string, options?: any) => string | null;
+  exec?: (file: string, args: string[]) => void;
 }
 
 export interface IINAFile {
   read: (path: string) => string;
   write: (path: string, content: string) => void;
   exists: (path: string) => boolean;
-}
-
-/**
- * HTTP adapter interface that abstracts iina.http for cloud storage.
- * Methods mirror the IINA HTTP module's API shape.
- */
-export interface HttpAdapter {
-  get(
-    url: string,
-    options?: { headers?: Record<string, string>; params?: Record<string, string> },
-  ): Promise<{ text: string; statusCode: number }>;
-  post(
-    url: string,
-    options?: {
-      headers?: Record<string, string>;
-      data?: any;
-      params?: Record<string, string>;
-    },
-  ): Promise<{ text: string; statusCode: number }>;
-  put(
-    url: string,
-    options?: {
-      headers?: Record<string, string>;
-      data?: any;
-      params?: Record<string, string>;
-    },
-  ): Promise<{ text: string; statusCode: number }>;
-  patch(
-    url: string,
-    options?: {
-      headers?: Record<string, string>;
-      data?: any;
-      params?: Record<string, string>;
-    },
-  ): Promise<{ text: string; statusCode: number }>;
-  delete(
-    url: string,
-    options?: { headers?: Record<string, string>; params?: Record<string, string> },
-  ): Promise<{ text: string; statusCode: number }>;
 }
 
 export interface IINARuntimeDependencies {
@@ -288,5 +379,6 @@ export interface IINARuntimeDependencies {
   standaloneWindow: IINAStandaloneWindow;
   utils: IINAUtils;
   file: IINAFile;
-  http: HttpAdapter;
+  mpv?: IINAMpv;
+  playlist?: IINAPlaylist;
 }
