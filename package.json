@@ -57,7 +57,7 @@
     "husky": "^9.1.7",
     "iina-plugin-definition": "^0.99.3",
     "jsdom": "^28.1.0",
-    "lint-staged": "^16.2.7",
+    "lint-staged": "^16.3.1",
     "parcel": "~2.16.4",
     "parcel-optimizer-webview": "git+https://github.com/iina/parcel-optimizer-webview.git#18412b22cbf27c6b49bc90b521e02fde80e47806",
     "prettier": "^3.8.1",
