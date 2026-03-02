@@ -1,6 +1,6 @@
 ---
 title: Interfaces & Types
-description: Practical type reference for src/types.ts
+description: TypeScript interface definitions and type declarations
 icon: FileType
 ---
 
@@ -9,20 +9,19 @@ import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
 # TypeScript Interfaces & Types
 
-This page summarizes the most important runtime contracts in `src/types.ts`.
-
-<Callout type="info">
-  Source of truth: <code>src/types.ts</code>. If this page and code differ, trust the code.
-</Callout>
+This page documents the current contract in `src/types.ts`.
 
 ## Constants
 
 ```typescript
 export const MAX_TIMESTAMP = 86400 * 365;
-export function errorMessage(e: unknown): string;
+
+export function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 ```
 
-## Literal Types (selected)
+## Literal Union Types
 
 ```typescript
 export type UISource = 'sidebar' | 'overlay' | 'window';
@@ -38,12 +37,15 @@ export type BookmarkColor =
   | 'purple'
   | 'pink'
   | 'grey';
+export type BatchTagAction = 'add' | 'remove';
+export type CollectionAssignAction = 'add' | 'remove';
+export type BookmarkNavigationScope = 'file' | 'all';
 ```
 
-## Core Interfaces
+<Tabs items={['Bookmarks', 'Collections', 'Messaging', 'IINA Runtime']}>
+  <Tab value="Bookmarks">
+    ### `BookmarkData`
 
-<Tabs items={['Bookmark Data', 'Collections', 'Messaging', 'IINA Runtime']}>
-  <Tab value="Bookmark Data">
     ```typescript
     interface BookmarkData {
       id: string;
@@ -62,7 +64,11 @@ export type BookmarkColor =
       subtitleText?: string;
       scratchpad?: boolean;
     }
+    ```
 
+    ### `BookmarkUpdatableFields`
+
+    ```typescript
     interface BookmarkUpdatableFields {
       title?: string;
       description?: string;
@@ -74,9 +80,33 @@ export type BookmarkColor =
     }
     ```
 
+    ### Import/Export Types
+
+    ```typescript
+    interface ImportOptions {
+      duplicateHandling?: DuplicateHandling;
+      preserveIds?: boolean;
+    }
+
+    interface ImportResult {
+      success: boolean;
+      importedCount: number;
+      skippedCount: number;
+      errorCount: number;
+      errors?: string[];
+      duplicates?: number;
+    }
+
+    type ExportResult =
+      | { success: true; format: ExportFormat; content: string }
+      | { success: false; error: string; format?: ExportFormat };
+    ```
+
   </Tab>
 
   <Tab value="Collections">
+    ### `BookmarkCollection`
+
     ```typescript
     interface BookmarkCollection {
       id: string;
@@ -88,7 +118,11 @@ export type BookmarkColor =
       createdAt: string;
       updatedAt: string;
     }
+    ```
 
+    ### `SmartCollection`
+
+    ```typescript
     interface SmartCollectionFilters {
       searchTerm?: string;
       fileFilter?: string;
@@ -99,35 +133,141 @@ export type BookmarkColor =
       showOnlyScratchpad?: boolean;
       dateRange?: { start: string; end: string };
     }
+
+    interface SmartCollection {
+      id: string;
+      name: string;
+      description?: string;
+      filters: SmartCollectionFilters;
+      color?: BookmarkColor;
+      icon?: string;
+      createdAt: string;
+      usageCount: number;
+      builtin?: boolean;
+    }
+    ```
+
+    ### Playback & Sort
+
+    ```typescript
+    interface PlaybackStatus {
+      duration: number;
+      position: number;
+      chapters: ChapterInfo[];
+    }
+
+    interface SortPreferences {
+      sortBy: string;
+      sortDirection: 'asc' | 'desc';
+    }
     ```
 
   </Tab>
 
   <Tab value="Messaging">
-    Common UI → backend messages:
+    ### `UIMessage`
 
-    - `UI_READY`, `REQUEST_FILE_PATH`, `REQUEST_BOOKMARK_DEFAULTS`
-    - `ADD_BOOKMARK`, `UPDATE_BOOKMARK`, `DELETE_BOOKMARK`, `JUMP_TO_BOOKMARK`
-    - `IMPORT_BOOKMARKS`, `EXPORT_BOOKMARKS`
-    - `RECONCILE_FILES`, `FILE_RECONCILIATION_REQUEST`
-    - collection and batch-operation messages
-    - navigation and loop messages (`NEXT_BOOKMARK`, `PREV_BOOKMARK`, `SET_AB_LOOP`, `CLEAR_AB_LOOP`)
+    ```typescript
+    interface UIMessage {
+      type: string;
+      payload?: Record<string, unknown>;
+      sourceUI?: UISource;
+    }
+    ```
 
-    Common backend → UI messages:
+    ### `UIToBackendPayloadMap` (selected current entries)
 
-    - `BOOKMARKS_UPDATED`, `BOOKMARK_DEFAULTS`, `CURRENT_FILE_PATH`
-    - `BOOKMARK_ADDED`, `BOOKMARK_DELETED`, `BOOKMARK_JUMPED`
-    - `IMPORT_RESULT`, `EXPORT_RESULT`, `ERROR`
-    - `PLAYBACK_STATUS`, `THUMBNAIL_READY`, `QUICK_BOOKMARK_CREATED`
-    - reconciliation and collection update messages
+    ```typescript
+    interface UIToBackendPayloadMap {
+      UI_READY: { uiType: UISource };
+      ADD_BOOKMARK: {
+        title?: string;
+        timestamp?: number;
+        description?: string;
+        tags?: string[];
+        color?: BookmarkColor;
+        endTimestamp?: number;
+      };
+      UPDATE_BOOKMARK: { id: string; data: BookmarkUpdatableFields };
+      IMPORT_BOOKMARKS: {
+        bookmarks: unknown[];
+        options?: ImportOptions;
+        collections?: BookmarkCollection[];
+        smartCollections?: SmartCollection[];
+      };
+      CREATE_COLLECTION: { name: string; description?: string; color?: BookmarkColor; icon?: string };
+      CREATE_SMART_COLLECTION: {
+        name: string;
+        description?: string;
+        filters: SmartCollectionFilters;
+        color?: BookmarkColor;
+        icon?: string;
+      };
+      BATCH_TAG: { ids: string[]; tags: string[]; action: BatchTagAction };
+      SET_AB_LOOP: { bookmarkId: string };
+      REQUEST_THUMBNAIL: { bookmarkId: string };
+      SEEK_TO_TIMESTAMP: { timestamp: number };
+    }
+    ```
 
-    <Callout type="warning">
-      Cloud sync request/result message types are not part of the current runtime contracts.
+    ### `BackendToUIPayloadMap` (selected current entries)
+
+    ```typescript
+    interface BackendToUIPayloadMap {
+      BOOKMARKS_UPDATED: BookmarkData[];
+      COLLECTIONS_UPDATED: BookmarkCollection[];
+      SMART_COLLECTIONS_UPDATED: SmartCollection[];
+      BOOKMARK_DEFAULTS: BookmarkDefaults;
+      IMPORT_RESULT: ImportResult;
+      EXPORT_RESULT: ExportResult;
+      PLAYBACK_STATUS: PlaybackStatus;
+      RESUME_POSITION: { filepath: string; timestamp: number };
+      BOOKMARK_NEAR_DUPLICATE: {
+        existingBookmark: BookmarkData;
+        proposedTimestamp: number;
+        distance: number;
+      };
+      THUMBNAIL_READY: { bookmarkId: string; path: string };
+      QUICK_BOOKMARK_CREATED: { bookmarkId: string; timestamp: number };
+      ERROR: { message: string };
+    }
+    ```
+
+    <Callout type="info">
+      The full payload maps live in `src/types.ts`; keep docs as a practical contract summary and avoid adding message names not present in source.
     </Callout>
 
   </Tab>
 
   <Tab value="IINA Runtime">
+    ### Core Runtime Interfaces
+
+    ```typescript
+    interface IINACore {
+      status: {
+        path?: string;
+        currentTime?: number;
+        duration?: number;
+        position?: number;
+        metadata?: { title?: string };
+      };
+      window?: { loaded: boolean };
+      seek?: (time: number, exact?: boolean) => void;
+      seekTo?: (seconds: number) => void;
+      osd?: (message: string) => void;
+      open?: (url: string) => void;
+      getChapters?: () => ChapterInfo[];
+    }
+
+    interface IINAUIAPI {
+      loadFile: (path: string) => void;
+      postMessage: (name: string, data?: any) => void;
+      onMessage: (name: string, callback: (data: any) => void) => void;
+    }
+    ```
+
+    ### `IINARuntimeDependencies`
+
     ```typescript
     interface IINARuntimeDependencies {
       console: IINAConsole;
@@ -144,11 +284,50 @@ export type BookmarkColor =
       playlist?: IINAPlaylist;
     }
     ```
+
   </Tab>
 </Tabs>
 
-## Validation Notes
+## Type Safety Notes
 
-- User-provided text fields are sanitized before persistence.
-- Import/export normalizes payloads through `normalizeExportResult`.
-- Timestamps and range endpoints are validated against `MAX_TIMESTAMP`.
+<Callout type="warn">
+  User-provided text fields are sanitized with `stripHtmlTags()` in backend update/import flows.
+</Callout>
+
+<Callout type="info">
+  Time values are validated against `MAX_TIMESTAMP`, and invalid range endpoints (`endTimestamp`)
+  are dropped.
+</Callout>
+
+## Usage Examples
+
+```typescript
+import {
+  normalizeExportResult,
+  type BookmarkData,
+  type BookmarkUpdatableFields,
+  type ExportResult,
+} from './types';
+
+const bookmark: BookmarkData = {
+  id: 'abc123',
+  title: 'Epic Scene',
+  timestamp: 1234.5,
+  filepath: '/Movies/Example.mp4',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  tags: ['favorite'],
+};
+
+const updates: BookmarkUpdatableFields = {
+  title: 'Updated Scene',
+  pinned: true,
+  color: 'purple',
+};
+
+const exportResult: ExportResult = normalizeExportResult({
+  success: true,
+  format: 'json',
+  content: JSON.stringify([bookmark]),
+});
+```

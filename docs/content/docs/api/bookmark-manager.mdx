@@ -1,6 +1,6 @@
 ---
 title: BookmarkManager API
-description: Runtime behavior and public API of src/bookmark-manager.ts
+description: Complete API reference for the BookmarkManager class
 icon: Code
 ---
 
@@ -9,16 +9,15 @@ import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
 # BookmarkManager API Reference
 
-`BookmarkManager` coordinates bookmark data, UI messaging, and IINA integration.
+`BookmarkManager` is the orchestrator for bookmark CRUD, collection workflows, playback helpers, and UI message routing.
 
 ## Class Overview
 
 ```typescript
-class BookmarkManager {
-  private bookmarks: BookmarkData[] = [];
-  private collections: BookmarkCollection[] = [];
-  private smartCollections: SmartCollection[] = [];
-
+export class BookmarkManager {
+  private bookmarks: BookmarkData[];
+  private collections: BookmarkCollection[];
+  private smartCollections: SmartCollection[];
   private persistence: BookmarkPersistence;
   private importExport: BookmarkImportExport;
   private thumbnailGenerator: ThumbnailGenerator;
@@ -28,22 +27,37 @@ class BookmarkManager {
 ```
 
 <Callout type="info">
-  The current runtime does not include a cloud sync handler in <code>BookmarkManager</code>.
+  Current runtime modules are `BookmarkPersistence`, `BookmarkImportExport`, and
+  `ThumbnailGenerator`. There is no cloud-sync module in the current `src/bookmark-manager.ts`.
 </Callout>
 
-## Constructor Behavior
+## Constructor
 
-On construction, the manager:
+```typescript
+constructor(dependencies: IINARuntimeDependencies)
+```
 
-1. Initializes persistence/import-export/thumbnail modules.
-2. Loads bookmarks, collections, and resume positions.
-3. Registers IINA event listeners and plugin menu items.
-4. Defers UI file loading until `iina.window-loaded` when needed.
+**Dependencies used by the manager:**
+
+- `console`, `core`, `preferences`, `menu`, `event`
+- `sidebar`, `overlay`, `standaloneWindow`
+- `utils`, `file`
+- optional `mpv`, `playlist`
+
+**Initialization flow (practical):**
+
+1. Create persistence/import-export/thumbnail helpers
+2. Load bookmarks, collections, and saved resume positions
+3. Register event + menu handlers
+4. Initialize UI immediately (if window loaded) or on `iina.window-loaded`
+5. Register UI message listeners + load saved sort preferences
 
 ## Public Methods
 
-<Tabs items={['Bookmark Ops', 'Navigation & Loop', 'Queries', 'Lifecycle']}>
-  <Tab value="Bookmark Ops">
+<Tabs items={['Bookmarks', 'Collections & Batch', 'Playback & Lifecycle']}>
+  <Tab value="Bookmarks">
+    ### `addBookmark()`
+
     ```typescript
     async addBookmark(
       title?: string,
@@ -55,69 +69,202 @@ On construction, the manager:
         color?: BookmarkColor;
         endTimestamp?: number;
         scratchpad?: boolean;
-      }
-    ): Promise<string | undefined>;
-
-    removeBookmark(id: string): void;
-    updateBookmark(id: string, data: BookmarkUpdatableFields): void;
-    jumpToBookmark(id: string): void;
+      },
+    ): Promise<string | undefined>
     ```
 
-    Notes:
+    **Notes:**
+    - Returns bookmark ID on success.
+    - Returns `undefined` when max bookmark cap is reached or near-duplicate detection blocks creation.
+    - Validates timestamp and range fields; sanitizes title/description/tags.
+    - Enriches with chapter/subtitle metadata when available.
 
-    - `addBookmark` can return `undefined` (for example, near-duplicate detection).
-    - Input text is sanitized before persistence.
-    - `jumpToBookmark` supports same-file seek and cross-file open+seek.
+    ### `removeBookmark(id: string): void`
+
+    Removes bookmark and cleans collection references.
+
+    ### `updateBookmark(id: string, data: BookmarkUpdatableFields): void`
+
+    Updates mutable fields (`title`, `description`, `tags`, `color`, `endTimestamp`, `pinned`, `scratchpad`) and refreshes `updatedAt`.
+
+    ### `jumpToBookmark(id: string): void`
+
+    - Seeks directly when bookmark file matches current file.
+    - For cross-file jumps, opens the file and waits for `iina.file-started` before seeking.
+
+    ### Query helpers
+
+    ```typescript
+    getBookmarksForFile(filepath?: string): BookmarkData[]
+    getAllBookmarks(): BookmarkData[]
+    getBookmarkCount(): number
+    ```
 
   </Tab>
 
-  <Tab value="Navigation & Loop">
+  <Tab value="Collections & Batch">
+    ### Collections
+
     ```typescript
-    setABLoop(bookmarkId: string): void;
-    clearABLoop(): void;
-    navigateBookmark(
+    createCollection(name: string, description?: string, color?: BookmarkColor, icon?: string): void
+    updateCollection(id: string, data: Partial<Omit<BookmarkCollection, 'id' | 'createdAt'>>): void
+    deleteCollection(id: string): void
+    addToCollection(bookmarkIds: string[], collectionId: string): void
+    removeFromCollection(bookmarkIds: string[], collectionId: string): void
+    ```
+
+    ### Smart Collections
+
+    ```typescript
+    createSmartCollection(name: string, description?: string, filters?: SmartCollectionFilters, color?: BookmarkColor, icon?: string): void
+    updateSmartCollection(id: string, data: Partial<Omit<SmartCollection, 'id' | 'createdAt' | 'builtin'>>): void
+    deleteSmartCollection(id: string): void
+    ```
+
+    ### Batch + Scratchpad
+
+    ```typescript
+    batchDelete(ids: string[]): void
+    batchTag(ids: string[], tags: string[], action: 'add' | 'remove'): void
+    batchAssignCollection(ids: string[], collectionId: string, action: 'add' | 'remove'): void
+    batchPin(ids: string[], pinned: boolean): void
+    batchColor(ids: string[], color: BookmarkColor): void
+    promoteScratchpad(ids: string[]): void
+    discardScratchpad(ids: string[]): void
+    ```
+
+  </Tab>
+
+  <Tab value="Playback & Lifecycle">
+    ### Navigation + A-B Loop
+
+    ```typescript
+    getAdjacentBookmark(
       currentId: string,
       direction: 'next' | 'prev',
-      scope: 'file' | 'all'
-    ): void;
+      scope: 'file' | 'all',
+    ): BookmarkData | null
+
+    navigateBookmark(currentId: string, direction: 'next' | 'prev', scope: 'file' | 'all'): void
+
+    setABLoop(bookmarkId: string): void
+    clearABLoop(): void
     ```
 
-    These are wired to plugin menu actions and shortcuts (`Ctrl+B`, `Ctrl+]`, `Ctrl+[`).
+    ### Resume + cleanup
 
-  </Tab>
-
-<Tab value="Queries">
-  ```typescript getBookmarksForFile(filepath?: string): BookmarkData[]; getAllBookmarks():
-  BookmarkData[]; getBookmarkCount(): number; ```
-</Tab>
-
-  <Tab value="Lifecycle">
     ```typescript
-    destroy(): void;
+    saveResumePosition(): void
+    destroy(): void
     ```
-
-    `destroy()` unregisters event listeners, clears playback timers, and cancels pending seek work.
 
   </Tab>
 </Tabs>
 
-## Message Protocol (Practical)
+## UI Message Protocol (Current)
 
-`BookmarkManager` handles UI messages such as:
+### Incoming messages (UI → Backend)
 
-- CRUD + seek: `ADD_BOOKMARK`, `UPDATE_BOOKMARK`, `DELETE_BOOKMARK`, `JUMP_TO_BOOKMARK`
-- import/export: `IMPORT_BOOKMARKS`, `EXPORT_BOOKMARKS`
-- reconciliation: `RECONCILE_FILES`, `FILE_RECONCILIATION_REQUEST`
-- collections and batch operations
-- timeline/loop/navigation actions
+```typescript
+type UIToBackendMessageName =
+  | 'UI_READY'
+  | 'REQUEST_FILE_PATH'
+  | 'REQUEST_BOOKMARK_DEFAULTS'
+  | 'SAVE_SORT_PREFERENCES'
+  | 'ADD_BOOKMARK'
+  | 'DELETE_BOOKMARK'
+  | 'UPDATE_BOOKMARK'
+  | 'JUMP_TO_BOOKMARK'
+  | 'HIDE_OVERLAY'
+  | 'IMPORT_BOOKMARKS'
+  | 'EXPORT_BOOKMARKS'
+  | 'CREATE_COLLECTION'
+  | 'UPDATE_COLLECTION'
+  | 'DELETE_COLLECTION'
+  | 'CREATE_SMART_COLLECTION'
+  | 'UPDATE_SMART_COLLECTION'
+  | 'DELETE_SMART_COLLECTION'
+  | 'ADD_TO_COLLECTION'
+  | 'REMOVE_FROM_COLLECTION'
+  | 'BATCH_DELETE'
+  | 'BATCH_TAG'
+  | 'BATCH_ASSIGN_COLLECTION'
+  | 'BATCH_PIN'
+  | 'BATCH_COLOR'
+  | 'SET_AB_LOOP'
+  | 'CLEAR_AB_LOOP'
+  | 'SET_IN_POINT'
+  | 'SET_OUT_POINT'
+  | 'NEXT_BOOKMARK'
+  | 'PREV_BOOKMARK'
+  | 'SEEK_TO_TIMESTAMP'
+  | 'REQUEST_THUMBNAIL'
+  | 'PROMOTE_SCRATCHPAD'
+  | 'DISCARD_SCRATCHPAD'
+  | 'FILE_RECONCILIATION_REQUEST'
+  | 'RECONCILE_FILES'
+  | 'CONFIRM_BOOKMARK'
+  | 'MERGE_BOOKMARK';
+```
 
-And emits updates such as:
+### Outgoing messages (Backend → UI)
 
-- `BOOKMARKS_UPDATED`, `BOOKMARK_DEFAULTS`, `CURRENT_FILE_PATH`
-- `BOOKMARK_ADDED`, `BOOKMARK_DELETED`, `BOOKMARK_JUMPED`
-- `IMPORT_RESULT`, `EXPORT_RESULT`, `PLAYBACK_STATUS`, `ERROR`
+```typescript
+type BackendToUIMessageName =
+  | 'BOOKMARKS_UPDATED'
+  | 'CURRENT_FILE_PATH'
+  | 'BOOKMARK_ADDED'
+  | 'BOOKMARK_DELETED'
+  | 'BOOKMARK_JUMPED'
+  | 'BOOKMARK_DEFAULTS'
+  | 'SORT_PREFERENCES'
+  | 'IMPORT_STARTED'
+  | 'IMPORT_RESULT'
+  | 'EXPORT_RESULT'
+  | 'COLLECTIONS_UPDATED'
+  | 'SMART_COLLECTIONS_UPDATED'
+  | 'SHOW_FILE_RECONCILIATION_DIALOG'
+  | 'FILE_RECONCILIATION_RESULT'
+  | 'BOOKMARK_NEAR_DUPLICATE'
+  | 'THUMBNAIL_READY'
+  | 'PLAYBACK_STATUS'
+  | 'RESUME_POSITION'
+  | 'QUICK_BOOKMARK_CREATED'
+  | 'ERROR';
+```
 
-## Related References
+### Practical behavior notes
 
-- [Interfaces & Types](/docs/api/interfaces)
-- [Architecture](/docs/development/architecture)
+- Overlay gets file-scoped bookmarks from backend; sidebar/window get full bookmark arrays.
+- `BOOKMARK_NEAR_DUPLICATE` is broadcast to all UIs when duplicate threshold checks trigger.
+- `search_similar` reconciliation currently returns an empty list with a "not yet implemented" message.
+
+## Example Usage
+
+```typescript
+const manager = new BookmarkManager({
+  console: iina.console,
+  core: iina.core,
+  preferences: iina.preferences,
+  menu: iina.menu,
+  event: iina.event,
+  sidebar: iina.sidebar,
+  overlay: iina.overlay,
+  standaloneWindow: iina.standaloneWindow,
+  utils: iina.utils,
+  file: iina.file,
+  mpv: iina.mpv,
+  playlist: iina.playlist,
+});
+
+const id = await manager.addBookmark('Important Scene', 1234.5, 'Key plot point', ['plot']);
+if (id) {
+  manager.updateBookmark(id, { pinned: true, color: 'yellow' });
+  manager.jumpToBookmark(id);
+}
+```
+
+<Callout type="info">
+  If cloud sync is added later, document it as roadmap first; do not add cloud request/response
+  contracts here until code ships.
+</Callout>
