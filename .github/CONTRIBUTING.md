@@ -39,7 +39,7 @@ In general, we follow the "fork-and-pull" Git workflow:
 ## Code Guidelines
 
 - **Code Style**: Please follow the existing code style. We use Prettier for code formatting. Ensure you run `pnpm run format` (or `make format`) before committing your changes.
-- **Testing**: If you add new features or fix bugs, please add tests to ensure the stability of the plugin. Run CI-parity checks before opening a PR: `pnpm run lint`, `pnpm run format:check`, `pnpm run type-check`, `pnpm run test:coverage`, and `make build`.
+- **Testing**: If you add new features or fix bugs, please add tests to ensure the stability of the plugin. Run core local checks before opening a PR: `pnpm run lint`, `pnpm run format:check`, `pnpm run type-check`, `pnpm run test:coverage`, and `make build` (CI additionally runs release-critical E2E and dependency audit).
 - **Documentation**: Update any relevant documentation, including the [README.md](https://github.com/wyattowalsh/iina-plugin-bookmarks/blob/main/README.md) if necessary, to reflect your changes.
 
 Common commit types include:
@@ -57,7 +57,7 @@ Common commit types include:
 
 Releases are published by `.github/workflows/release.yml` only when a pushed tag matches `v*`.
 
-1. Run local preflight: `make release`
+1. Run local preflight: `RELEASE_TAG=vX.Y.Z make release-run` (or `make release` for a clean-install gate)
 2. Create and push the release tag: `git tag -a vX.Y.Z -m "vX.Y.Z"` then `git push origin vX.Y.Z`
 3. Use [`RELEASE_RUNBOOK.md`](./RELEASE_RUNBOOK.md) for the full checklist and release-workflow parity commands.
 

@@ -24,8 +24,9 @@ A bookmark management plugin for [IINA](https://iina.io) that lets you save, org
 
 ## Installation
 
-1. Download the latest `.iinaplgz` file from [Releases](https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest).
-2. Double-click the file to install it in IINA, or extract it manually:
+1. In IINA, open **Preferences → Plugins** and use **Install from GitHub** with:
+   - `https://github.com/wyattowalsh/iina-plugin-bookmarks`
+2. Or download the latest `.iinaplgz` file from [Releases](https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest), then double-click it to install (or extract manually):
    ```bash
    mkdir -p ~/Library/Application\ Support/com.colliderli.iina/plugins/
    unzip iina-plugin-bookmarks.iinaplgz -d ~/Library/Application\ Support/com.colliderli.iina/plugins/iina-plugin-bookmarks.iinaplugin
@@ -53,26 +54,23 @@ pnpm run lint         # Run linter
 pnpm run format       # Format code
 pnpm run type-check   # TypeScript type checking
 make package          # Build and package as .iinaplgz
-make release          # Full local release pipeline: clean, install, lint, type-check, test, test-e2e, build, package, validate
+make release          # Full local release gate: clean install + release-run
 ```
 
 ### Releases (Maintainers)
 
 GitHub release publishing is tag-driven (`v*` only). For exact steps, use the [release runbook](.github/RELEASE_RUNBOOK.md).
 
-Package manager distribution paths:
+Canonical release preflight (same lane as `.github/workflows/release.yml`):
+
+```bash
+RELEASE_TAG=vX.Y.Z make release-run
+```
+
+Direct-release install URLs:
 
 - Pinned tag: `https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/download/vX.Y.Z/iina-plugin-bookmarks.iinaplgz`
 - Latest channel: `https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest/download/iina-plugin-bookmarks.iinaplgz`
-
-Homebrew tap install/upgrade:
-
-```bash
-brew install wyattowalsh/tap/iina-plugin-bookmarks
-brew upgrade wyattowalsh/tap/iina-plugin-bookmarks
-```
-
-Alternative managers should prefer the pinned tag URL for deterministic installs and checksum verification.
 
 ## Project Structure
 
