@@ -151,9 +151,15 @@ describe('File reconciliation flow', () => {
       newPath: 'relative/path.mp4', // Invalid: doesn't start with /
     });
 
-    // Verify path NOT updated (no FILE_RECONCILIATION_RESULT sent)
+    // Verify deterministic failure response
     const result = harness.getLastMessage('sidebar', 'FILE_RECONCILIATION_RESULT');
-    expect(result).toBeUndefined();
+    expect(result).toMatchObject({
+      success: false,
+      action: 'update_path',
+      bookmarkId: bookmark.id,
+      newPath: 'relative/path.mp4',
+    });
+    expect(result.message).toContain('Invalid new path');
 
     // Verify error was logged
     expect(harness.deps.console.error).toHaveBeenCalledWith(
@@ -171,12 +177,15 @@ describe('File reconciliation flow', () => {
       newPath: '/test/new.mp4',
     });
 
-    // Verify no FILE_RECONCILIATION_RESULT (updateBookmarkPath finds no bookmark, returns early)
+    // Verify deterministic failure response
     const result = harness.getLastMessage('sidebar', 'FILE_RECONCILIATION_RESULT');
-    expect(result).toBeUndefined();
-
-    // No error should be logged for this case (it's handled gracefully)
-    // The method simply returns early if bookmark is not found
+    expect(result).toMatchObject({
+      success: false,
+      action: 'update_path',
+      bookmarkId: 'nonexistent',
+      newPath: '/test/new.mp4',
+    });
+    expect(result.message).toContain('Bookmark not found');
   });
 
   it('treats files as missing when file.exists throws', async () => {

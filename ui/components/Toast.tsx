@@ -90,6 +90,9 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
           ×
         </button>
       </div>
+      {toast.action && toast.duration && toast.duration > 0 && (
+        <div className="toast-undo-timer" style={{ animationDuration: `${toast.duration}ms` }} />
+      )}
     </div>
   );
 };

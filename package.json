@@ -1,6 +1,6 @@
 {
   "name": "iina-plugin-bookmarks",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "IINA plugin for user-friendly media bookmark management",
   "main": "dist/index.js",
   "packageManager": "pnpm@10.29.3",
@@ -8,8 +8,8 @@
     "serve-window": "parcel serve ui/window/index.html --dist-dir dist/ui/window --port 1236",
     "serve-sidebar": "parcel serve ui/sidebar/index.html --dist-dir dist/ui/sidebar --port 1234",
     "serve-overlay": "parcel serve ui/overlay/index.html --dist-dir dist/ui/overlay --port 1235",
-    "build": "rm -rf dist .parcel-cache && parcel build --target entry --no-content-hash && parcel build --target window --no-scope-hoist && parcel build --target overlay --no-scope-hoist && parcel build --target sidebar --no-scope-hoist && sed -i '' 's/ type=module//g' dist/ui/*/index.html && sed -i '' 's/let[{][^}]*[}]=parcelRequire[^;]*;export[{][^}]*[}];//g' dist/ui/*/*.js && cp Info.json preferences.html LICENSE dist/",
-    "build:dev": "rm -rf dist .parcel-cache && parcel build --target entry --no-content-hash --no-optimize && parcel build --target window --no-scope-hoist --no-optimize && parcel build --target overlay --no-scope-hoist --no-optimize && parcel build --target sidebar --no-scope-hoist --no-optimize && sed -i '' 's/ type=module//g' dist/ui/*/index.html && sed -i '' 's/let[{][^}]*[}]=parcelRequire[^;]*;export[{][^}]*[}];//g' dist/ui/*/*.js && cp Info.json preferences.html LICENSE dist/",
+    "build": "rm -rf dist .parcel-cache && parcel build --target entry --no-content-hash && parcel build --target window --no-scope-hoist && parcel build --target overlay --no-scope-hoist && parcel build --target sidebar --no-scope-hoist && node scripts/postprocess-build.mjs && cp Info.json preferences.html LICENSE dist/",
+    "build:dev": "rm -rf dist .parcel-cache && parcel build --target entry --no-content-hash --no-optimize && parcel build --target window --no-scope-hoist --no-optimize && parcel build --target overlay --no-scope-hoist --no-optimize && parcel build --target sidebar --no-scope-hoist --no-optimize && node scripts/postprocess-build.mjs && cp Info.json preferences.html LICENSE dist/",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
@@ -38,6 +38,12 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "coveragePolicy": {
+    "lines": 33,
+    "statements": 32,
+    "branches": 24,
+    "functions": 23
   },
   "author": "IINA Plugin Bookmarks Contributors",
   "license": "ISC",

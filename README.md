@@ -53,8 +53,12 @@ pnpm run lint         # Run linter
 pnpm run format       # Format code
 pnpm run type-check   # TypeScript type checking
 make package          # Build and package as .iinaplgz
-make release          # Full release pipeline: clean, install, type-check, test, build, package, validate
+make release          # Full local release pipeline: clean, install, lint, type-check, test, test-e2e, build, package, validate
 ```
+
+### Releases (Maintainers)
+
+GitHub release publishing is tag-driven (`v*` only). For exact steps, use the [release runbook](.github/RELEASE_RUNBOOK.md).
 
 ## Project Structure
 

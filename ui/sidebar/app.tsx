@@ -14,7 +14,13 @@ import { useEscapeKey } from '../hooks/useEscapeKey';
 import useFilterHistory from '../hooks/useFilterHistory';
 import useToast from '../hooks/useToast';
 import { useIinaMessages } from '../hooks/useIinaMessages';
-import { BookmarkData, PlaybackStatus, ChapterInfo, AppWindow } from '../types';
+import {
+  BookmarkData,
+  PlaybackStatus,
+  ChapterInfo,
+  AppWindow,
+  normalizeExportResult,
+} from '../types';
 import { formatTime, formatDate, formatRelativeTime } from '../utils/formatTime';
 
 // ---------------------------------------------------------------------------
@@ -277,13 +283,15 @@ const App: React.FC = () => {
       BOOKMARK_JUMPED: () => {
         showInfoRef.current('Jumped to Bookmark', 'Playback position updated');
       },
-      EXPORT_RESULT: (data: any) => {
+      EXPORT_RESULT: (data: unknown) => {
+        const result = normalizeExportResult(data);
         setIsLoading(false);
-        showSuccessRef.current(
-          'Export Complete',
-          `Bookmarks exported as ${data?.format || 'file'}`,
-        );
-        window.postMessage({ type: 'EXPORT_RESULT', data }, window.location.origin);
+        if (result.success) {
+          showSuccessRef.current('Export Complete', `Bookmarks exported as ${result.format}`);
+        } else {
+          showErrorRef.current('Export Failed', result.error);
+        }
+        window.postMessage({ type: 'EXPORT_RESULT', data: result }, window.location.origin);
       },
       IMPORT_RESULT: (data: any) => {
         setIsLoading(false);
@@ -409,9 +417,12 @@ const App: React.FC = () => {
     });
   };
 
-  const postMessage = (type: string, data?: any) => {
-    appWindow.iina?.postMessage?.(type, data);
-  };
+  const postMessage = useCallback(
+    (type: string, data?: any) => {
+      appWindow.iina?.postMessage?.(type, data);
+    },
+    [appWindow],
+  );
 
   const handleDeleteBookmark = (id: string) => {
     setPendingDeleteId(id);

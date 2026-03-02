@@ -95,7 +95,7 @@ export const useAdvancedBookmarkFilters = ({
     );
 
     return result;
-  }, [bookmarks, filters, parsedQuery]);
+  }, [bookmarks, filters, parsedQuery, collectionFilter, collections]);
 
   const availableFiles = useMemo(() => {
     return Array.from(new Set(bookmarks.map((b) => b.filepath))).sort();

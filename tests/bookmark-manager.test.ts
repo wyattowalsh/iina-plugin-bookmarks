@@ -82,6 +82,20 @@ describe('BookmarkManager', () => {
       expect(bookmarks[0].timestamp).toBe(120); // from deps.core.status.currentTime
     });
 
+    it('should ignore invalid endTimestamp values in add options', async () => {
+      await manager.addBookmark('NaN end', 10, undefined, undefined, { endTimestamp: Number.NaN });
+      await manager.addBookmark('Over max end', 20, undefined, undefined, {
+        endTimestamp: 86400 * 365 + 1,
+      });
+      await manager.addBookmark('Before start end', 30, undefined, undefined, { endTimestamp: 29 });
+
+      const bookmarks = manager.getAllBookmarks();
+      expect(bookmarks).toHaveLength(3);
+      expect(bookmarks[0].endTimestamp).toBeUndefined();
+      expect(bookmarks[1].endTimestamp).toBeUndefined();
+      expect(bookmarks[2].endTimestamp).toBeUndefined();
+    });
+
     it('should save bookmarks to preferences after adding', async () => {
       await manager.addBookmark('Save Test', 10);
       expect(deps.preferences.set).toHaveBeenCalledWith(
@@ -595,6 +609,23 @@ describe('BookmarkManager', () => {
         timestamp: 300,
       });
     });
+
+    it('should ignore non-numeric resume position values loaded from preferences', () => {
+      (deps.preferences.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
+        if (key === 'resumePositions') return JSON.stringify({ '/test/video.mp4': '300' });
+        return null;
+      });
+      (deps.event.on as ReturnType<typeof vi.fn>).mockClear();
+      void new BookmarkManager(deps);
+      const fileLoadedHandler = findHandler(deps.event.on, 'iina.file-loaded');
+      (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+      fileLoadedHandler({});
+
+      expect(deps.sidebar.postMessage).not.toHaveBeenCalledWith(
+        'RESUME_POSITION',
+        expect.anything(),
+      );
+    });
   });
 
   // ---------------------------------------------------------------
@@ -646,6 +677,35 @@ describe('BookmarkManager', () => {
       expect(manager.getAllBookmarks()).toHaveLength(1);
       expect(manager.getAllBookmarks()[0].title).toBe('Regular');
     });
+
+    it('should clean discarded scratchpad IDs from collections', async () => {
+      await manager.addBookmark('Regular', 100);
+      await manager.addBookmark('Quick', 200);
+      const bookmarks = manager.getAllBookmarks();
+      const regularId = bookmarks[0].id;
+      const scratchpadId = bookmarks[1].id;
+
+      manager.updateBookmark(scratchpadId, { scratchpad: true });
+      manager.createCollection('Scratchpad Collection');
+      const collectionId = (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mock.calls.find(
+        (c: unknown[]) => c[0] === 'COLLECTIONS_UPDATED',
+      )?.[1]?.[0]?.id as string;
+
+      manager.addToCollection([regularId, scratchpadId], collectionId);
+
+      (deps.preferences.set as ReturnType<typeof vi.fn>).mockClear();
+      manager.discardScratchpad([scratchpadId]);
+
+      const savedCollectionsCall = (
+        deps.preferences.set as ReturnType<typeof vi.fn>
+      ).mock.calls.find((c: unknown[]) => c[0] === 'bookmark_collections');
+      expect(savedCollectionsCall).toBeDefined();
+      const savedCollections = JSON.parse(savedCollectionsCall![1] as string) as Array<{
+        id: string;
+        bookmarkIds: string[];
+      }>;
+      expect(savedCollections.find((c) => c.id === collectionId)?.bookmarkIds).toEqual([regularId]);
+    });
   });
 
   // ---------------------------------------------------------------
@@ -696,6 +756,103 @@ describe('BookmarkManager', () => {
         'smart_collections',
         expect.stringContaining('sc-recent'),
       );
+    });
+
+    it('should ignore imported collections with unsafe IDs and sanitize bookmarkIds', () => {
+      const now = new Date().toISOString();
+      (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [],
+        collections: [
+          {
+            id: '../unsafe',
+            name: 'Unsafe Collection',
+            bookmarkIds: ['safe-id'],
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: 'safe-col',
+            name: 'Safe Collection',
+            bookmarkIds: ['safe-id', '../unsafe-id'],
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      });
+
+      const collectionsCall = (
+        deps.sidebar.postMessage as ReturnType<typeof vi.fn>
+      ).mock.calls.find((c: any[]) => c[0] === 'COLLECTIONS_UPDATED');
+      expect(collectionsCall).toBeDefined();
+
+      const payload = collectionsCall![1] as Array<{ id: string; bookmarkIds: string[] }>;
+      expect(payload.some((c) => c.id === '../unsafe')).toBe(false);
+      expect(payload.find((c) => c.id === 'safe-col')?.bookmarkIds).toEqual(['safe-id']);
+    });
+
+    it('should enforce imported collection cap', () => {
+      const now = new Date().toISOString();
+      (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      const importedCollections = Array.from({ length: 250 }, (_, i) => ({
+        id: `col-${i}`,
+        name: `Collection ${i}`,
+        bookmarkIds: [],
+        createdAt: now,
+        updatedAt: now,
+      }));
+
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [],
+        collections: importedCollections,
+      });
+
+      const collectionsCall = (
+        deps.sidebar.postMessage as ReturnType<typeof vi.fn>
+      ).mock.calls.find((c: any[]) => c[0] === 'COLLECTIONS_UPDATED');
+      expect(collectionsCall).toBeDefined();
+
+      const payload = collectionsCall![1] as Array<{ id: string }>;
+      expect(payload.length).toBeLessThanOrEqual(200);
+    });
+
+    it('should ignore imported smart collections with unsafe IDs and invalid filters', () => {
+      const now = new Date().toISOString();
+      (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [],
+        smartCollections: [
+          {
+            id: '../unsafe-sc',
+            name: 'Unsafe SC',
+            filters: { searchTerm: 'x' },
+            createdAt: now,
+            usageCount: 0,
+          },
+          {
+            id: 'safe-sc',
+            name: 'Safe SC',
+            filters: 'invalid-filters',
+            createdAt: now,
+            usageCount: 1,
+          },
+        ],
+      });
+
+      const smartCall = (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mock.calls.find(
+        (c: any[]) => c[0] === 'SMART_COLLECTIONS_UPDATED',
+      );
+      expect(smartCall).toBeDefined();
+
+      const payload = smartCall![1] as Array<{ id: string; filters: Record<string, unknown> }>;
+      expect(payload.some((c) => c.id === '../unsafe-sc')).toBe(false);
+      expect(payload.find((c) => c.id === 'safe-sc')?.filters).toEqual({});
     });
   });
 
@@ -781,6 +938,7 @@ describe('BookmarkManager', () => {
         (c: any[]) => c[0] === 'EXPORT_RESULT',
       );
       expect(exportCall).toBeDefined();
+      expect(exportCall![1].success).toBe(true);
       expect(exportCall![1].format).toBe('json');
 
       const parsed = JSON.parse(exportCall![1].content);
@@ -801,6 +959,7 @@ describe('BookmarkManager', () => {
       const exportCall = (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mock.calls.find(
         (c: any[]) => c[0] === 'EXPORT_RESULT',
       );
+      expect(exportCall![1].success).toBe(true);
       expect(exportCall![1].format).toBe('csv');
 
       const csv: string = exportCall![1].content;
@@ -840,6 +999,26 @@ describe('BookmarkManager', () => {
       const parsed = JSON.parse(exportCall![1].content);
       expect(parsed.version).toBe(2);
       expect(parsed.bookmarks).toEqual([]);
+    });
+
+    it('should return structured error payload when export throws', () => {
+      (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+      vi.spyOn((manager as any).importExport, 'exportJSONv2').mockImplementation(() => {
+        throw new Error('export failed');
+      });
+
+      const handler = findHandler(deps.sidebar.onMessage, 'EXPORT_BOOKMARKS');
+      expect(() => handler({ format: 'json' })).not.toThrow();
+
+      const exportCall = (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mock.calls.find(
+        (c: any[]) => c[0] === 'EXPORT_RESULT',
+      );
+      expect(exportCall).toBeDefined();
+      expect(exportCall![1]).toMatchObject({
+        success: false,
+        format: 'json',
+      });
+      expect(exportCall![1].error).toContain('export failed');
     });
   });
 
@@ -1174,11 +1353,17 @@ describe('BookmarkManager', () => {
   // ---------------------------------------------------------------
   describe('file-based auto-backup', () => {
     it('should write auto-backup file when a bookmark is saved', async () => {
-      await manager.addBookmark('Auto Backup Test', 30);
-      expect(deps.file.write).toHaveBeenCalledWith(
-        '@data/bookmarks-backup.json',
-        expect.stringContaining('"title": "Auto Backup Test"'),
-      );
+      vi.useFakeTimers();
+      try {
+        await manager.addBookmark('Auto Backup Test', 30);
+        vi.advanceTimersByTime(3000);
+        expect(deps.file.write).toHaveBeenCalledWith(
+          '@data/bookmarks-backup.json',
+          expect.stringContaining('"title":"Auto Backup Test"'),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -1213,6 +1398,24 @@ describe('BookmarkManager', () => {
       handler({ data: { title: 'Should Not Apply' } });
 
       expect(manager.getAllBookmarks()[0].title).toBe('Unchanged');
+    });
+
+    it('should sanitize tags and reject invalid endTimestamp', async () => {
+      await manager.addBookmark('Original Title', 10, 'Original desc', ['initial']);
+      const id = manager.getAllBookmarks()[0].id;
+
+      const handler = findHandler(deps.sidebar.onMessage, 'UPDATE_BOOKMARK');
+      handler({
+        id,
+        data: {
+          tags: ['  clean-tag  ', '<b>tag</b>', '', '   ', 42 as unknown as string],
+          endTimestamp: Number.NaN,
+        },
+      });
+
+      const updated = manager.getAllBookmarks()[0];
+      expect(updated.tags).toEqual(['clean-tag', 'tag']);
+      expect(updated.endTimestamp).toBeUndefined();
     });
   });
 

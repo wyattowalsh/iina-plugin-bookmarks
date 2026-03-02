@@ -296,6 +296,57 @@ describe('ExportDialog', () => {
     expect(exportButton.disabled).toBe(true);
   });
 
+  it('should consume EXPORT_RESULT success payload and download content', () => {
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    const createObjectURLMock = vi.fn(() => 'blob:export');
+    const revokeObjectURLMock = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { writable: true, value: createObjectURLMock });
+    Object.defineProperty(URL, 'revokeObjectURL', { writable: true, value: revokeObjectURLMock });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    act(() => {
+      root = ReactDOM.createRoot(container);
+      root.render(
+        <ExportDialog
+          isOpen={true}
+          onClose={onClose}
+          availableTags={[]}
+          postMessage={postMessage}
+        />,
+      );
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            type: 'EXPORT_RESULT',
+            data: {
+              success: true,
+              format: 'json',
+              content: '{"version":2,"bookmarks":[]}',
+            },
+          },
+        }),
+      );
+    });
+
+    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('Export Successful!');
+
+    clickSpy.mockRestore();
+    Object.defineProperty(URL, 'createObjectURL', {
+      writable: true,
+      value: originalCreateObjectURL,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      writable: true,
+      value: originalRevokeObjectURL,
+    });
+  });
+
   it('should have proper aria attributes for a11y', () => {
     act(() => {
       root = ReactDOM.createRoot(container);

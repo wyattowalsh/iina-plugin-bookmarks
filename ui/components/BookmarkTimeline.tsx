@@ -121,8 +121,9 @@ const BookmarkTimeline: React.FC<BookmarkTimelineProps> = ({
   const handleMarkerHover = useCallback((bookmarkId: string | null, e?: React.MouseEvent) => {
     setHoveredId(bookmarkId);
     setHoveredClusterIdx(null);
-    if (bookmarkId && e) {
-      setTooltipPos({ x: e.clientX, y: e.clientY });
+    if (bookmarkId && e && barRef.current) {
+      const rect = barRef.current.getBoundingClientRect();
+      setTooltipPos({ x: e.clientX - rect.left, y: rect.top - e.clientY });
     } else {
       setTooltipPos(null);
     }
@@ -131,8 +132,9 @@ const BookmarkTimeline: React.FC<BookmarkTimelineProps> = ({
   const handleClusterHover = useCallback((idx: number | null, e?: React.MouseEvent) => {
     setHoveredClusterIdx(idx);
     setHoveredId(null);
-    if (idx != null && e) {
-      setTooltipPos({ x: e.clientX, y: e.clientY });
+    if (idx != null && e && barRef.current) {
+      const rect = barRef.current.getBoundingClientRect();
+      setTooltipPos({ x: e.clientX - rect.left, y: rect.top - e.clientY });
     } else {
       setTooltipPos(null);
     }
@@ -280,7 +282,10 @@ const BookmarkTimeline: React.FC<BookmarkTimelineProps> = ({
 
       {/* Tooltip */}
       {tooltipPos && hoveredBookmark && (
-        <div className="timeline-tooltip" style={{ left: tooltipPos.x, top: tooltipPos.y }}>
+        <div
+          className="timeline-tooltip"
+          style={{ left: tooltipPos.x, bottom: '100%', marginBottom: 8 }}
+        >
           <div className="tooltip-title">{hoveredBookmark.title}</div>
           <div className="tooltip-time">
             {formatTime(hoveredBookmark.timestamp)}
@@ -295,7 +300,10 @@ const BookmarkTimeline: React.FC<BookmarkTimelineProps> = ({
 
       {/* Cluster tooltip */}
       {tooltipPos && hoveredClusterIdx != null && clusters[hoveredClusterIdx] && (
-        <div className="timeline-tooltip" style={{ left: tooltipPos.x, top: tooltipPos.y }}>
+        <div
+          className="timeline-tooltip"
+          style={{ left: tooltipPos.x, bottom: '100%', marginBottom: 8 }}
+        >
           <div className="tooltip-title">{clusters[hoveredClusterIdx].count} bookmarks</div>
           {clusters[hoveredClusterIdx].bookmarks.slice(0, 5).map((b) => (
             <div key={b.id} className="tooltip-time">

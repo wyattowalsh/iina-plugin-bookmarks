@@ -12,6 +12,7 @@ import { validateBookmarkArray } from './utils/validation';
 
 export class BookmarkPersistence {
   private readonly STORAGE_KEY = 'bookmarks';
+  private backupTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private preferences: IINAPreferences,
@@ -48,6 +49,7 @@ export class BookmarkPersistence {
         this.preferences.set(`${this.STORAGE_KEY}_backup`, currentData);
       }
       this.preferences.set(this.STORAGE_KEY, JSON.stringify(bookmarks));
+      this.preferences.sync?.();
       this.console.log('Bookmarks saved');
     } catch (error) {
       this.console.error(`Error saving bookmarks: ${errorMessage(error)}`);
@@ -56,11 +58,16 @@ export class BookmarkPersistence {
 
   saveAutoBackup(bookmarks: BookmarkData[]): void {
     if (!this.file) return;
-    try {
-      this.file.write('@data/bookmarks-backup.json', JSON.stringify(bookmarks, null, 2));
-    } catch (error) {
-      this.console.warn(`[BookmarkPersistence] Auto-backup write failed: ${errorMessage(error)}`);
-    }
+    if (this.backupTimer) clearTimeout(this.backupTimer);
+    const data = JSON.stringify(bookmarks);
+    this.backupTimer = setTimeout(() => {
+      try {
+        this.file!.write('@data/bookmarks-backup.json', data);
+      } catch (error) {
+        this.console.warn(`[BookmarkPersistence] Auto-backup write failed: ${errorMessage(error)}`);
+      }
+      this.backupTimer = null;
+    }, 3000);
   }
 
   recover(): BookmarkData[] | null {

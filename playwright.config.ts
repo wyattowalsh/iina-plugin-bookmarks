@@ -27,7 +27,7 @@ export default defineConfig({
     },
     {
       name: 'overlay',
-      testMatch: /overlay|shared|visual/,
+      testMatch: /overlay|visual/,
       use: {
         ...devices['Desktop Safari'],
         baseURL: 'http://localhost:1235',
@@ -36,7 +36,7 @@ export default defineConfig({
     },
     {
       name: 'window',
-      testMatch: /window|shared|visual/,
+      testMatch: /window|visual/,
       use: {
         ...devices['Desktop Safari'],
         baseURL: 'http://localhost:1236',

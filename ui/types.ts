@@ -10,7 +10,10 @@ export type {
   PlaybackStatus,
   ChapterInfo,
   ImportResult,
+  ExportFormat,
+  ExportResult,
 } from '../src/types';
+export { normalizeExportResult } from '../src/types';
 
 export interface AppWindow extends Window {
   iina?: {

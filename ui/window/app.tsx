@@ -30,6 +30,7 @@ import {
   SmartCollection,
   PlaybackStatus,
   AppWindow,
+  normalizeExportResult,
 } from '../types';
 import { formatTime, formatDate, formatRelativeTime } from '../utils/formatTime';
 
@@ -168,8 +169,12 @@ const App: React.FC = () => {
       IMPORT_RESULT: (data: any) => {
         window.postMessage({ type: 'IMPORT_RESULT', data }, window.location.origin);
       },
-      EXPORT_RESULT: (data: any) => {
-        window.postMessage({ type: 'EXPORT_RESULT', data }, window.location.origin);
+      EXPORT_RESULT: (data: unknown) => {
+        const result = normalizeExportResult(data);
+        if (!result.success) {
+          showErrorRef.current('Export Failed', result.error);
+        }
+        window.postMessage({ type: 'EXPORT_RESULT', data: result }, window.location.origin);
       },
       BOOKMARK_DEFAULTS: (data: any) => {
         window.postMessage({ type: 'BOOKMARK_DEFAULTS', data }, window.location.origin);
@@ -499,9 +504,12 @@ const App: React.FC = () => {
     });
   };
 
-  const postMessage = (type: string, data?: any) => {
-    appWindow.iina?.postMessage?.(type, data);
-  };
+  const postMessage = useCallback(
+    (type: string, data?: any) => {
+      appWindow.iina?.postMessage?.(type, data);
+    },
+    [appWindow],
+  );
 
   // Find adjacent bookmarks for navigation
   const adjacentBookmarks = useMemo(() => {
@@ -548,7 +556,7 @@ const App: React.FC = () => {
         onClose={() => setShowAddDialog(false)}
         onSave={handleSaveBookmark}
         availableTags={availableTags}
-        postMessage={appWindow.iina?.postMessage}
+        postMessage={postMessage}
       />
 
       <ImportDialog

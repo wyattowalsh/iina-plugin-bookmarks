@@ -82,8 +82,21 @@ test.describe('Sidebar Bookmark Display and Interaction', () => {
     await expect(page.locator('.bookmark-item')).toHaveCount(2);
   });
 
-  test('clicking bookmark sends JUMP_TO_BOOKMARK message', async () => {
-    test.skip(true, 'Outbound iina.postMessage capture unreliable in WebKit E2E');
+  test('clicking bookmark sends JUMP_TO_BOOKMARK message', async ({ page, harness }) => {
+    const bookmarks = makeBookmarksForFile(TEST_FILE_A, 2);
+    await harness.sendBookmarks(bookmarks);
+    await expect(page.locator('.bookmark-item')).toHaveCount(2);
+    await harness.clearOutbound();
+
+    await page.locator('.bookmark-item').first().click();
+    await page.waitForFunction(() => {
+      const outbound = (window as unknown as { __iinaOutbound?: Array<{ type?: string }> })
+        .__iinaOutbound;
+      return Array.isArray(outbound) && outbound.some((m) => m.type === 'JUMP_TO_BOOKMARK');
+    });
+
+    const jumpMessage = await harness.getLastOutbound('JUMP_TO_BOOKMARK');
+    expect(jumpMessage?.data).toEqual({ id: bookmarks[0].id });
   });
 
   test('search filters bookmarks by title', async ({ page, harness }) => {
@@ -145,24 +158,20 @@ test.describe('Sidebar Bookmark Display and Interaction', () => {
     ];
     await harness.sendBookmarks(bookmarks);
 
-    // Find sort dropdown/button (implementation-specific selector)
     const sortButton = page.locator('[aria-label*="Sort"]').or(page.locator('.sort-control'));
-
-    if ((await sortButton.count()) > 0) {
-      await sortButton.click();
-
-      // Select title sort
-      const titleOption = page.locator('text="Title"').or(page.locator('[data-sort="title"]'));
-      if ((await titleOption.count()) > 0) {
-        await titleOption.click();
-
-        // Verify order changed
-        const firstItemTitle = await page.locator('.bookmark-item').first().textContent();
-        expect(firstItemTitle).toContain('A First');
-      }
-    } else {
-      test.skip();
+    if ((await sortButton.count()) === 0) {
+      test.skip(true, 'Sort control not available in current UI');
     }
+    await sortButton.first().click();
+
+    const titleOption = page.locator('text="Title"').or(page.locator('[data-sort="title"]'));
+    if ((await titleOption.count()) === 0) {
+      test.skip(true, 'Sort option controls not available in current UI');
+    }
+    await titleOption.first().click();
+
+    const firstItemTitle = await page.locator('.bookmark-item').first().textContent();
+    expect(firstItemTitle).toContain('A First');
   });
 
   test('advanced search toggle expands search panel', async ({ page, harness }) => {
@@ -170,16 +179,12 @@ test.describe('Sidebar Bookmark Display and Interaction', () => {
     await harness.sendBookmarks(bookmarks);
 
     const toggle = page.locator('.advanced-search-toggle');
-
     if ((await toggle.count()) > 0) {
       await toggle.click();
-
-      // Verify expanded state — AdvancedSearch renders with class "advanced-search"
-      const advancedPanel = page.locator('.advanced-search');
-      await expect(advancedPanel).toBeVisible();
-    } else {
-      test.skip();
     }
+
+    const advancedPanel = page.locator('.advanced-search');
+    await expect(advancedPanel).toBeVisible();
   });
 
   test('advanced search query filters by tag', async ({ page, harness }) => {
@@ -189,16 +194,15 @@ test.describe('Sidebar Bookmark Display and Interaction', () => {
     ];
     await harness.sendBookmarks(bookmarks);
 
-    // Toggle advanced search mode first
+    // Toggle advanced search mode when available
     const toggle = page.locator('.advanced-search-toggle');
-    if ((await toggle.count()) === 0) {
-      test.skip(true, 'Advanced search toggle not available');
-      return;
+    if ((await toggle.count()) > 0) {
+      await toggle.click();
     }
-    await toggle.click();
 
     // Type in the advanced search input
-    const searchInput = page.locator('.advanced-search-input');
+    const searchInput = page.locator('.advanced-search-input').first();
+    await expect(searchInput).toBeVisible();
     await searchInput.fill('tag:important');
 
     // Only tagged bookmark should show

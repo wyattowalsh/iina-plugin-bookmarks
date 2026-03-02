@@ -399,11 +399,17 @@ describe('Input Validation via BookmarkManager', () => {
 
       // Path should remain unchanged
       expect(manager.getAllBookmarks()[0].filepath).toBe('/test/video.mp4');
-      // Verify update was not applied (no FILE_RECONCILIATION_RESULT success message)
-      const resultCalls = (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mock.calls.filter(
-        (c: any[]) => c[0] === 'FILE_RECONCILIATION_RESULT',
-      );
-      expect(resultCalls).toHaveLength(0);
+      const result = (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mock.calls
+        .slice()
+        .reverse()
+        .find((c: any[]) => c[0] === 'FILE_RECONCILIATION_RESULT')?.[1];
+      expect(result).toMatchObject({
+        success: false,
+        action: 'update_path',
+        bookmarkId: id,
+        newPath: '',
+      });
+      expect(result.message).toContain('new path');
     });
 
     it('should reject paths that do not start with /', async () => {
@@ -414,6 +420,17 @@ describe('Input Validation via BookmarkManager', () => {
       handler({ action: 'update_path', bookmarkId: id, newPath: 'relative/path.mp4' });
 
       expect(manager.getAllBookmarks()[0].filepath).toBe('/test/video.mp4');
+      const result = (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mock.calls
+        .slice()
+        .reverse()
+        .find((c: any[]) => c[0] === 'FILE_RECONCILIATION_RESULT')?.[1];
+      expect(result).toMatchObject({
+        success: false,
+        action: 'update_path',
+        bookmarkId: id,
+        newPath: 'relative/path.mp4',
+      });
+      expect(result.message).toContain('Invalid new path');
     });
 
     it('should accept valid absolute paths', async () => {

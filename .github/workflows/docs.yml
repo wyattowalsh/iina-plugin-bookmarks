@@ -3,10 +3,18 @@ name: Documentation Build
 on:
   push:
     branches: [ main ]
-    paths: [ 'docs/**' ]
+    paths:
+      - 'docs/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'Info.json'
   pull_request:
     branches: [ main ]
-    paths: [ 'docs/**' ]
+    paths:
+      - 'docs/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'Info.json'
 
 permissions:
   contents: read
@@ -15,6 +23,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: docs
 
     steps:
       - name: Checkout
@@ -30,18 +41,13 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: |
-          cd docs
-          pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build documentation
-        run: |
-          cd docs
-          pnpm run build
+        run: pnpm run build
 
       - name: Test build
         run: |
-          cd docs
           pnpm run start &
           SERVER_PID=$!
           for i in $(seq 1 30); do

@@ -1,7 +1,7 @@
 {
   "name": "Bookmarks",
   "identifier": "com.wyattowalsh.iina-plugin-bookmarks",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "iina plugin for user-friendly media bookmark management that allows users to easily add, edit, and organize bookmarks within their media player.",
   "author": {
     "name": "Wyatt Walsh",

@@ -13,7 +13,7 @@ import { ProjectStats } from '@/components/ProjectStats';
 
 # IINA Plugin Bookmarks
 
-**IINA Plugin Bookmarks** is a bookmark management system for the IINA media player. It provides bookmark creation, organization with tags and filtering, data import/export, and cloud sync capabilities.
+**IINA Plugin Bookmarks** is a bookmark management system for the IINA media player. It provides bookmark creation, organization with tags and filtering, and JSON/CSV data import/export.
 
 ## ✨ Key Features
 
@@ -52,14 +52,12 @@ import { ProjectStats } from '@/components/ProjectStats';
   </Card>
 
   <Card
-    title="☁️ Cloud Sync"
+    title="☁️ Cloud Sync (Planned)"
     href="/docs/features/cloud-sync"
-    description="Sync bookmarks across devices"
+    description="Documentation preview for planned sync providers"
   >
-    - Google Drive support
-    - Dropbox support
-    - Upload, download, and bidirectional sync
-    - Conflict resolution
+    - Provider integrations are not in the current release
+    - Use JSON/CSV export and import for backup/transfer today
   </Card>
 
   <Card
@@ -83,17 +81,17 @@ import { ProjectStats } from '@/components/ProjectStats';
       <Tab value="macOS">
         ```bash
         # Download the latest release
-        curl -L -o bookmarks.iinaplgz https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest/download/iina-plugin-bookmarks.iinaplgz
+        curl -L -o iina-plugin-bookmarks.iinaplgz https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest/download/iina-plugin-bookmarks.iinaplgz
         
         # Install in IINA
-        open bookmarks.iinaplgz
+        open iina-plugin-bookmarks.iinaplgz
         ```
       </Tab>
       <Tab value="Manual Install">
         ```bash
         # Extract to IINA plugins directory
-        mkdir -p ~/.config/iina/plugins/
-        unzip iina-plugin-bookmarks.iinaplgz -d ~/.config/iina/plugins/bookmarks/
+        mkdir -p ~/Library/Application\ Support/com.colliderli.iina/plugins/
+        unzip iina-plugin-bookmarks.iinaplgz -d ~/Library/Application\ Support/com.colliderli.iina/plugins/iina-plugin-bookmarks.iinaplugin
         ```
       </Tab>
     </Tabs>
@@ -106,17 +104,15 @@ import { ProjectStats } from '@/components/ProjectStats';
   <Step>
     **Configuration**
     
-    Access plugin settings through multiple interfaces:
+    Access plugin settings through:
     
     - **IINA Preferences** → Plugins → Bookmarks
-    - **Plugin Menu** → Manage Bookmarks 
-    - **Sidebar** → Settings button
+    - **Plugin Menu** → Manage Bookmarks
     
-    Key settings to configure:
+    Common preferences:
     - Auto-save behavior
-    - Default sort preferences  
     - Maximum bookmark limits
-    - Timestamp display format
+    - Automatic file reconciliation
   </Step>
   
   <Step>
@@ -132,7 +128,7 @@ import { ProjectStats } from '@/components/ProjectStats';
         Click the **"➕ Add Bookmark"** button in the sidebar
       </Tab>
       <Tab value="Keyboard">
-        Use the configurable keyboard shortcut (default: `Cmd+B`)
+        Use the global quick-bookmark shortcut (default: `Ctrl+B`)
       </Tab>
     </Tabs>
   </Step>
@@ -254,7 +250,7 @@ class BookmarkManager {
   - **BookmarkManager** orchestrates all operations
   - **BookmarkPersistence** handles storage
   - **BookmarkImportExport** manages data transformation
-  - **CloudSyncHandler** coordinates cloud operations
+  - Collection and smart-collection logic is handled inside `BookmarkManager`
 </Callout>
 
 ## 🆘 Support & Community
@@ -300,6 +296,7 @@ class BookmarkManager {
 <Callout type="tip" title="Quick Links">
   - **[GitHub Repository](https://github.com/wyattowalsh/iina-plugin-bookmarks)** - Source code and releases
   - **[Latest Release](https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest)** - Download the plugin
+  - **[Release Notes](https://github.com/wyattowalsh/iina-plugin-bookmarks/blob/main/CHANGELOG.md)** - Track release changes and upcoming updates
   - **[Development Roadmap](https://github.com/wyattowalsh/iina-plugin-bookmarks/projects)** - Upcoming features
   - **[API Documentation](/docs/api/bookmark-manager)** - Technical reference
 </Callout>

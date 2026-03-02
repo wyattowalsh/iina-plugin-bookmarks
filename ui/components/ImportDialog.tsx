@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BookmarkData, ImportResult } from '../types';
+import { BookmarkData, BookmarkCollection, SmartCollection, ImportResult } from '../types';
 import { handleDialogKeyDown } from '../utils/focusTrap';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useWindowMessage } from '../hooks/useWindowMessage';
@@ -17,6 +17,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileFormat, setFileFormat] = useState<'json' | 'csv' | null>(null);
   const [parsedData, setParsedData] = useState<BookmarkData[]>([]);
+  const [parsedCollections, setParsedCollections] = useState<BookmarkCollection[]>([]);
+  const [parsedSmartCollections, setParsedSmartCollections] = useState<SmartCollection[]>([]);
   const [importOptions, setImportOptions] = useState({
     duplicateHandling: 'skip' as 'skip' | 'replace' | 'merge',
     validateData: true,
@@ -169,6 +171,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
       bookmarks = parsed;
     } else if (parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
       bookmarks = parsed.bookmarks;
+      // Preserve collections from v2 format
+      if (Array.isArray(parsed.collections)) {
+        setParsedCollections(parsed.collections);
+      }
+      if (Array.isArray(parsed.smartCollections)) {
+        setParsedSmartCollections(parsed.smartCollections);
+      }
     } else {
       throw new Error(
         'Invalid JSON format. Expected array of bookmarks or object with bookmarks array.',
@@ -322,6 +331,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({ isOpen, onClose, postMessag
     postMessage?.('IMPORT_BOOKMARKS', {
       bookmarks: parsedData,
       options: importOptions,
+      ...(parsedCollections.length > 0 && { collections: parsedCollections }),
+      ...(parsedSmartCollections.length > 0 && { smartCollections: parsedSmartCollections }),
     });
   };
 

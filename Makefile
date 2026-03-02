@@ -7,6 +7,7 @@ PACKAGE_DIR := packaging
 BUILD_DIR := dist
 PLUGIN_DIR := $(PACKAGE_DIR)/$(PLUGIN_NAME).iinaplugin
 PLUGIN_ARCHIVE := $(PACKAGE_DIR)/$(PLUGIN_NAME).iinaplgz
+RELEASE_TAG ?=
 
 # Build Tools
 NPM := pnpm
@@ -38,7 +39,9 @@ help:
 	@echo "  $(GREEN)clean$(RESET)          - Remove build artifacts and packages"
 	@echo "  $(GREEN)dev$(RESET)            - Start development servers for UI components"
 	@echo "  $(GREEN)test$(RESET)           - Run test suite"
+	@echo "  $(GREEN)test-coverage$(RESET)  - Run tests with coverage"
 	@echo "  $(GREEN)test-e2e$(RESET)       - Run E2E tests with Playwright"
+	@echo "  $(GREEN)test-e2e-release$(RESET) - Run release-critical E2E lane"
 	@echo "  $(GREEN)test-watch$(RESET)     - Run tests in watch mode"
 	@echo "  $(GREEN)lint$(RESET)           - Run ESLint"
 	@echo "  $(GREEN)lint-fix$(RESET)       - Run ESLint with auto-fix"
@@ -47,9 +50,10 @@ help:
 	@echo "  $(GREEN)type-check$(RESET)     - Run TypeScript type checking"
 	@echo "  $(GREEN)install$(RESET)        - Install dependencies"
 	@echo "  $(GREEN)validate$(RESET)       - Validate plugin structure and configuration"
+	@echo "  $(GREEN)validate-artifact$(RESET) - Validate release archive integrity"
 	@echo "  $(GREEN)link$(RESET)           - Build and symlink plugin for IINA dev loading"
 	@echo "  $(GREEN)unlink$(RESET)         - Remove dev plugin symlink"
-	@echo "  $(GREEN)release$(RESET)        - Clean, build, package, test, and validate"
+	@echo "  $(GREEN)release$(RESET)        - Clean install plus canonical release checks"
 	@echo "  $(GREEN)help$(RESET)           - Show this help message"
 
 # Install dependencies
@@ -87,6 +91,8 @@ package: build
 	
 	@echo "$(CYAN)  → Copying build artifacts...$(RESET)"
 	cp -r $(BUILD_DIR)/* $(PLUGIN_DIR)/
+	@echo "$(CYAN)  → Stripping source maps...$(RESET)"
+	find $(PLUGIN_DIR) -name "*.map" -delete
 	cp Info.json $(PLUGIN_DIR)/
 	cp LICENSE $(PLUGIN_DIR)/
 	
@@ -94,6 +100,7 @@ package: build
 	cp preferences.html $(PLUGIN_DIR)/ 2>/dev/null || true
 	
 	@echo "$(CYAN)  → Creating archive...$(RESET)"
+	rm -f $(PLUGIN_ARCHIVE)
 	cd $(PLUGIN_DIR) && zip -r ../$(PLUGIN_NAME).iinaplgz . -x ".*"
 	
 	@echo "$(GREEN)✓ Package created: $(PLUGIN_ARCHIVE)$(RESET)"
@@ -117,7 +124,13 @@ dev:
 .PHONY: test
 test:
 	@echo "$(BLUE)Running tests...$(RESET)"
-	$(NPM) run test -- --run
+	$(NPM) run test --run
+
+# Run tests with coverage
+.PHONY: test-coverage
+test-coverage:
+	@echo "$(BLUE)Running tests with coverage...$(RESET)"
+	$(NPM) run test:coverage
 
 # Run E2E tests
 .PHONY: test-e2e
@@ -126,6 +139,14 @@ test-e2e:
 	@pnpm exec playwright --version >/dev/null 2>&1 || \
 		(echo "$(YELLOW)Playwright not installed. Run 'pnpm exec playwright install --with-deps webkit' first.$(RESET)" && exit 1)
 	$(NPM) run test:e2e
+
+# Run release-critical E2E lane
+.PHONY: test-e2e-release
+test-e2e-release:
+	@echo "$(BLUE)Running release-critical E2E lane...$(RESET)"
+	@pnpm exec playwright --version >/dev/null 2>&1 || \
+		(echo "$(YELLOW)Playwright not installed. Run 'pnpm exec playwright install --with-deps webkit' first.$(RESET)" && exit 1)
+	CI=1 $(NPM) exec playwright test e2e/sidebar/sidebar-bookmarks.spec.ts --project=sidebar -g "clicking bookmark sends JUMP_TO_BOOKMARK message"
 
 # Run tests in watch mode
 .PHONY: test-watch
@@ -188,9 +209,56 @@ validate:
 	
 	@echo "$(GREEN)✓ Plugin structure validation passed$(RESET)"
 
+# Validate release artifact
+.PHONY: validate-artifact
+validate-artifact:
+	@echo "$(BLUE)Validating release artifact...$(RESET)"
+	@test -f $(PLUGIN_ARCHIVE) || (echo "$(RED)✗ Package missing: $(PLUGIN_ARCHIVE)$(RESET)" && exit 1)
+	@test -s $(PLUGIN_ARCHIVE) || (echo "$(RED)✗ Package is empty: $(PLUGIN_ARCHIVE)$(RESET)" && exit 1)
+	@unzip -tq $(PLUGIN_ARCHIVE) > /dev/null || (echo "$(RED)✗ Package archive integrity check failed$(RESET)" && exit 1)
+	@ARCHIVE_FILES=$$(unzip -Z1 $(PLUGIN_ARCHIVE)); \
+		echo "$$ARCHIVE_FILES" | grep -qx "Info.json" || (echo "$(RED)✗ Package missing Info.json$(RESET)" && exit 1); \
+		echo "$$ARCHIVE_FILES" | grep -qx "index.js" || (echo "$(RED)✗ Package missing index.js$(RESET)" && exit 1); \
+		echo "$$ARCHIVE_FILES" | grep -qx "ui/sidebar/index.html" || (echo "$(RED)✗ Package missing ui/sidebar/index.html$(RESET)" && exit 1); \
+		echo "$$ARCHIVE_FILES" | grep -qx "ui/overlay/index.html" || (echo "$(RED)✗ Package missing ui/overlay/index.html$(RESET)" && exit 1); \
+		echo "$$ARCHIVE_FILES" | grep -qx "ui/window/index.html" || (echo "$(RED)✗ Package missing ui/window/index.html$(RESET)" && exit 1); \
+		if echo "$$ARCHIVE_FILES" | grep -q '\.map$$'; then \
+			echo "$(RED)✗ Package contains source maps$(RESET)"; \
+			exit 1; \
+		fi
+	@echo "$(GREEN)✓ Release artifact validation passed$(RESET)"
+
+# Canonical release artifact path
+.PHONY: release-artifact
+release-artifact: build package validate validate-artifact
+
+# Guard release context
+.PHONY: release-guard
+release-guard:
+	@echo "$(BLUE)Validating release context...$(RESET)"
+	@if [ -n "$(GITHUB_EVENT_NAME)" ] || [ -n "$(GITHUB_REF_TYPE)" ] || [ -n "$(GITHUB_REF_NAME)" ]; then \
+		if [ "$(GITHUB_EVENT_NAME)" != "push" ] || [ "$(GITHUB_REF_TYPE)" != "tag" ] || ! echo "$(GITHUB_REF_NAME)" | grep -Eq '^v'; then \
+			echo "$(RED)✗ Release publishing is only allowed for push tag refs matching v* (got $(GITHUB_REF_NAME))$(RESET)"; \
+			exit 1; \
+		fi; \
+	fi
+	@if [ -n "$(RELEASE_TAG)" ]; then \
+		echo "$(RELEASE_TAG)" | grep -Eq '^v' || (echo "$(RED)✗ RELEASE_TAG must start with v (got $(RELEASE_TAG))$(RESET)" && exit 1); \
+		INFO_VERSION=$$(node -p "require('./Info.json').version"); \
+		if [ "v$$INFO_VERSION" != "$(RELEASE_TAG)" ]; then \
+			echo "$(RED)✗ RELEASE_TAG $(RELEASE_TAG) does not match Info.json version v$$INFO_VERSION$(RESET)"; \
+			exit 1; \
+		fi; \
+	fi
+	@echo "$(GREEN)✓ Release guard checks passed$(RESET)"
+
+# Canonical release validation path
+.PHONY: release-run
+release-run: release-guard lint type-check test-e2e-release test-coverage release-artifact
+
 # Full release process
 .PHONY: release
-release: clean install lint type-check test test-e2e build package validate
+release: clean install release-run
 	@echo ""
 	@echo "$(GREEN)🎉 Release complete!$(RESET)"
 	@echo "$(CYAN)Plugin package: $(PLUGIN_ARCHIVE)$(RESET)"
@@ -207,8 +275,10 @@ quick-package:
 	rm -rf $(PLUGIN_DIR)
 	mkdir -p $(PLUGIN_DIR)
 	cp -r $(BUILD_DIR)/* $(PLUGIN_DIR)/
+	find $(PLUGIN_DIR) -name "*.map" -delete
 	cp Info.json $(PLUGIN_DIR)/
 	cp LICENSE $(PLUGIN_DIR)/
+	rm -f $(PLUGIN_ARCHIVE)
 	cd $(PLUGIN_DIR) && zip -r ../$(PLUGIN_NAME).iinaplgz . -x ".*"
 	@echo "$(GREEN)✓ Quick package created: $(PLUGIN_ARCHIVE)$(RESET)"
 

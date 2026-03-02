@@ -28,7 +28,7 @@ export function findHandler(uiMock: any, messageType: string): (data: any) => vo
 export function createMockDeps(overrides: Record<string, any> = {}): IINARuntimeDependencies {
   return {
     console: { log: vi.fn(), error: vi.fn(), warn: vi.fn() },
-    preferences: { get: vi.fn().mockReturnValue(null), set: vi.fn() },
+    preferences: { get: vi.fn().mockReturnValue(null), set: vi.fn(), sync: vi.fn() },
     core: {
       status: { path: '/test/video.mp4', currentTime: 120, duration: 3600, position: 120 },
       window: { loaded: true },

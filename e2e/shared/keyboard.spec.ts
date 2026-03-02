@@ -35,20 +35,38 @@ test.describe('Keyboard and Accessibility Tests', () => {
     // Start tabbing
     await page.keyboard.press('Tab');
 
-    // Check if focus is visible on any interactive element
-    const focusedElement = page.locator(':focus');
-    await expect(focusedElement).toBeVisible();
+    // Verify focus landed on an interactive element within the app
+    const focused = page.locator(':focus');
+    await expect(focused).toBeVisible();
+    const tagName = await focused.evaluate((el) => el.tagName.toLowerCase());
+    expect(['button', 'input', 'a', 'div', 'li'].includes(tagName)).toBe(true);
 
-    // Tab through items
+    // Tab again and verify focus moved to a different element
+    const firstFocusedText = await focused.textContent();
     await page.keyboard.press('Tab');
-    await page.keyboard.press('Tab');
-
-    // Verify focus still visible
-    await expect(focusedElement).toBeVisible();
+    const focused2 = page.locator(':focus');
+    await expect(focused2).toBeVisible();
+    const secondFocusedText = await focused2.textContent();
+    expect(secondFocusedText).not.toBe(firstFocusedText);
   });
 
-  test('Enter key activates focused bookmark', async () => {
-    test.skip(true, 'Outbound iina.postMessage capture unreliable in WebKit E2E');
+  test('Enter key activates focused bookmark', async ({ page, harness }) => {
+    const bookmarks = makeBookmarksForFile(TEST_FILE_A, 2);
+    await harness.sendBookmarks(bookmarks);
+    await expect(page.locator('.bookmark-item')).toHaveCount(2);
+    await harness.clearOutbound();
+
+    await page.locator('.bookmark-item').first().focus();
+    await page.keyboard.press('Enter');
+
+    await page.waitForFunction(() => {
+      const outbound = (window as unknown as { __iinaOutbound?: Array<{ type?: string }> })
+        .__iinaOutbound;
+      return Array.isArray(outbound) && outbound.some((m) => m.type === 'JUMP_TO_BOOKMARK');
+    });
+
+    const jumpMessage = await harness.getLastOutbound('JUMP_TO_BOOKMARK');
+    expect(jumpMessage?.data).toEqual({ id: bookmarks[0].id });
   });
 
   test('advanced search toggle responds to keyboard activation', async ({ page, harness }) => {
@@ -56,29 +74,15 @@ test.describe('Keyboard and Accessibility Tests', () => {
     await harness.sendBookmarks(bookmarks);
 
     const toggle = page.locator('.advanced-search-toggle');
-    const toggleCount = await toggle.count();
-
-    if (toggleCount > 0) {
-      // Focus toggle
-      await toggle.focus();
-
-      // Press Enter or Space
-      await page.keyboard.press('Enter');
-
-      // Verify expanded — AdvancedSearch renders with class "advanced-search"
-      const advancedPanel = page.locator('.advanced-search');
-      const panelCount = await advancedPanel.count();
-
-      if (panelCount > 0) {
-        await expect(advancedPanel).toBeVisible();
-      } else {
-        // Check if toggle state changed
-        const ariaExpanded = await toggle.getAttribute('aria-expanded');
-        expect(ariaExpanded).toBe('true');
-      }
-    } else {
-      test.skip();
+    if ((await toggle.count()) === 0) {
+      test.skip(true, 'Advanced search toggle not available in this UI');
     }
+    await expect(toggle).toBeVisible();
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+
+    const advancedPanel = page.locator('.advanced-search');
+    await expect(advancedPanel).toBeVisible();
   });
 
   test('Space key also activates advanced search toggle', async ({ page, harness }) => {
@@ -86,27 +90,14 @@ test.describe('Keyboard and Accessibility Tests', () => {
     await harness.sendBookmarks(bookmarks);
 
     const toggle = page.locator('.advanced-search-toggle');
-    const toggleCount = await toggle.count();
-
-    if (toggleCount > 0) {
-      // Focus toggle
-      await toggle.focus();
-
-      // Press Space
-      await page.keyboard.press('Space');
-
-      // Verify expanded
-      const advancedPanel = page.locator('.advanced-search');
-      const panelCount = await advancedPanel.count();
-
-      if (panelCount > 0) {
-        await expect(advancedPanel).toBeVisible();
-      } else {
-        const ariaExpanded = await toggle.getAttribute('aria-expanded');
-        expect(ariaExpanded).toBe('true');
-      }
-    } else {
-      test.skip();
+    if ((await toggle.count()) === 0) {
+      test.skip(true, 'Advanced search toggle not available in this UI');
     }
+    await expect(toggle).toBeVisible();
+    await toggle.focus();
+    await page.keyboard.press('Space');
+
+    const advancedPanel = page.locator('.advanced-search');
+    await expect(advancedPanel).toBeVisible();
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TagInput from './TagInput';
 import Loading from './Loading';
 import BookmarkColorPicker from './BookmarkColorPicker';
@@ -62,11 +62,22 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
   const [subtitleText, setSubtitleText] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingDefaults, setLoadingDefaults] = useState(false);
+  const postMessageRef = useRef(postMessage);
+  const requestedDefaultsForOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen && postMessage) {
+    postMessageRef.current = postMessage;
+
+    if (!isOpen) {
+      requestedDefaultsForOpenRef.current = false;
+      setLoadingDefaults(false);
+      return;
+    }
+
+    if (!requestedDefaultsForOpenRef.current && postMessageRef.current) {
+      requestedDefaultsForOpenRef.current = true;
       setLoadingDefaults(true);
-      postMessage('REQUEST_BOOKMARK_DEFAULTS');
+      postMessageRef.current('REQUEST_BOOKMARK_DEFAULTS');
     }
   }, [isOpen, postMessage]);
 
@@ -85,6 +96,7 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
   useWindowMessage('BOOKMARK_DEFAULTS', handleBookmarkDefaults, isOpen);
 
   const handleClose = useCallback(() => {
+    requestedDefaultsForOpenRef.current = false;
     onClose();
     setTitle('');
     setDescription('');

@@ -141,7 +141,7 @@ test.describe('Sidebar Dialog Interactions', () => {
     const toast = page.locator('.toast-container');
     await expect(toast).toBeVisible();
 
-    // Wait for toast to disappear (typically 3-5 seconds)
-    await expect(toast).not.toBeVisible({ timeout: 10000 });
+    // Wait for toast to disappear (error toasts have 8s duration + 300ms exit animation)
+    await expect(toast).not.toBeVisible({ timeout: 15000 });
   });
 });

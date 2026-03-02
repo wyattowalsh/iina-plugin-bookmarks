@@ -1,46 +1,82 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Page } from '@playwright/test';
 
+function installIinaBridge(): void {
+  const w = window as any;
+  if (w.__iinaHarnessInstalled) return;
+  w.__iinaHarnessInstalled = true;
+
+  // Record outbound messages for test assertion
+  w.__iinaOutbound = [] as Array<{ type: string; data: any }>;
+  const inboundHandlers: Record<string, Array<(data: any) => void>> = {};
+  const pendingInbound: Array<{ type: string; data: any }> = [];
+
+  const deliverInbound = (type: string, data: any) => {
+    const handlers = inboundHandlers[type];
+    if (!handlers || handlers.length === 0) {
+      pendingInbound.push({ type, data });
+      return;
+    }
+    handlers.forEach((handler) => handler(data));
+  };
+
+  w.__iinaDeliverInbound = deliverInbound;
+
+  // Stub window.iina with onMessage + postMessage.
+  w.iina = {
+    onMessage(event: string, callback: (data: any) => void) {
+      if (!inboundHandlers[event]) inboundHandlers[event] = [];
+      inboundHandlers[event].push(callback);
+
+      const remaining: Array<{ type: string; data: any }> = [];
+      pendingInbound.forEach((message) => {
+        if (message.type === event) {
+          callback(message.data);
+        } else {
+          remaining.push(message);
+        }
+      });
+      pendingInbound.length = 0;
+      pendingInbound.push(...remaining);
+    },
+    postMessage(type: string, data?: any) {
+      w.__iinaOutbound.push({ type, data });
+    },
+  };
+}
+
 /**
  * IinaHarness — simulates IINA backend messages for Playwright E2E tests.
  *
- * Sets `window.iina` with a stub `postMessage` (captures outbound UI→backend calls)
- * but deliberately omits `onMessage` so that `useIinaMessages` falls through to the
- * dev-mode `window.postMessage` path for inbound (backend→UI) message injection.
+ * Installs a production-like `window.iina` bridge with:
+ * - `onMessage` for backend→UI message delivery
+ * - `postMessage` capture for UI→backend assertions
+ *
+ * Inbound messages are queued until handlers register to avoid races between
+ * app mount/effect timing and early test injections.
  */
 export class IinaHarness {
   constructor(private page: Page) {}
 
   /**
    * Install the harness init script. Must be called BEFORE page.goto().
-   * Sets up `window.iina.postMessage` stub for outbound message capture.
+   * Sets up `window.iina` bridge and outbound message capture.
    */
   async install(): Promise<void> {
-    await this.page.addInitScript(() => {
-      // Record outbound messages for test assertion
-      (window as any).__iinaOutbound = [] as Array<{ type: string; data: any }>;
-
-      // Stub window.iina with postMessage only (NO onMessage).
-      // UI code calls `appWindow.iina?.postMessage?.('TYPE', data)` for outbound
-      // messages — this stub captures those calls.
-      // onMessage is intentionally omitted so useIinaMessages falls back to
-      // window.addEventListener('message', ...) for inbound injection.
-      (window as any).iina = {
-        postMessage(type: string, data?: any) {
-          (window as any).__iinaOutbound.push({ type, data });
-        },
-      };
-
-      // window.postMessage is used by the harness send() method for inbound
-      // (backend→UI) injection — no need to patch it for outbound capture now
-      // that window.iina.postMessage handles that.
-    });
+    await this.page.addInitScript(installIinaBridge);
+    // Ensure the current document also has the bridge even if navigation already occurred.
+    await this.page.evaluate(installIinaBridge);
   }
 
-  /** Send a backend→UI message via window.postMessage */
+  /** Send a backend→UI message via the simulated IINA bridge */
   async send(type: string, data: any = {}): Promise<void> {
     await this.page.evaluate(
       ({ type, data }) => {
+        const deliverInbound = (window as any).__iinaDeliverInbound;
+        if (typeof deliverInbound === 'function') {
+          deliverInbound(type, data);
+        }
+        // Also send via MessageEvent for UIs that already fell back before bridge install.
         window.postMessage({ type, data }, window.location.origin);
       },
       { type, data },

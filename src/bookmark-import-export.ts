@@ -10,7 +10,15 @@ import {
   type ImportResult,
   type IINAConsole,
 } from './types';
-import { stripHtmlTags, validateBookmarkArray } from './utils/validation';
+import {
+  isSafeBookmarkId,
+  isSafeThumbnailPath,
+  isValidEndTimestamp,
+  stripHtmlTags,
+  validateBookmarkArray,
+} from './utils/validation';
+
+const MAX_BOOKMARK_IMPORT = 5000;
 
 /** Prefix CSV-dangerous leading characters with a single quote to prevent formula injection */
 export function sanitizeCsvCell(value: string): string {
@@ -38,14 +46,16 @@ function sanitizeImportedBookmark(
     updatedAt: now,
     tags: Array.isArray(raw.tags) ? raw.tags.map((t: unknown) => stripHtmlTags(String(t))) : [],
   };
-  // Preserve annotation fields
+  // Preserve annotation fields (sanitize text, validate paths)
   if (raw.color) bookmark.color = raw.color;
-  if (typeof raw.endTimestamp === 'number') bookmark.endTimestamp = raw.endTimestamp;
+  if (isValidEndTimestamp(raw.endTimestamp, ts)) bookmark.endTimestamp = raw.endTimestamp;
   if (typeof raw.pinned === 'boolean') bookmark.pinned = raw.pinned;
-  if (raw.chapterTitle) bookmark.chapterTitle = raw.chapterTitle;
-  if (raw.subtitleText) bookmark.subtitleText = raw.subtitleText;
+  if (raw.chapterTitle) bookmark.chapterTitle = stripHtmlTags(String(raw.chapterTitle));
+  if (raw.subtitleText) bookmark.subtitleText = stripHtmlTags(String(raw.subtitleText));
   if (typeof raw.scratchpad === 'boolean') bookmark.scratchpad = raw.scratchpad;
-  if (raw.thumbnailPath) bookmark.thumbnailPath = raw.thumbnailPath;
+  if (isSafeThumbnailPath(raw.thumbnailPath)) {
+    bookmark.thumbnailPath = raw.thumbnailPath;
+  }
   return bookmark;
 }
 
@@ -58,11 +68,37 @@ export class BookmarkImportExport {
     options?: ImportOptions,
     generateId?: () => string,
   ): { bookmarks: BookmarkData[]; result: ImportResult } {
-    const validated = validateBookmarkArray(rawBookmarks, this.console);
+    const cappedRaw = rawBookmarks.slice(0, MAX_BOOKMARK_IMPORT);
     const duplicateHandling = options?.duplicateHandling || 'skip';
     const preserveIds = options?.preserveIds ?? false;
     let imported = 0;
     let skipped = 0;
+    const errors: string[] = [];
+
+    const prevalidatedRaw: unknown[] = [];
+    for (const entry of cappedRaw) {
+      if (
+        preserveIds &&
+        entry &&
+        typeof entry === 'object' &&
+        typeof (entry as Record<string, unknown>).id === 'string' &&
+        !isSafeBookmarkId((entry as Record<string, unknown>).id as string)
+      ) {
+        const unsafeId = (entry as Record<string, unknown>).id as string;
+        skipped++;
+        errors.push(`Skipped bookmark with unsafe id: ${unsafeId}`);
+        continue;
+      }
+      prevalidatedRaw.push(entry);
+    }
+
+    const validated = validateBookmarkArray(prevalidatedRaw, this.console);
+
+    if (rawBookmarks.length > MAX_BOOKMARK_IMPORT) {
+      errors.push(
+        `Import limited to ${MAX_BOOKMARK_IMPORT} bookmarks; ${rawBookmarks.length - MAX_BOOKMARK_IMPORT} entries were ignored`,
+      );
+    }
 
     // Work on a copy to avoid mutating the caller's array
     const bookmarks = [...existingBookmarks];
@@ -72,12 +108,17 @@ export class BookmarkImportExport {
       if (!Number.isFinite(ts) || ts < 0 || ts > MAX_TIMESTAMP) continue;
 
       const now = new Date().toISOString();
-      const bookmarkId =
-        preserveIds && raw.id
-          ? raw.id
-          : generateId
-            ? generateId()
-            : `import-${Date.now()}-${imported + skipped}`;
+      let bookmarkId: string;
+      if (preserveIds && typeof raw.id === 'string') {
+        if (!isSafeBookmarkId(raw.id)) {
+          skipped++;
+          errors.push(`Skipped bookmark with unsafe id: ${raw.id}`);
+          continue;
+        }
+        bookmarkId = raw.id;
+      } else {
+        bookmarkId = generateId ? generateId() : `import-${Date.now()}-${imported + skipped}`;
+      }
 
       // Check for duplicates by id
       const existingIndex = bookmarks.findIndex((b) => b.id === bookmarkId || b.id === raw.id);
@@ -122,7 +163,8 @@ export class BookmarkImportExport {
         success: true,
         importedCount: imported,
         skippedCount: skipped,
-        errorCount: 0,
+        errorCount: errors.length,
+        ...(errors.length > 0 ? { errors } : {}),
       },
     };
   }

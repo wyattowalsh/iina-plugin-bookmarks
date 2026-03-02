@@ -2,9 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { handleDialogKeyDown } from '../utils/focusTrap';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useWindowMessage } from '../hooks/useWindowMessage';
+import { ExportFormat, ExportResult, normalizeExportResult } from '../types';
 
 interface ExportOptions {
-  format: 'json' | 'csv';
+  format: ExportFormat;
   includeMetadata: boolean;
   compressOutput?: boolean;
   filePath?: string;
@@ -34,10 +35,10 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   availableTags,
   postMessage,
 }) => {
-  const [format, setFormat] = useState<'json' | 'csv'>('json');
+  const [format, setFormat] = useState<ExportFormat>('json');
   const [includeMetadata, setIncludeMetadata] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportResult, setExportResult] = useState<any>(null);
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null);
 
   // CSV specific options
   const [selectedFields, setSelectedFields] = useState<string[]>([
@@ -78,30 +79,37 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
 
   useEscapeKey(isOpen, handleClose);
 
-  const handleExportResult = useCallback((data: any) => {
-    setIsExporting(false);
-    setExportResult(data);
+  const downloadFile = useCallback(
+    (content: string, filename: string, exportFormat: ExportFormat) => {
+      const blob = new Blob([content], {
+        type: exportFormat === 'json' ? 'application/json' : 'text/csv',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    },
+    [],
+  );
 
-    if (data.success && data.data) {
-      downloadFile(data.data, data.filePath || 'export.txt');
-    }
-  }, []);
+  const handleExportResult = useCallback(
+    (data: unknown) => {
+      const result = normalizeExportResult(data);
+      setIsExporting(false);
+      setExportResult(result);
+
+      if (result.success) {
+        downloadFile(result.content, `bookmarks.${result.format}`, result.format);
+      }
+    },
+    [downloadFile],
+  );
 
   useWindowMessage('EXPORT_RESULT', handleExportResult);
-
-  const downloadFile = (content: string, filename: string) => {
-    const blob = new Blob([content], {
-      type: format === 'json' ? 'application/json' : 'text/csv',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
 
   const handleFieldToggle = (field: string) => {
     setSelectedFields((prev) =>
@@ -176,8 +184,8 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                 <div className="success-message">
                   <div className="result-icon">✅</div>
                   <h4>Export Successful!</h4>
-                  <p>Exported {exportResult.recordCount} bookmarks</p>
-                  <p>File: {exportResult.filePath}</p>
+                  <p>Format: {exportResult.format.toUpperCase()}</p>
+                  <p>Download started automatically.</p>
                   <button onClick={() => setExportResult(null)} className="btn-primary">
                     Export Another
                   </button>

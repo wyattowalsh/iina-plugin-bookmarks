@@ -1,5 +1,6 @@
 import { test as base } from '@playwright/test';
 import { IinaHarness } from './iina-harness';
+import { resetIdCounter } from './bookmark-data';
 
 /**
  * Custom Playwright test fixture that provides an IinaHarness instance.
@@ -7,6 +8,7 @@ import { IinaHarness } from './iina-harness';
  */
 export const test = base.extend<{ harness: IinaHarness }>({
   harness: async ({ page }, use) => {
+    resetIdCounter();
     const harness = new IinaHarness(page);
     await harness.install();
     await use(harness);

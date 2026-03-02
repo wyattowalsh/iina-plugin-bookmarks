@@ -1,4 +1,7 @@
 import { defineConfig } from 'vitest/config';
+import packageJson from './package.json';
+
+const coveragePolicy = packageJson.coveragePolicy;
 
 export default defineConfig({
   test: {
@@ -17,10 +20,10 @@ export default defineConfig({
       include: ['src/**/*.ts', 'ui/**/*.{ts,tsx}'],
       exclude: ['src/types.ts', 'src/index.ts', 'ui/components/__tests__/**'],
       thresholds: {
-        lines: 35,
-        statements: 35,
-        branches: 25,
-        functions: 25,
+        lines: coveragePolicy.lines,
+        statements: coveragePolicy.statements,
+        branches: coveragePolicy.branches,
+        functions: coveragePolicy.functions,
       },
     },
   },

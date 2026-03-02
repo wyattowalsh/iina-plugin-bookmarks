@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { act } from 'react';
-import { FilterComponent } from '../FilterComponent';
+import { FilterComponent, DEFAULT_FILTER_STATE } from '../FilterComponent';
 
 // Mock localStorage for usePersistentState
 const localStorageMock = (() => {
@@ -282,5 +282,69 @@ describe('FilterComponent', () => {
     // Should now show multi-sort container
     const multiSortContainer = container.querySelector('.multi-sort-container');
     expect(multiSortContainer).not.toBeNull();
+  });
+
+  it('should sync child state when parent initialFilters changes externally', () => {
+    act(() => {
+      root = ReactDOM.createRoot(container);
+      root.render(
+        <FilterComponent onFilterChange={onFilterChange} initialFilters={DEFAULT_FILTER_STATE} />,
+      );
+    });
+
+    const updatedFilters = { ...DEFAULT_FILTER_STATE, searchTerm: 'preset query' };
+
+    act(() => {
+      root.render(
+        <FilterComponent onFilterChange={onFilterChange} initialFilters={updatedFilters} />,
+      );
+    });
+
+    const input = container.querySelector('input[type="text"]') as HTMLInputElement;
+    expect(input.value).toBe('preset query');
+
+    const persistedRaw = localStorageMock.getItem('iina-bookmarks-filters-default');
+    expect(persistedRaw).not.toBeNull();
+    if (persistedRaw) {
+      expect(JSON.parse(persistedRaw).searchTerm).toBe('preset query');
+    }
+  });
+
+  it('should sync persisted filters after reload when parent resets externally', () => {
+    const storageKey = 'iina-bookmarks-filters-default';
+    const persistedFilters = { ...DEFAULT_FILTER_STATE, searchTerm: 'persisted query' };
+    localStorageMock.setItem(storageKey, JSON.stringify(persistedFilters));
+
+    act(() => {
+      root = ReactDOM.createRoot(container);
+      root.render(
+        <FilterComponent onFilterChange={onFilterChange} initialFilters={DEFAULT_FILTER_STATE} />,
+      );
+    });
+
+    expect((container.querySelector('input[type="text"]') as HTMLInputElement).value).toBe(
+      'persisted query',
+    );
+
+    act(() => {
+      root.render(
+        <FilterComponent onFilterChange={onFilterChange} initialFilters={persistedFilters} />,
+      );
+    });
+
+    act(() => {
+      root.render(
+        <FilterComponent onFilterChange={onFilterChange} initialFilters={DEFAULT_FILTER_STATE} />,
+      );
+    });
+
+    const input = container.querySelector('input[type="text"]') as HTMLInputElement;
+    expect(input.value).toBe('');
+
+    const resetPersistedRaw = localStorageMock.getItem(storageKey);
+    expect(resetPersistedRaw).not.toBeNull();
+    if (resetPersistedRaw) {
+      expect(JSON.parse(resetPersistedRaw).searchTerm).toBe('');
+    }
   });
 });

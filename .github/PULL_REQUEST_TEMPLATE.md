@@ -15,12 +15,14 @@ Fixes # (issue)
 
 ## Checklist
 
-- [ ] Tests pass (`pnpm test`)
+- [ ] Tests pass (`pnpm run test:coverage`)
 - [ ] Linting passes (`pnpm run lint`)
+- [ ] Formatting check passes (`pnpm run format:check`)
 - [ ] Type checking passes (`pnpm run type-check`)
 - [ ] Build succeeds (`make build`)
 - [ ] Self-review of code completed
 - [ ] Documentation updated (if applicable)
+- [ ] Release docs updated if release commands/workflow changed (`.github/RELEASE_RUNBOOK.md`)
 
 ## Test Plan
 

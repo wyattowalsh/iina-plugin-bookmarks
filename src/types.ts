@@ -128,6 +128,59 @@ export interface ImportResult {
   duplicates?: number;
 }
 
+export type ExportResult =
+  | {
+      success: true;
+      format: ExportFormat;
+      content: string;
+    }
+  | {
+      success: false;
+      error: string;
+      format?: ExportFormat;
+    };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isExportFormat(value: unknown): value is ExportFormat {
+  return value === 'json' || value === 'csv';
+}
+
+export function normalizeExportResult(payload: unknown): ExportResult {
+  if (!isRecord(payload)) {
+    return { success: false, error: 'Invalid export result payload' };
+  }
+
+  const format = isExportFormat(payload.format) ? payload.format : undefined;
+  const content =
+    typeof payload.content === 'string'
+      ? payload.content
+      : typeof payload.data === 'string'
+        ? payload.data
+        : undefined;
+  const error = typeof payload.error === 'string' ? payload.error : undefined;
+
+  if (payload.success === false || (!content && error)) {
+    return {
+      success: false,
+      ...(format ? { format } : {}),
+      error: error || 'Export failed',
+    };
+  }
+
+  if (format && content !== undefined) {
+    return { success: true, format, content };
+  }
+
+  return {
+    success: false,
+    ...(format ? { format } : {}),
+    error: error || 'Invalid export result payload',
+  };
+}
+
 export interface BookmarkUpdatableFields {
   title?: string;
   description?: string;
@@ -164,7 +217,12 @@ export interface UIToBackendPayloadMap {
   JUMP_TO_BOOKMARK: { id: string };
   UPDATE_BOOKMARK: { id: string; data: BookmarkUpdatableFields };
   HIDE_OVERLAY: undefined;
-  IMPORT_BOOKMARKS: { bookmarks: unknown[]; options?: ImportOptions };
+  IMPORT_BOOKMARKS: {
+    bookmarks: unknown[];
+    options?: ImportOptions;
+    collections?: BookmarkCollection[];
+    smartCollections?: SmartCollection[];
+  };
   EXPORT_BOOKMARKS: { format?: ExportFormat };
   FILE_RECONCILIATION_REQUEST: {
     action: ReconciliationAction;
@@ -246,7 +304,7 @@ export interface BackendToUIPayloadMap {
   SORT_PREFERENCES: SortPreferences;
   IMPORT_RESULT: ImportResult;
   IMPORT_STARTED: undefined;
-  EXPORT_RESULT: { format: ExportFormat; content: string };
+  EXPORT_RESULT: ExportResult;
   SHOW_FILE_RECONCILIATION_DIALOG: { movedFiles: BookmarkData[] };
   FILE_RECONCILIATION_RESULT: {
     success: boolean;
@@ -315,6 +373,7 @@ export interface IINAConsole {
 export interface IINAPreferences {
   get: (key: string) => string | null;
   set: (key: string, value: string) => void;
+  sync?: () => void;
 }
 
 export interface IINAMenu {

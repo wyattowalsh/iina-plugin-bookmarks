@@ -20,45 +20,41 @@ test.describe('Overlay Interaction Tests', () => {
     await expect(page.locator('.bookmark-item').first()).toContainText(fileABookmarks[0].title);
   });
 
-  test('clicking bookmark sends jump message', async () => {
-    test.skip(true, 'Outbound iina.postMessage capture unreliable in WebKit E2E');
+  test('clicking bookmark sends jump message', async ({ page, harness }) => {
+    const bookmarks = makeBookmarksForFile(TEST_FILE_A, 2);
+    await harness.sendCurrentFile(TEST_FILE_A);
+    await harness.sendBookmarks(bookmarks);
+    await expect(page.locator('.bookmark-item')).toHaveCount(2);
+    await harness.clearOutbound();
+
+    await page.locator('.bookmark-item').first().click();
+    await page.waitForFunction(() => {
+      const outbound = (window as unknown as { __iinaOutbound?: Array<{ type?: string }> })
+        .__iinaOutbound;
+      return Array.isArray(outbound) && outbound.some((m) => m.type === 'JUMP_TO_BOOKMARK');
+    });
+
+    const jumpMessage = await harness.getLastOutbound('JUMP_TO_BOOKMARK');
+    expect(jumpMessage?.data).toEqual({ id: bookmarks[0].id });
   });
 
   test('close button hides overlay', async ({ page }) => {
     const closeButton = page.locator('[aria-label="Close bookmark overlay"]');
     await closeButton.click();
 
-    // Overlay should be hidden (implementation-specific - could be display:none or removed from DOM)
     const overlay = page.locator('.bookmark-overlay').or(page.locator('[data-overlay]'));
-
-    // Check if hidden via style or removed
-    const isHidden =
-      (await overlay.count()) === 0 ||
-      (await overlay.evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return style.display === 'none' || style.visibility === 'hidden';
-      }));
-
-    expect(isHidden).toBe(true);
+    await expect(overlay).not.toBeVisible();
   });
 
   test('Escape key closes overlay', async ({ page }) => {
     await page.keyboard.press('Escape');
 
     const overlay = page.locator('.bookmark-overlay').or(page.locator('[data-overlay]'));
-
-    const isHidden =
-      (await overlay.count()) === 0 ||
-      (await overlay.evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return style.display === 'none' || style.visibility === 'hidden';
-      }));
-
-    expect(isHidden).toBe(true);
+    await expect(overlay).not.toBeVisible();
   });
 
-  test('search input visible with 4 or more bookmarks', async ({ page, harness }) => {
-    const bookmarks = makeBookmarksForFile(TEST_FILE_A, 4);
+  test('search input visible when bookmarks are available', async ({ page, harness }) => {
+    const bookmarks = makeBookmarksForFile(TEST_FILE_A, 2);
     await harness.sendCurrentFile(TEST_FILE_A);
     await harness.sendBookmarks(bookmarks);
 
@@ -68,22 +64,11 @@ test.describe('Overlay Interaction Tests', () => {
     await expect(searchInput).toBeVisible();
   });
 
-  test('search input hidden with fewer than 4 bookmarks', async ({ page, harness }) => {
-    const bookmarks = makeBookmarksForFile(TEST_FILE_A, 2);
-    await harness.sendCurrentFile(TEST_FILE_A);
-    await harness.sendBookmarks(bookmarks);
-
+  test('search input hidden when no bookmarks are available', async ({ page }) => {
     const searchInput = page
       .locator('input[placeholder*="Search"]')
       .or(page.locator('.overlay-search-input'));
-
-    // Should not be visible or not exist
-    const count = await searchInput.count();
-    if (count > 0) {
-      await expect(searchInput).not.toBeVisible();
-    } else {
-      expect(count).toBe(0);
-    }
+    await expect(searchInput).not.toBeVisible();
   });
 
   test('search filters bookmarks in overlay', async ({ page, harness }) => {

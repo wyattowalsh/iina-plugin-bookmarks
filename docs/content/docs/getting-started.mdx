@@ -32,7 +32,7 @@ Before installing the plugin, ensure you have:
 
 Download the latest release from the [GitHub Releases page](https://github.com/wyattowalsh/iina-plugin-bookmarks/releases).
 
-Look for the `.iinaplugin` file in the release assets.
+Look for `iina-plugin-bookmarks.iinaplgz` in the release assets.
 
 </Step>
 
@@ -40,7 +40,7 @@ Look for the `.iinaplugin` file in the release assets.
 
 ### Install in IINA
 
-Double-click the downloaded `.iinaplugin` file. IINA will automatically:
+Double-click `iina-plugin-bookmarks.iinaplgz`. IINA will automatically:
 - Install the plugin
 - Enable it in your preferences
 - Load it on next startup
@@ -48,7 +48,7 @@ Double-click the downloaded `.iinaplugin` file. IINA will automatically:
 Alternatively, install manually:
 1. Open IINA Preferences (Cmd+,)
 2. Go to the **Plugins** tab
-3. Click **+** and select the `.iinaplugin` file
+3. Click **+** and select `iina-plugin-bookmarks.iinaplgz`
 
 </Step>
 
@@ -119,7 +119,7 @@ This compiles TypeScript, bundles the UI, and prepares the plugin for installati
 make package
 ```
 
-This creates `dist/iina-plugin-bookmarks.iinaplugin`. Double-click to install in IINA.
+This creates `packaging/iina-plugin-bookmarks.iinaplgz`. Double-click to install in IINA.
 
 </Step>
 
@@ -189,7 +189,6 @@ Integrated IINA sidebar with full functionality:
 - Add, edit, delete bookmarks
 - Filter and search
 - Import/export data
-- Cloud sync
 
 **Access:** Cmd+Shift+B or View → Toggle Sidebar
 
@@ -200,7 +199,7 @@ Lightweight overlay for quick bookmark jumping:
 - Search bookmarks
 - Quick jump to timestamp
 
-**Access:** Configure hotkey in IINA preferences
+**Access:** Plugin menu → Toggle Bookmarks Overlay
 
 ### Standalone Window
 
@@ -209,13 +208,13 @@ Independent window with complete features:
 - Can be positioned anywhere on screen
 - Useful for multi-monitor setups
 
-**Access:** Via IINA menu → Plugins → Bookmarks → Open Window
+**Access:** Plugin menu → Manage Bookmarks
 
 ## Next Steps
 
 - Learn about [Bookmark Management](/docs/features/bookmark-management)
-- Set up [Cloud Sync](/docs/features/cloud-sync) for cross-device access
 - Explore [Filtering and Search](/docs/features/filtering)
+- Review interface details in [User Interface](/docs/user-interface)
 - Import existing bookmarks via [Data Management](/docs/features/data-management)
 
 ## Troubleshooting

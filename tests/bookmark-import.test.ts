@@ -187,6 +187,76 @@ describe('Bookmark Import via IMPORT_BOOKMARKS message', () => {
 
       expect(manager.getAllBookmarks()).toHaveLength(0);
     });
+
+    it('should ignore invalid endTimestamp values during import', () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [
+          { ...makeBookmark('end-nan', 'NaN End', 10), endTimestamp: Number.NaN },
+          { ...makeBookmark('end-over', 'Over End', 20), endTimestamp: 86400 * 365 + 1 },
+          { ...makeBookmark('end-before', 'Before End', 30), endTimestamp: 29 },
+        ],
+        options: { preserveIds: true },
+      });
+
+      const imported = manager.getAllBookmarks();
+      expect(imported).toHaveLength(3);
+      expect(imported.find((b) => b.id === 'end-nan')?.endTimestamp).toBeUndefined();
+      expect(imported.find((b) => b.id === 'end-over')?.endTimestamp).toBeUndefined();
+      expect(imported.find((b) => b.id === 'end-before')?.endTimestamp).toBeUndefined();
+    });
+
+    it('should apply thumbnailPath safe-path validation consistently', () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [
+          {
+            ...makeBookmark('thumb-valid', 'Valid Thumb', 40),
+            thumbnailPath: '@data/thumbs/valid.webp',
+          },
+          {
+            ...makeBookmark('thumb-bad-prefix', 'Bad Prefix', 50),
+            thumbnailPath: '@data/other/invalid.webp',
+          },
+          {
+            ...makeBookmark('thumb-bad-traversal', 'Bad Traversal', 60),
+            thumbnailPath: '@data/thumbs/../invalid.webp',
+          },
+        ],
+        options: { preserveIds: true },
+      });
+
+      const imported = manager.getAllBookmarks();
+      expect(imported.find((b) => b.id === 'thumb-valid')?.thumbnailPath).toBe(
+        '@data/thumbs/valid.webp',
+      );
+      expect(imported.find((b) => b.id === 'thumb-bad-prefix')?.thumbnailPath).toBeUndefined();
+      expect(imported.find((b) => b.id === 'thumb-bad-traversal')?.thumbnailPath).toBeUndefined();
+    });
+
+    it('should skip entries with unsafe IDs when preserveIds is true', () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'IMPORT_BOOKMARKS');
+      handler({
+        bookmarks: [
+          {
+            id: '../unsafe-id',
+            title: 'Unsafe',
+            timestamp: 10,
+            filepath: '/test.mp4',
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+            tags: [],
+          },
+        ],
+        options: { preserveIds: true },
+      });
+
+      expect(manager.getAllBookmarks()).toHaveLength(0);
+      expect(deps.sidebar.postMessage).toHaveBeenCalledWith(
+        'IMPORT_RESULT',
+        expect.objectContaining({ skippedCount: 1 }),
+      );
+    });
   });
 });
 

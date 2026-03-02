@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-03-02
+
 ### Added
 
 - ESLint, Prettier, and Husky pre-commit hooks
@@ -51,5 +53,6 @@ All notable changes to this project will be documented in this file.
 - Preferences page
 - Comprehensive test suite
 
-[Unreleased]: https://github.com/wyattowalsh/iina-plugin-bookmarks/compare/main...HEAD
+[Unreleased]: https://github.com/wyattowalsh/iina-plugin-bookmarks/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/wyattowalsh/iina-plugin-bookmarks/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/tag/v1.0.0

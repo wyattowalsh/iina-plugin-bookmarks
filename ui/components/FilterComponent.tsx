@@ -47,6 +47,9 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   enableMultiSort: false,
 };
 
+const areFiltersEqual = (a: FilterState, b: FilterState): boolean =>
+  JSON.stringify(a) === JSON.stringify(b);
+
 export const FilterComponent: React.FC<FilterComponentProps> = ({
   onFilterChange,
   availableTags = [],
@@ -59,6 +62,10 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
 }) => {
   // Use persistent state for filters, but merge with initial filters
   const baseFilters = { ...DEFAULT_FILTER_STATE, ...initialFilters };
+  const mergedInitialFilters = useMemo(
+    () => ({ ...DEFAULT_FILTER_STATE, ...initialFilters }),
+    [initialFilters],
+  );
   const [persistentFilters, setPersistentFilters] = usePersistentFilterState(viewId, baseFilters);
 
   // Use persistent sort preferences
@@ -68,6 +75,8 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(showAdvanced);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const [searchInput, setSearchInput] = useState(persistentFilters.searchTerm);
+  const hasSkippedInitialParentSync = React.useRef(false);
+  const previousInitialFilters = React.useRef<FilterState>(mergedInitialFilters);
 
   // Debounce search input for performance
   const debouncedSearchTerm = useDebounce(searchInput, 300);
@@ -98,16 +107,35 @@ export const FilterComponent: React.FC<FilterComponentProps> = ({
 
   // Update filters when debounced search term changes
   React.useEffect(() => {
-    if (debouncedSearchTerm !== persistentFilters.searchTerm) {
+    if (
+      debouncedSearchTerm === searchInput &&
+      debouncedSearchTerm !== persistentFilters.searchTerm
+    ) {
       updateFilters({ searchTerm: debouncedSearchTerm });
     }
-  }, [debouncedSearchTerm, persistentFilters.searchTerm, updateFilters]);
+  }, [debouncedSearchTerm, searchInput, persistentFilters.searchTerm, updateFilters]);
 
   // Initialize parent component with persistent filters on mount
 
   React.useEffect(() => {
     onFilterChange(persistentFilters);
   }, []);
+
+  React.useEffect(() => {
+    if (!hasSkippedInitialParentSync.current) {
+      hasSkippedInitialParentSync.current = true;
+      previousInitialFilters.current = mergedInitialFilters;
+      return;
+    }
+
+    if (areFiltersEqual(previousInitialFilters.current, mergedInitialFilters)) {
+      return;
+    }
+
+    previousInitialFilters.current = mergedInitialFilters;
+    setPersistentFilters(mergedInitialFilters);
+    setSearchInput(mergedInitialFilters.searchTerm);
+  }, [mergedInitialFilters, setPersistentFilters]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);

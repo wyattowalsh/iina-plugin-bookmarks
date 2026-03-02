@@ -11,16 +11,19 @@ import {
   type SmartCollectionFilters,
   type BookmarkColor,
   type ImportOptions,
+  type ExportFormat,
+  type ExportResult,
   type SortPreferences,
   type UIMessage,
   type UISource,
+  type ChapterInfo,
   type IINARuntimeDependencies,
   type IINAUIAPI,
 } from './types';
 import { BookmarkPersistence } from './bookmark-persistence';
 import { BookmarkImportExport } from './bookmark-import-export';
 import { ThumbnailGenerator } from './thumbnail-generator';
-import { stripHtmlTags } from './utils/validation';
+import { isSafeBookmarkId, isValidEndTimestamp, stripHtmlTags } from './utils/validation';
 import { formatTime } from './utils/formatTime';
 
 export class BookmarkManager {
@@ -40,8 +43,11 @@ export class BookmarkManager {
   private idCounter = 0;
   private pendingSeek: { cancel: () => void } | null = null;
   private playbackInterval: ReturnType<typeof setInterval> | null = null;
+  private cachedChapters: ChapterInfo[] = [];
   private resumePositions: Record<string, number> = {};
   private pendingInPoint: number | null = null;
+  private readonly MAX_COLLECTION_IMPORT = 200;
+  private readonly MAX_SMART_COLLECTION_IMPORT = 200;
 
   constructor(dependencies: IINARuntimeDependencies) {
     this.deps = dependencies;
@@ -228,10 +234,24 @@ export class BookmarkManager {
           const updates: BookmarkUpdatableFields = {};
           if (typeof raw.title === 'string') updates.title = raw.title;
           if (typeof raw.description === 'string') updates.description = raw.description;
-          if (Array.isArray(raw.tags))
-            updates.tags = raw.tags.filter((t): t is string => typeof t === 'string');
+          if (Array.isArray(raw.tags)) {
+            updates.tags = raw.tags
+              .filter((t): t is string => typeof t === 'string')
+              .map((t) => stripHtmlTags(t.trim()))
+              .filter((t) => t.length > 0);
+          }
           if (typeof raw.color === 'string') updates.color = raw.color as BookmarkColor;
-          if (typeof raw.endTimestamp === 'number') updates.endTimestamp = raw.endTimestamp;
+          if (typeof raw.endTimestamp === 'number') {
+            if (
+              Number.isFinite(raw.endTimestamp) &&
+              raw.endTimestamp >= 0 &&
+              raw.endTimestamp <= MAX_TIMESTAMP
+            ) {
+              updates.endTimestamp = raw.endTimestamp;
+            } else {
+              this.deps.console.warn(`Ignored invalid endTimestamp update for ${p.id}`);
+            }
+          }
           if (typeof raw.pinned === 'boolean') updates.pinned = raw.pinned;
           if (typeof raw.scratchpad === 'boolean') updates.scratchpad = raw.scratchpad;
           this.updateBookmark(p.id, updates);
@@ -245,6 +265,13 @@ export class BookmarkManager {
             uiSource,
             p?.options as ImportOptions | undefined,
           );
+          // Merge collections from v2 import format
+          if (Array.isArray(p.collections)) {
+            this.mergeImportedCollections(p.collections as BookmarkCollection[]);
+          }
+          if (Array.isArray(p.smartCollections)) {
+            this.mergeImportedSmartCollections(p.smartCollections as SmartCollection[]);
+          }
         }
         break;
 
@@ -424,7 +451,7 @@ export class BookmarkManager {
 
       // Thumbnails
       case 'REQUEST_THUMBNAIL':
-        if (typeof p?.bookmarkId === 'string') {
+        if (typeof p?.bookmarkId === 'string' && isSafeBookmarkId(p.bookmarkId)) {
           const bookmark = this.bookmarks.find((b) => b.id === p.bookmarkId);
           if (bookmark) {
             const thumbnailPath = this.thumbnailGenerator.generate(bookmark);
@@ -658,6 +685,7 @@ export class BookmarkManager {
       skipDuplicateCheck?: boolean;
       color?: BookmarkColor;
       endTimestamp?: number;
+      scratchpad?: boolean;
     },
   ): Promise<string | undefined> {
     const maxBookmarks = parseInt(this.deps.preferences.get('maxBookmarks') || '1000', 10) || 1000;
@@ -711,7 +739,24 @@ export class BookmarkManager {
       ? stripHtmlTags(description)
       : `Bookmark at ${formatTime(currentTime)}`;
 
+    // Extract #hashtags from description and merge into tags
+    const hashtagRegex = /#(\w[\w/-]*)/g;
+    const extractedTags: string[] = [];
+    let match;
+    while ((match = hashtagRegex.exec(safeDescription)) !== null) {
+      extractedTags.push(match[1]);
+    }
+    const mergedTags = [
+      ...new Set([...(tags ? tags.map((t) => stripHtmlTags(t)) : []), ...extractedTags]),
+    ];
+
     const now = new Date().toISOString();
+    const safeEndTimestamp = isValidEndTimestamp(options?.endTimestamp, currentTime)
+      ? options.endTimestamp
+      : undefined;
+    if (options?.endTimestamp !== undefined && safeEndTimestamp === undefined) {
+      this.deps.console.warn('Ignored invalid endTimestamp on addBookmark');
+    }
     const bookmark: BookmarkData = {
       id: this.generateId(),
       title: safeTitle,
@@ -720,9 +765,10 @@ export class BookmarkManager {
       description: safeDescription,
       createdAt: now,
       updatedAt: now,
-      tags: tags ? tags.map((t) => stripHtmlTags(t)) : [],
+      tags: mergedTags,
       ...(options?.color ? { color: options.color } : {}),
-      ...(options?.endTimestamp !== undefined ? { endTimestamp: options.endTimestamp } : {}),
+      ...(safeEndTimestamp !== undefined ? { endTimestamp: safeEndTimestamp } : {}),
+      ...(options?.scratchpad ? { scratchpad: true } : {}),
     };
 
     // Chapter enrichment
@@ -769,6 +815,18 @@ export class BookmarkManager {
       const sanitized: BookmarkUpdatableFields = { ...data };
       if (sanitized.title) sanitized.title = stripHtmlTags(sanitized.title);
       if (sanitized.description) sanitized.description = stripHtmlTags(sanitized.description);
+      if (Array.isArray(sanitized.tags)) {
+        sanitized.tags = sanitized.tags
+          .filter((t): t is string => typeof t === 'string')
+          .map((t) => stripHtmlTags(t.trim()))
+          .filter((t) => t.length > 0);
+      }
+      if (sanitized.endTimestamp !== undefined) {
+        if (!isValidEndTimestamp(sanitized.endTimestamp, this.bookmarks[index].timestamp)) {
+          this.deps.console.warn(`Ignored invalid endTimestamp update for ${id}`);
+          delete sanitized.endTimestamp;
+        }
+      }
 
       this.bookmarks[index] = {
         ...this.bookmarks[index],
@@ -872,15 +930,24 @@ export class BookmarkManager {
     payload: { action: string; bookmarkId: string; newPath?: string; originalPath?: string },
     uiSource: UISource,
   ): Promise<void> {
+    const target = this.getUITarget(uiSource);
     try {
       this.deps.console.log(`Handling file reconciliation: ${payload.action}`);
-
-      const target = this.getUITarget(uiSource);
 
       switch (payload.action) {
         case 'update_path':
           if (payload.newPath) {
             this.updateBookmarkPath(payload.bookmarkId, payload.newPath, target);
+          } else {
+            const message = 'Missing new path for update_path action';
+            this.deps.console.error(message);
+            target.postMessage('FILE_RECONCILIATION_RESULT', {
+              success: false,
+              action: 'update_path',
+              bookmarkId: payload.bookmarkId,
+              newPath: payload.newPath,
+              message,
+            });
           }
           break;
         case 'remove_bookmark':
@@ -894,41 +961,97 @@ export class BookmarkManager {
         case 'search_similar':
           if (payload.originalPath) {
             this.searchForSimilarFiles(payload.bookmarkId, payload.originalPath, target);
+          } else {
+            const message = 'Missing original path for search_similar action';
+            this.deps.console.error(message);
+            target.postMessage('FILE_RECONCILIATION_RESULT', {
+              success: false,
+              action: 'search_similar',
+              bookmarkId: payload.bookmarkId,
+              originalPath: payload.originalPath,
+              message,
+            });
           }
           break;
-        default:
-          this.deps.console.warn(`Unknown reconciliation action: ${payload.action}`);
+        default: {
+          const message = `Unknown reconciliation action: ${payload.action}`;
+          this.deps.console.warn(message);
+          target.postMessage('FILE_RECONCILIATION_RESULT', {
+            success: false,
+            action: payload.action,
+            bookmarkId: payload.bookmarkId,
+            newPath: payload.newPath,
+            originalPath: payload.originalPath,
+            message,
+          });
+        }
       }
     } catch (error) {
-      this.deps.console.error(`Error handling file reconciliation: ${errorMessage(error)}`);
+      const message = `Error handling file reconciliation: ${errorMessage(error)}`;
+      this.deps.console.error(message);
+      target.postMessage('FILE_RECONCILIATION_RESULT', {
+        success: false,
+        action: payload.action,
+        bookmarkId: payload.bookmarkId,
+        newPath: payload.newPath,
+        originalPath: payload.originalPath,
+        message,
+      });
     }
   }
 
   private updateBookmarkPath(bookmarkId: string, newPath: string, target: IINAUIAPI): void {
     try {
       if (!newPath || !newPath.startsWith('/')) {
-        this.deps.console.error(`Invalid new path: must be non-empty and start with /`);
+        const message = `Invalid new path: must be non-empty and start with /`;
+        this.deps.console.error(message);
+        target.postMessage('FILE_RECONCILIATION_RESULT', {
+          success: false,
+          action: 'update_path',
+          bookmarkId,
+          newPath,
+          message,
+        });
         return;
       }
 
       const bookmark = this.bookmarks.find((b) => b.id === bookmarkId);
-      if (bookmark) {
-        const oldPath = bookmark.filepath;
-        bookmark.filepath = newPath;
-        bookmark.updatedAt = new Date().toISOString();
-        this.saveBookmarks();
-        this.deps.console.log(`Updated bookmark path: ${oldPath} -> ${newPath}`);
-
+      if (!bookmark) {
+        const message = `Bookmark not found for path update: ${bookmarkId}`;
+        this.deps.console.warn(message);
         target.postMessage('FILE_RECONCILIATION_RESULT', {
-          success: true,
+          success: false,
           action: 'update_path',
-          bookmarkId: bookmarkId,
-          oldPath: oldPath,
-          newPath: newPath,
+          bookmarkId,
+          newPath,
+          message,
         });
+        return;
       }
+
+      const oldPath = bookmark.filepath;
+      bookmark.filepath = newPath;
+      bookmark.updatedAt = new Date().toISOString();
+      this.saveBookmarks();
+      this.deps.console.log(`Updated bookmark path: ${oldPath} -> ${newPath}`);
+
+      target.postMessage('FILE_RECONCILIATION_RESULT', {
+        success: true,
+        action: 'update_path',
+        bookmarkId: bookmarkId,
+        oldPath: oldPath,
+        newPath: newPath,
+      });
     } catch (error) {
-      this.deps.console.error(`Error updating bookmark path: ${errorMessage(error)}`);
+      const message = `Error updating bookmark path: ${errorMessage(error)}`;
+      this.deps.console.error(message);
+      target.postMessage('FILE_RECONCILIATION_RESULT', {
+        success: false,
+        action: 'update_path',
+        bookmarkId,
+        newPath,
+        message,
+      });
     }
   }
 
@@ -965,24 +1088,72 @@ export class BookmarkManager {
     target.postMessage('IMPORT_RESULT', result);
   }
 
+  /** Merge imported collections (skip duplicates by ID) */
+  private mergeImportedCollections(imported: BookmarkCollection[]): void {
+    const sanitized = this.sanitizeCollections(
+      imported,
+      this.MAX_COLLECTION_IMPORT,
+      'imported collections',
+    );
+    const existingIds = new Set(this.collections.map((c) => c.id));
+    let added = 0;
+    for (const col of sanitized) {
+      if (col.id && col.name && !existingIds.has(col.id)) {
+        this.collections.push(col);
+        existingIds.add(col.id);
+        added++;
+      }
+    }
+    if (added > 0) {
+      this.saveCollections();
+    }
+  }
+
+  /** Merge imported smart collections (skip duplicates and builtins) */
+  private mergeImportedSmartCollections(imported: SmartCollection[]): void {
+    const sanitized = this.sanitizeSmartCollections(
+      imported,
+      this.MAX_SMART_COLLECTION_IMPORT,
+      'imported smart collections',
+    );
+    const existingIds = new Set(this.smartCollections.map((sc) => sc.id));
+    let added = 0;
+    for (const sc of sanitized) {
+      if (sc.id && sc.name && !existingIds.has(sc.id) && !sc.builtin) {
+        this.smartCollections.push(sc);
+        existingIds.add(sc.id);
+        added++;
+      }
+    }
+    if (added > 0) {
+      this.saveSmartCollections();
+    }
+  }
+
   /** Delegate export to BookmarkImportExport module */
   private exportBookmarks(format: string, uiSource: UISource): void {
     const target = this.getUITarget(uiSource);
+    const exportFormat: ExportFormat = format === 'csv' ? 'csv' : 'json';
 
-    if (format === 'csv') {
-      target.postMessage('EXPORT_RESULT', {
-        format: 'csv',
-        content: this.importExport.exportCSV(this.bookmarks),
-      });
-    } else {
-      target.postMessage('EXPORT_RESULT', {
-        format: 'json',
-        content: this.importExport.exportJSONv2(
-          this.bookmarks,
-          this.collections,
-          this.smartCollections,
-        ),
-      });
+    try {
+      const content =
+        exportFormat === 'csv'
+          ? this.importExport.exportCSV(this.bookmarks)
+          : this.importExport.exportJSONv2(this.bookmarks, this.collections, this.smartCollections);
+      const result: ExportResult = {
+        success: true,
+        format: exportFormat,
+        content,
+      };
+      target.postMessage('EXPORT_RESULT', result);
+    } catch (error) {
+      const result: ExportResult = {
+        success: false,
+        format: exportFormat,
+        error: errorMessage(error),
+      };
+      target.postMessage('EXPORT_RESULT', result);
+      this.deps.console.error(`Export failed: ${errorMessage(error)}`);
     }
   }
 
@@ -1045,13 +1216,18 @@ export class BookmarkManager {
   }
 
   discardScratchpad(ids: string[]): void {
-    const initialLength = this.bookmarks.length;
-    this.bookmarks = this.bookmarks.filter((b) => !ids.includes(b.id) || !b.scratchpad);
-    if (this.bookmarks.length < initialLength) {
+    const idSet = new Set(ids);
+    const discardedIdSet = new Set(
+      this.bookmarks.filter((b) => idSet.has(b.id) && b.scratchpad).map((b) => b.id),
+    );
+    if (discardedIdSet.size > 0) {
+      this.bookmarks = this.bookmarks.filter((b) => !discardedIdSet.has(b.id));
+      for (const collection of this.collections) {
+        collection.bookmarkIds = collection.bookmarkIds.filter((id) => !discardedIdSet.has(id));
+      }
       this.saveBookmarks();
-      this.deps.console.log(
-        `Discarded ${initialLength - this.bookmarks.length} scratchpad bookmark(s)`,
-      );
+      this.saveCollections();
+      this.deps.console.log(`Discarded ${discardedIdSet.size} scratchpad bookmark(s)`);
     }
   }
 
@@ -1063,7 +1239,25 @@ export class BookmarkManager {
     try {
       const stored = this.deps.preferences.get(this.RESUME_POSITIONS_KEY);
       if (stored) {
-        this.resumePositions = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          this.deps.console.warn('Could not load resume positions: expected object map');
+          this.resumePositions = {};
+          return;
+        }
+        const safePositions: Record<string, number> = {};
+        for (const [path, value] of Object.entries(parsed as Record<string, unknown>)) {
+          if (
+            typeof path === 'string' &&
+            typeof value === 'number' &&
+            Number.isFinite(value) &&
+            value >= 0 &&
+            value <= MAX_TIMESTAMP
+          ) {
+            safePositions[path] = value;
+          }
+        }
+        this.resumePositions = safePositions;
       }
     } catch (error) {
       this.deps.console.warn(`Could not load resume positions: ${errorMessage(error)}`);
@@ -1095,7 +1289,7 @@ export class BookmarkManager {
     if (autoResume === 'false') return;
 
     const position = this.resumePositions[path];
-    if (position && position > 5) {
+    if (typeof position === 'number' && Number.isFinite(position) && position > 5) {
       this.deps.sidebar.postMessage('RESUME_POSITION', {
         filepath: path,
         timestamp: position,
@@ -1130,17 +1324,157 @@ export class BookmarkManager {
   private loadCollections(): void {
     try {
       const stored = this.deps.preferences.get(this.COLLECTIONS_KEY);
-      if (stored) this.collections = JSON.parse(stored);
+      if (stored) {
+        this.collections = this.sanitizeCollections(
+          JSON.parse(stored),
+          this.MAX_COLLECTION_IMPORT,
+          'stored collections',
+        );
+      }
     } catch (error) {
       this.deps.console.warn(`Could not load collections: ${errorMessage(error)}`);
     }
     try {
       const stored = this.deps.preferences.get(this.SMART_COLLECTIONS_KEY);
-      if (stored) this.smartCollections = JSON.parse(stored);
+      if (stored) {
+        this.smartCollections = this.sanitizeSmartCollections(
+          JSON.parse(stored),
+          this.MAX_SMART_COLLECTION_IMPORT,
+          'stored smart collections',
+        );
+      }
     } catch (error) {
       this.deps.console.warn(`Could not load smart collections: ${errorMessage(error)}`);
     }
     this.ensureBuiltinSmartCollections();
+  }
+
+  private sanitizeCollections(
+    input: unknown,
+    cap: number,
+    sourceLabel: string,
+  ): BookmarkCollection[] {
+    if (!Array.isArray(input)) return [];
+
+    const now = new Date().toISOString();
+    const sanitized: BookmarkCollection[] = [];
+    const total = input.length;
+
+    for (const entry of input) {
+      if (sanitized.length >= cap) break;
+      if (!entry || typeof entry !== 'object') continue;
+
+      const raw = entry as Record<string, unknown>;
+      if (typeof raw.id !== 'string' || !isSafeBookmarkId(raw.id)) continue;
+      if (typeof raw.name !== 'string' || raw.name.trim().length === 0) continue;
+
+      const bookmarkIds = Array.isArray(raw.bookmarkIds)
+        ? raw.bookmarkIds.filter(
+            (id): id is string => typeof id === 'string' && isSafeBookmarkId(id),
+          )
+        : [];
+
+      sanitized.push({
+        id: raw.id,
+        name: stripHtmlTags(raw.name).trim(),
+        description:
+          typeof raw.description === 'string' ? stripHtmlTags(raw.description) : undefined,
+        bookmarkIds,
+        color: typeof raw.color === 'string' ? (raw.color as BookmarkColor) : undefined,
+        icon: typeof raw.icon === 'string' ? raw.icon : undefined,
+        createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
+        updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
+      });
+    }
+
+    if (total > cap) {
+      this.deps.console.warn(
+        `Collection import capped at ${cap}; ignored ${total - cap} entries from ${sourceLabel}`,
+      );
+    }
+    return sanitized;
+  }
+
+  private sanitizeSmartCollectionFilters(raw: unknown): SmartCollectionFilters {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const filtersRaw = raw as Record<string, unknown>;
+    const filters: SmartCollectionFilters = {};
+
+    if (typeof filtersRaw.searchTerm === 'string') filters.searchTerm = filtersRaw.searchTerm;
+    if (typeof filtersRaw.fileFilter === 'string') filters.fileFilter = filtersRaw.fileFilter;
+    if (Array.isArray(filtersRaw.tags)) {
+      filters.tags = filtersRaw.tags.filter((t): t is string => typeof t === 'string');
+    }
+    if (typeof filtersRaw.showOnlyUntagged === 'boolean') {
+      filters.showOnlyUntagged = filtersRaw.showOnlyUntagged;
+    }
+    if (typeof filtersRaw.showOnlyPinned === 'boolean') {
+      filters.showOnlyPinned = filtersRaw.showOnlyPinned;
+    }
+    if (typeof filtersRaw.showOnlyRangeBookmarks === 'boolean') {
+      filters.showOnlyRangeBookmarks = filtersRaw.showOnlyRangeBookmarks;
+    }
+    if (typeof filtersRaw.showOnlyScratchpad === 'boolean') {
+      filters.showOnlyScratchpad = filtersRaw.showOnlyScratchpad;
+    }
+    if (
+      filtersRaw.dateRange &&
+      typeof filtersRaw.dateRange === 'object' &&
+      !Array.isArray(filtersRaw.dateRange)
+    ) {
+      const range = filtersRaw.dateRange as Record<string, unknown>;
+      if (typeof range.start === 'string' && typeof range.end === 'string') {
+        filters.dateRange = { start: range.start, end: range.end };
+      }
+    }
+
+    return filters;
+  }
+
+  private sanitizeSmartCollections(
+    input: unknown,
+    cap: number,
+    sourceLabel: string,
+  ): SmartCollection[] {
+    if (!Array.isArray(input)) return [];
+
+    const now = new Date().toISOString();
+    const sanitized: SmartCollection[] = [];
+    const total = input.length;
+
+    for (const entry of input) {
+      if (sanitized.length >= cap) break;
+      if (!entry || typeof entry !== 'object') continue;
+
+      const raw = entry as Record<string, unknown>;
+      if (typeof raw.id !== 'string' || !isSafeBookmarkId(raw.id)) continue;
+      if (typeof raw.name !== 'string' || raw.name.trim().length === 0) continue;
+
+      const usageCount =
+        typeof raw.usageCount === 'number' && Number.isFinite(raw.usageCount) && raw.usageCount > 0
+          ? raw.usageCount
+          : 0;
+
+      sanitized.push({
+        id: raw.id,
+        name: stripHtmlTags(raw.name).trim(),
+        description:
+          typeof raw.description === 'string' ? stripHtmlTags(raw.description) : undefined,
+        filters: this.sanitizeSmartCollectionFilters(raw.filters),
+        color: typeof raw.color === 'string' ? (raw.color as BookmarkColor) : undefined,
+        icon: typeof raw.icon === 'string' ? raw.icon : undefined,
+        createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
+        usageCount,
+        builtin: raw.builtin === true,
+      });
+    }
+
+    if (total > cap) {
+      this.deps.console.warn(
+        `Smart collection import capped at ${cap}; ignored ${total - cap} entries from ${sourceLabel}`,
+      );
+    }
+    return sanitized;
   }
 
   private ensureBuiltinSmartCollections(): void {
@@ -1165,6 +1499,7 @@ export class BookmarkManager {
       { id: 'sc-scratchpad', name: 'Scratchpad', filters: { showOnlyScratchpad: true } },
     ];
 
+    let added = 0;
     for (const builtin of builtins) {
       if (!this.smartCollections.find((sc) => sc.id === builtin.id)) {
         this.smartCollections.push({
@@ -1175,9 +1510,10 @@ export class BookmarkManager {
           usageCount: 0,
           builtin: true,
         });
+        added++;
       }
     }
-    this.saveSmartCollections();
+    if (added > 0) this.saveSmartCollections();
   }
 
   private saveCollections(): void {
@@ -1253,7 +1589,13 @@ export class BookmarkManager {
   updateCollection(id: string, data: Partial<Omit<BookmarkCollection, 'id' | 'createdAt'>>): void {
     const collection = this.collections.find((c) => c.id === id);
     if (collection) {
-      Object.assign(collection, data, { updatedAt: new Date().toISOString() });
+      const { name, description, bookmarkIds, color, icon } = data;
+      if (name !== undefined) collection.name = name;
+      if (description !== undefined) collection.description = description;
+      if (bookmarkIds !== undefined) collection.bookmarkIds = bookmarkIds;
+      if (color !== undefined) collection.color = color;
+      if (icon !== undefined) collection.icon = icon;
+      collection.updatedAt = new Date().toISOString();
       this.saveCollections();
     }
   }
@@ -1312,7 +1654,13 @@ export class BookmarkManager {
   ): void {
     const collection = this.smartCollections.find((sc) => sc.id === id);
     if (collection && !collection.builtin) {
-      Object.assign(collection, data);
+      const { name, description, filters, color, icon, usageCount } = data;
+      if (name !== undefined) collection.name = name;
+      if (description !== undefined) collection.description = description;
+      if (filters !== undefined) collection.filters = filters;
+      if (color !== undefined) collection.color = color;
+      if (icon !== undefined) collection.icon = icon;
+      if (usageCount !== undefined) collection.usageCount = usageCount;
       this.saveSmartCollections();
     }
   }
@@ -1465,19 +1813,12 @@ export class BookmarkManager {
 
     const bookmarkId = await this.addBookmark(undefined, undefined, undefined, undefined, {
       skipDuplicateCheck: false,
+      ...(scratchpadMode ? { scratchpad: true } : {}),
     });
 
     if (!bookmarkId) {
       // Duplicate detected or other issue — addBookmark already notified the UI
       return;
-    }
-
-    if (scratchpadMode) {
-      const bookmark = this.bookmarks.find((b) => b.id === bookmarkId);
-      if (bookmark) {
-        bookmark.scratchpad = true;
-        this.saveBookmarks();
-      }
     }
 
     this.deps.core.osd?.(`Bookmarked at ${formatTime(currentTime)}`);
@@ -1520,12 +1861,14 @@ export class BookmarkManager {
   // Playback status broadcast
   // ---------------------------------------------------------------------------
 
-  private broadcastPlaybackStatus(): void {
+  private broadcastPlaybackStatus(includeChapters = false): void {
     if (!this.uiInitialized) return;
     const duration = this.deps.core.status.duration || 0;
     const position = this.deps.core.status.position || this.deps.core.status.currentTime || 0;
-    const chapters = this.deps.core.getChapters?.() || [];
-    const status = { duration, position, chapters };
+    const status: Record<string, unknown> = { duration, position };
+    if (includeChapters) {
+      status.chapters = this.cachedChapters;
+    }
     for (const ui of ['sidebar', 'overlay', 'window'] as const) {
       this.getUITarget(ui).postMessage('PLAYBACK_STATUS', status);
     }
@@ -1533,8 +1876,9 @@ export class BookmarkManager {
 
   private startPlaybackBroadcast(): void {
     this.stopPlaybackBroadcast();
-    this.broadcastPlaybackStatus();
-    this.playbackInterval = setInterval(() => this.broadcastPlaybackStatus(), 5000);
+    this.cachedChapters = this.deps.core.getChapters?.() || [];
+    this.broadcastPlaybackStatus(true);
+    this.playbackInterval = setInterval(() => this.broadcastPlaybackStatus(false), 5000);
   }
 
   private stopPlaybackBroadcast(): void {

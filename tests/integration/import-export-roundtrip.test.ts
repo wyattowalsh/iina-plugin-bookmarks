@@ -32,6 +32,7 @@ describe('Import/Export Round-trip', () => {
 
     const exportResult = getLastMessage('sidebar', 'EXPORT_RESULT');
     expect(exportResult).toBeDefined();
+    expect(exportResult.success).toBe(true);
     expect(exportResult.format).toBe('json');
     expect(exportResult.content).toBeDefined();
 
@@ -95,6 +96,7 @@ describe('Import/Export Round-trip', () => {
 
     const exportResult = getLastMessage('sidebar', 'EXPORT_RESULT');
     expect(exportResult).toBeDefined();
+    expect(exportResult.success).toBe(true);
     expect(exportResult.format).toBe('csv');
     expect(exportResult.content).toContain('id,title,timestamp,filepath');
     expect(exportResult.content).toContain('CSV Test');
@@ -207,12 +209,79 @@ describe('Import/Export Round-trip', () => {
 
     const exportResult = getLastMessage('sidebar', 'EXPORT_RESULT');
     expect(exportResult).toBeDefined();
+    expect(exportResult.success).toBe(true);
     expect(exportResult.format).toBe('json');
 
     const parsed = JSON.parse(exportResult.content);
     expect(parsed.version).toBe(2);
     expect(Array.isArray(parsed.bookmarks)).toBe(true);
     expect(parsed.bookmarks.length).toBe(0);
+  });
+
+  it('should round-trip annotation fields (color, endTimestamp, pinned, scratchpad)', async () => {
+    const { send, getLastMessage, deps } = createTestHarness();
+
+    deps.core.status.path = '/test/video.mp4';
+    deps.core.status.currentTime = 100;
+
+    // Add a bookmark with annotation fields
+    send('sidebar', 'ADD_BOOKMARK', {
+      title: 'Annotated',
+      timestamp: 50,
+      tags: ['tag1'],
+      color: 'blue',
+      endTimestamp: 60,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Manually set fields that are only populated server-side
+    const bookmarks = getLastMessage('sidebar', 'BOOKMARKS_UPDATED');
+    const bm = bookmarks.find((b: any) => b.title === 'Annotated');
+    expect(bm).toBeDefined();
+    expect(bm.color).toBe('blue');
+    expect(bm.endTimestamp).toBe(60);
+
+    // Update to add pinned and scratchpad
+    send('sidebar', 'UPDATE_BOOKMARK', {
+      id: bm.id,
+      data: { pinned: true, scratchpad: true },
+    });
+
+    // Export as JSON
+    send('sidebar', 'EXPORT_BOOKMARKS', { format: 'json' });
+
+    const exportResult = getLastMessage('sidebar', 'EXPORT_RESULT');
+    expect(exportResult.success).toBe(true);
+    const parsed = JSON.parse(exportResult.content);
+    expect(parsed.version).toBe(2);
+
+    const exported = parsed.bookmarks.find((b: any) => b.title === 'Annotated');
+    expect(exported).toBeDefined();
+    expect(exported.color).toBe('blue');
+    expect(exported.endTimestamp).toBe(60);
+    expect(exported.pinned).toBe(true);
+    expect(exported.scratchpad).toBe(true);
+
+    // Import into fresh harness
+    const { send: send2, getLastMessage: getLastMessage2 } = createTestHarness();
+
+    send2('sidebar', 'IMPORT_BOOKMARKS', {
+      bookmarks: parsed.bookmarks,
+      options: { preserveIds: true },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const importResult = getLastMessage2('sidebar', 'IMPORT_RESULT');
+    expect(importResult.success).toBe(true);
+
+    const reimported = getLastMessage2('sidebar', 'BOOKMARKS_UPDATED');
+    const found = reimported.find((b: any) => b.title === 'Annotated');
+    expect(found).toBeDefined();
+    expect(found.color).toBe('blue');
+    expect(found.endTimestamp).toBe(60);
+    expect(found.pinned).toBe(true);
+    expect(found.scratchpad).toBe(true);
+    expect(found.tags).toEqual(['tag1']);
   });
 
   it('should skip duplicates when re-importing the same bookmarks', async () => {
@@ -235,6 +304,7 @@ describe('Import/Export Round-trip', () => {
     // Export
     send('sidebar', 'EXPORT_BOOKMARKS', { format: 'json' });
     const exportResult = getLastMessage('sidebar', 'EXPORT_RESULT');
+    expect(exportResult.success).toBe(true);
     const parsed = JSON.parse(exportResult.content);
     const exported = parsed.bookmarks; // v2 format
 

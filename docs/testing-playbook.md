@@ -5,10 +5,15 @@ Use this checklist when testing the plugin in a real IINA environment.
 ## Environment Setup
 
 1. macOS with IINA installed
-2. `make build` in the project root
-3. Symlink the plugin: `ln -sf "$(pwd)/dist" ~/Library/Application\ Support/com.colliderli.iina/plugins/iina-plugin-bookmarks.iinaplugin`
-4. Have 2+ test media files ready (different formats if possible)
-5. Restart IINA after installation
+2. `make link` in the project root (builds and symlinks the dev plugin)
+3. Have 2+ test media files ready (different formats if possible)
+4. Restart IINA after installation
+
+## Release Gate (Before Pushing a Release Tag)
+
+1. Run `make release` locally (full lint/type-check/test/e2e/build/package/validate pipeline).
+2. Complete all P0 tests in this playbook.
+3. Follow the tag-based publish checklist in [`.github/RELEASE_RUNBOOK.md`](../.github/RELEASE_RUNBOOK.md) (`v*` tags trigger the Release workflow).
 
 ## P0 — Critical Path (Must Pass Before Release)
 

@@ -135,8 +135,27 @@ test.describe('Window Interaction Tests', () => {
     await expect(dialog).toContainText(/delete|confirm/i);
   });
 
-  test('jump from detail panel sends message', async () => {
-    test.skip(true, 'Outbound iina.postMessage capture unreliable in WebKit E2E');
+  test('jump from detail panel sends message', async ({ page, harness }) => {
+    const bookmark = makeBookmark({ title: 'Jump Target', filepath: TEST_FILE_A });
+    await harness.sendBookmarks([bookmark]);
+    const listTab = page.getByRole('tab', { name: 'List' });
+    if ((await listTab.count()) > 0) {
+      await listTab.first().click();
+    }
+    await expect(page.locator('.bookmark-item')).toHaveCount(1);
+
+    await page.locator('.bookmark-item').first().click();
+    await harness.clearOutbound();
+    await page.locator('.jump-btn').click();
+
+    await page.waitForFunction(() => {
+      const outbound = (window as unknown as { __iinaOutbound?: Array<{ type?: string }> })
+        .__iinaOutbound;
+      return Array.isArray(outbound) && outbound.some((m) => m.type === 'JUMP_TO_BOOKMARK');
+    });
+
+    const jumpMessage = await harness.getLastOutbound('JUMP_TO_BOOKMARK');
+    expect(jumpMessage?.data).toEqual({ id: bookmark.id });
   });
 
   test('add dialog opens on add button click', async ({ page }) => {
@@ -203,16 +222,18 @@ test.describe('Window Interaction Tests', () => {
       .or(page.locator('.file-filter'))
       .or(page.locator('[aria-label*="Filter by file"]'));
 
-    const filterCount = await fileFilter.count();
-    if (filterCount > 0) {
-      await fileFilter.click();
+    if ((await fileFilter.count()) > 0) {
+      await fileFilter.first().click();
       await page.locator(`option:has-text("${TEST_FILE_A}")`).click();
-
-      // Verify only TEST_FILE_A bookmarks shown
-      await expect(page.locator('.bookmark-item')).toHaveCount(3);
     } else {
-      test.skip();
+      const fileLabel = TEST_FILE_A.split('/').pop() || TEST_FILE_A;
+      const fileCard = page.locator('[role="button"]').filter({ hasText: fileLabel }).first();
+      await expect(fileCard).toBeVisible();
+      await fileCard.click();
     }
+
+    // Verify only TEST_FILE_A bookmarks shown
+    await expect(page.locator('.bookmark-item')).toHaveCount(3);
   });
 
   test('placeholder panel shows when no bookmark selected', async ({ page, harness }) => {
@@ -222,15 +243,7 @@ test.describe('Window Interaction Tests', () => {
     // Verify placeholder visible initially — use the specific class only to avoid strict mode violation
     const placeholder = page.locator('.placeholder-panel');
 
-    const count = await placeholder.count();
-    if (count > 0) {
-      await expect(placeholder).toBeVisible();
-      await expect(placeholder).toContainText(/select/i);
-    } else {
-      // If no placeholder, detail panel should not be visible
-      const detailPanel = page.locator('.bookmark-detail-panel');
-      const detailCount = await detailPanel.count();
-      expect(detailCount === 0 || !(await detailPanel.isVisible())).toBe(true);
-    }
+    await expect(placeholder).toBeVisible();
+    await expect(placeholder).toContainText(/select/i);
   });
 });
