@@ -60,6 +60,20 @@ make release          # Full local release pipeline: clean, install, lint, type-
 
 GitHub release publishing is tag-driven (`v*` only). For exact steps, use the [release runbook](.github/RELEASE_RUNBOOK.md).
 
+Package manager distribution paths:
+
+- Pinned tag: `https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/download/vX.Y.Z/iina-plugin-bookmarks.iinaplgz`
+- Latest channel: `https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest/download/iina-plugin-bookmarks.iinaplgz`
+
+Homebrew tap install/upgrade:
+
+```bash
+brew install wyattowalsh/tap/iina-plugin-bookmarks
+brew upgrade wyattowalsh/tap/iina-plugin-bookmarks
+```
+
+Alternative managers should prefer the pinned tag URL for deterministic installs and checksum verification.
+
 ## Project Structure
 
 ```text

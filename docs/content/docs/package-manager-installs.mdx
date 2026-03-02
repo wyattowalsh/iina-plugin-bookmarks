@@ -1,0 +1,53 @@
+---
+title: Package Manager Installs
+description: Community package-manager install scaffolds for Homebrew tap and Nix
+---
+
+# Package Manager Installs
+
+This repository ships **scaffolds** for package-manager distribution.
+
+- Homebrew: `packaging/homebrew/Casks/iina-plugin-bookmarks.rb`
+- Nix: `packaging/nix/flake.nix`
+
+## Homebrew tap scaffold
+
+The project includes a tap-ready cask file, but this repository is **not** a Homebrew tap.
+To ship Homebrew installs, publish the cask from an external tap repository (for example, `<owner>/homebrew-iina-plugin-bookmarks`).
+
+Example end-user install flow after a tap is published:
+
+```bash
+brew tap <owner>/homebrew-iina-plugin-bookmarks
+brew install --cask iina-plugin-bookmarks
+brew upgrade --cask iina-plugin-bookmarks
+```
+
+Release updates for tap maintainers:
+
+1. Update `version` in the cask.
+2. Update `sha256` for `https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/download/vX.Y.Z/iina-plugin-bookmarks.iinaplgz`.
+3. Commit and push the tap repository update.
+
+## Nix scaffold (community, optional)
+
+`packaging/nix/flake.nix` provides a minimal scaffold for macOS (`aarch64-darwin` and `x86_64-darwin`) and fetches the plugin release asset.
+
+Build from the scaffold:
+
+```bash
+cd packaging/nix
+nix build .#iina-plugin-bookmarks
+```
+
+The scaffold starts with `hash = pkgs.lib.fakeHash;`.
+On the first build, replace it with the real hash reported by Nix, then rerun `nix build`.
+
+Link the result into IINA's plugin directory:
+
+```bash
+mkdir -p "$HOME/Library/Application Support/com.colliderli.iina/plugins"
+ln -sfn "$(pwd)/result" "$HOME/Library/Application Support/com.colliderli.iina/plugins/iina-plugin-bookmarks.iinaplugin"
+```
+
+Restart IINA after install or upgrade.

@@ -33,14 +33,35 @@ git push origin vX.Y.Z
 2. Confirm the GitHub Release is created for the tag.
 3. Confirm `packaging/iina-plugin-bookmarks.iinaplgz` is attached to the release.
 
-## 4) Go / No-Go Checklist
+## 4) Package-Manager Sync (Homebrew + alternatives)
+
+Use the same release tag from step 2:
+
+```bash
+scripts/pkg-followup-release.sh vX.Y.Z
+```
+
+Manual fallback:
+
+```bash
+TAG=vX.Y.Z
+ASSET_URL="https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/download/${TAG}/iina-plugin-bookmarks.iinaplgz"
+curl -fL "$ASSET_URL" -o /tmp/iina-plugin-bookmarks.iinaplgz
+shasum -a 256 /tmp/iina-plugin-bookmarks.iinaplgz
+```
+
+- Homebrew tap: update the tap formula/cask `url` and `sha256` to the tag-based asset URL and checksum above.
+- Alternative managers: use the same tag-based URL for pinned installs; reserve `/releases/latest/download/...` for rolling/latest channels only.
+
+## 5) Go / No-Go Checklist
 
 - `package.json` version, `Info.json` version, and `CHANGELOG.md` release section match the tag.
 - `RELEASE_TAG=vX.Y.Z make release-run` passes locally.
 - Docs build passes (`cd docs && pnpm install --frozen-lockfile && pnpm run build`).
 - Release workflow is green for the pushed tag.
+- Homebrew tap and alternative manager manifests point to `releases/download/vX.Y.Z/...` with updated checksum(s).
 
-## 5) Rollback Notes
+## 6) Rollback Notes
 
 If a bad tag/release was pushed:
 
