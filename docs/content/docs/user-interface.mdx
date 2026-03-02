@@ -1,6 +1,6 @@
 ---
 title: User Interface
-description: Overview of the three UI modes - Sidebar, Overlay, and Standalone Window
+description: Sidebar, overlay, and standalone window behavior in current releases
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -8,282 +8,95 @@ import { Card, Cards } from 'fumadocs-ui/components/card';
 
 # User Interface
 
-IINA Plugin Bookmarks provides three distinct interface modes to suit different workflows.
-
-## Interface Modes
+IINA Plugin Bookmarks ships three UI surfaces that share the same bookmark data.
 
 <Cards>
-  <Card title="Sidebar" description="Full-featured interface integrated into IINA's sidebar" href="#sidebar" />
-  <Card title="Overlay" description="Lightweight overlay for quick bookmark access" href="#overlay" />
-  <Card title="Standalone Window" description="Independent window with complete functionality" href="#standalone-window" />
+  <Card
+    title="Sidebar"
+    description="Primary interface for day-to-day bookmark management"
+    href="#sidebar"
+  />
+  <Card title="Overlay" description="In-video overlay for quick bookmark jumping" href="#overlay" />
+  <Card
+    title="Standalone Window"
+    description="Expanded management view opened from the plugin menu"
+    href="#standalone-window"
+  />
 </Cards>
 
 ## Sidebar
 
-The **recommended** interface for most users. Provides complete bookmark management within IINA's native sidebar.
+The sidebar is the default management surface.
 
-### Features
+### What it supports
 
-- ✓ View all bookmarks in scrollable list
-- ✓ Create, edit, delete bookmarks
-- ✓ Search and advanced filtering
-- ✓ Sort by timestamp, title, or creation date
-- ✓ Import/export bookmarks
-- ✓ Cloud sync integration
-- ✓ Drag-to-reorder (when custom sort enabled)
-- ✓ Tag management
-- ✓ File reconciliation for missing paths
+- Add bookmarks
+- Import/export bookmarks
+- Check moved files (reconciliation)
+- Filter/search bookmarks
+- Toggle scope: **This File** vs **All Files**
+- Jump, edit, and delete bookmarks
 
-### Access
+### How to access
 
-- **Keyboard:** Cmd+Shift+B
-- **Menu:** View → Toggle Sidebar
-- **Auto-open:** Sidebar appears by default when IINA launches
-
-### Layout
-
-```
-┌─────────────────────────────┐
-│ Search: [____________]  🔍  │
-│ ────────────────────────── │
-│ Filters: [All] [Tags] [▼]  │
-│ ────────────────────────── │
-│ Sort by: Timestamp ▼       │
-│ ────────────────────────── │
-│ [+ Add Bookmark]           │
-│ [↓ Import] [↑ Export]      │
-│ [☁ Cloud Sync]             │
-│ ────────────────────────── │
-│ 📑 Bookmark Title 1        │
-│    00:02:15 • Tag1, Tag2   │
-│ 📑 Bookmark Title 2        │
-│    00:05:30 • Tag3         │
-│ 📑 Bookmark Title 3        │
-│    00:12:45                │
-│ ...                         │
-└─────────────────────────────┘
-```
-
-### Bookmarks List
-
-Each bookmark displays:
-- **Title** - Auto-detected or custom
-- **Timestamp** - Formatted as HH:MM:SS
-- **Tags** - Color-coded labels
-- **File path** - Shown on hover
-- **Edit/Delete buttons** - On hover
+- **View → Toggle Sidebar** (or `Cmd+Shift+B` in IINA)
+- Open any media file and select the **Bookmarks** tab
 
 <Callout type="tip">
-  Click any bookmark to instantly jump to that timestamp in the video.
+  For quick capture without opening dialogs, use <strong>Ctrl+B</strong> (Quick Bookmark).
 </Callout>
 
 ## Overlay
 
-Minimal interface overlaid on the video for quick bookmark jumping without leaving fullscreen.
+The overlay is optimized for quick navigation while watching video.
 
-### Features
+### What it supports
 
-- ✓ Quick search
-- ✓ Jump to bookmark
-- ✓ Minimal visual footprint
-- ✓ Keyboard navigation
-- ✓ Auto-hide after selection
+- Search/filter visible bookmarks
+- Jump to selected bookmark
+- Close with `Esc`
 
-### Access
+### How to access
 
-Configure a custom hotkey in IINA preferences:
-1. Open IINA Preferences
-2. Go to Advanced → Plugins
-3. Set hotkey for "Show Bookmarks Overlay"
-
-### Use Cases
-
-- **Fullscreen viewing** - Access bookmarks without exiting fullscreen
-- **Presentations** - Quickly jump between marked segments
-- **Review sessions** - Navigate to specific timestamps efficiently
-
-### Layout
-
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│         🔍 Search bookmarks...          │
-│                                         │
-│  ┌────────────────────────────────┐    │
-│  │ 00:02:15 - Bookmark Title 1    │    │
-│  │ 00:05:30 - Bookmark Title 2    │    │
-│  │ 00:12:45 - Bookmark Title 3    │    │
-│  └────────────────────────────────┘    │
-│                                         │
-│         Press ESC to close              │
-└─────────────────────────────────────────┘
-```
-
-### Keyboard Shortcuts
-
-- **↑/↓** - Navigate bookmarks
-- **Enter** - Jump to selected bookmark
-- **ESC** - Close overlay
-- **Type** - Filter results
-
-<Callout type="info">
-  The overlay automatically hides after jumping to a bookmark, returning you to the video seamlessly.
-</Callout>
+- **Plugin menu → Toggle Bookmarks Overlay**
+- Optional: bind your own hotkey in IINA plugin shortcut settings
 
 ## Standalone Window
 
-Independent window with full functionality, ideal for multi-monitor setups or power users.
+The standalone window provides a larger workspace for heavy editing sessions.
 
-### Features
+### What it supports
 
-- ✓ All sidebar features
-- ✓ Resizable and repositionable
-- ✓ Stays on top (optional)
-- ✓ Separate from IINA window
-- ✓ Persistent position across sessions
+- Full bookmark list management
+- Advanced filtering and search
+- Batch actions and timeline tools
+- Import/export and reconciliation actions
 
-### Access
+### How to access
 
-- **Menu:** Plugins → Bookmarks → Open Window
-- **Sidebar:** Click "Open in Window" button
+- **Plugin menu → Manage Bookmarks**
 
-### Use Cases
+## Plugin Menu Actions
 
-- **Multi-monitor** - Keep bookmarks on second screen while video plays on primary
-- **Side-by-side** - View bookmarks alongside other reference material
-- **Annotation workflow** - Add detailed notes while video plays
+The plugin registers these menu actions:
 
-### Window Management
+- **Add Bookmark at Current Time**
+- **Manage Bookmarks**
+- **Toggle Bookmarks Overlay**
+- **Quick Bookmark** (`Ctrl+B`)
+- **Next Bookmark** (`Ctrl+]`)
+- **Previous Bookmark** (`Ctrl+[`)
 
-- **Resize** - Drag window edges/corners
-- **Move** - Drag title bar
-- **Always on Top** - Enable in window menu
-- **Close** - Cmd+W or close button
+## Cloud Sync Status
 
 <Callout type="warning">
-  Only one standalone window can be open at a time. Opening a new window closes the previous one.
+  Cloud provider sync is not shipped in current releases. Use
+  <a href="/docs/features/data-management">import/export</a> for backup and transfer.
 </Callout>
-
-## Shared Components
-
-All three interfaces share these dialogs:
-
-### Add Bookmark Dialog
-
-- Auto-populate current timestamp and file path
-- Optional custom title
-- Description field with markdown support
-- Tag input with autocomplete
-- Preview bookmark before saving
-
-### Import Dialog
-
-- Drag-and-drop JSON/CSV files
-- Duplicate handling options (skip/replace/merge)
-- Validation with error reporting
-- Import preview before confirmation
-
-### Export Dialog
-
-- Choose JSON or CSV format
-- Select bookmarks to export (all/filtered)
-- CSV includes formula injection protection
-- Download or copy to clipboard
-
-### Cloud Sync Dialog
-
-- Provider selection (Google Drive/Dropbox)
-- Authentication flow
-- Sync action selection (upload/download/sync)
-- Progress indicator
-- Result summary with statistics
-
-### Filter Component
-
-- Text search across titles and descriptions
-- Tag filtering (AND/OR logic)
-- Date range selection
-- File path filtering
-- Save filter presets
-
-## Dark Mode
-
-All interfaces support dark mode:
-
-- **Auto-detect** - Follows system preference
-- **Manual toggle** - Available in plugin settings
-- **High contrast** - Optimized for readability
-
-Dark mode themes:
-- Sidebar: Integrates with IINA's dark theme
-- Overlay: Semi-transparent dark background
-- Window: System-native dark appearance
-
-## Accessibility
-
-### Keyboard Navigation
-
-- **Tab** - Navigate between elements
-- **Enter/Space** - Activate buttons
-- **ESC** - Close dialogs/overlay
-- **Arrow keys** - Navigate lists
-
-### Screen Reader Support
-
-- Semantic HTML elements
-- ARIA labels and roles
-- Focus management
-- Descriptive alt text
-
-### Focus Trapping
-
-Dialogs implement focus trapping:
-- Focus stays within dialog when open
-- ESC closes dialog and restores focus
-- Tab cycles through dialog elements only
-
-<Callout type="info">
-  For accessibility feedback or issues, [open an issue](https://github.com/wyattowalsh/iina-plugin-bookmarks/issues) on GitHub.
-</Callout>
-
-## Performance
-
-### Optimization Techniques
-
-- **Virtual scrolling** - Large bookmark lists render efficiently
-- **Debounced search** - 300ms delay to prevent excessive filtering
-- **Lazy loading** - UI components load on demand
-- **Memoization** - React components memoized to prevent unnecessary re-renders
-
-### Memory Management
-
-- Event listeners cleaned up on unmount
-- No memory leaks from React hooks
-- Efficient state updates via reducers
-
-## Customization
-
-### UI Preferences
-
-Configure in plugin settings:
-
-- **Default interface** - Choose startup mode
-- **Theme** - Light/dark/auto
-- **Font size** - Adjust for readability
-- **Compact mode** - Reduce spacing for more bookmarks on screen
-
-### Hotkeys
-
-Set custom keyboard shortcuts:
-
-- Show/hide sidebar
-- Toggle overlay
-- Open standalone window
-- Add bookmark at current time
 
 ## Next Steps
 
-- Learn about [Bookmark Management](/docs/features/bookmark-management)
-- Explore [Filtering and Search](/docs/features/filtering)
-- Set up [Cloud Sync](/docs/features/cloud-sync)
-- Review [Data Management](/docs/features/data-management) for import/export
+- [Bookmark Management](/docs/features/bookmark-management)
+- [Filtering and Search](/docs/features/filtering)
+- [Data Management](/docs/features/data-management)
+- [Cloud Sync (Planned)](/docs/features/cloud-sync)

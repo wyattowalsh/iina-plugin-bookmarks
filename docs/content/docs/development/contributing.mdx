@@ -38,6 +38,7 @@ Thank you for your interest in contributing to IINA Plugin Bookmarks! This guide
     ```bash
     pnpm install
     ```
+
   </Step>
 
   <Step>
@@ -47,6 +48,7 @@ Thank you for your interest in contributing to IINA Plugin Bookmarks! This guide
     make build
     make test
     ```
+
   </Step>
 </Steps>
 
@@ -58,7 +60,8 @@ Thank you for your interest in contributing to IINA Plugin Bookmarks! This guide
 make build    # TypeScript compile + Parcel UI build
 make test     # Run test suite with Vitest
 make dev      # Start dev servers for sidebar/overlay/window
-make release  # Full production pipeline
+RELEASE_TAG=vX.Y.Z make release-run  # Canonical release lane
+make release  # Optional clean-install release gate
 ```
 
 ### Commit Guidelines
@@ -102,9 +105,7 @@ describe('BookmarkManager', () => {
 4. Submit PR with clear description
 5. Address review feedback
 
-<Callout type="info">
-  For major changes, please open an issue for discussion first.
-</Callout>
+<Callout type="info">For major changes, please open an issue for discussion first.</Callout>
 
 ## Community Guidelines
 

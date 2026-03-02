@@ -1,6 +1,6 @@
 ---
 title: BookmarkManager API
-description: Complete API reference for the BookmarkManager class
+description: Runtime behavior and public API of src/bookmark-manager.ts
 icon: Code
 ---
 
@@ -9,353 +9,115 @@ import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
 # BookmarkManager API Reference
 
-The `BookmarkManager` class is the central orchestrator for all bookmark operations, UI communication, and system integration.
+`BookmarkManager` coordinates bookmark data, UI messaging, and IINA integration.
 
 ## Class Overview
 
 ```typescript
-export class BookmarkManager {
-  private bookmarks: BookmarkData[];
-  private readonly SORT_PREFERENCES_KEY = 'sortPreferences';
-  private deps: IINARuntimeDependencies;
+class BookmarkManager {
+  private bookmarks: BookmarkData[] = [];
+  private collections: BookmarkCollection[] = [];
+  private smartCollections: SmartCollection[] = [];
+
   private persistence: BookmarkPersistence;
   private importExport: BookmarkImportExport;
-  private cloudSync: CloudSyncHandler;
-  private eventIds: string[];
-  private idCounter: number;
+  private thumbnailGenerator: ThumbnailGenerator;
 
-  constructor(dependencies: IINARuntimeDependencies)
+  constructor(dependencies: IINARuntimeDependencies);
 }
 ```
 
 <Callout type="info">
-  The BookmarkManager delegates specialized operations to focused modules: `BookmarkPersistence` for storage, `BookmarkImportExport` for data transformation, and `CloudSyncHandler` for cloud operations.
+  The current runtime does not include a cloud sync handler in <code>BookmarkManager</code>.
 </Callout>
 
-## Constructor
+## Constructor Behavior
 
-Creates a new BookmarkManager instance and initializes all subsystems.
+On construction, the manager:
 
-```typescript
-constructor(dependencies: IINARuntimeDependencies)
-```
+1. Initializes persistence/import-export/thumbnail modules.
+2. Loads bookmarks, collections, and resume positions.
+3. Registers IINA event listeners and plugin menu items.
+4. Defers UI file loading until `iina.window-loaded` when needed.
 
-**Parameters:**
-- `dependencies` - IINA runtime dependencies (console, core, preferences, menu, event, sidebar, overlay, standaloneWindow, utils, file, http)
+## Public Methods
 
-**Initialization sequence:**
-1. Creates persistence, import/export, and cloud sync handlers
-2. Loads existing bookmarks from storage
-3. Loads sort preferences
-4. Sets up event listeners for file-loaded events
-5. Sets up web UI (sidebar, overlay, window)
-6. Sets up UI message listeners for all message types
-
-## Core Methods
-
-<Tabs items={['Bookmark Operations', 'Query Operations', 'Lifecycle']}>
-  <Tab value="Bookmark Operations">
-    ### `addBookmark()`
-
-    Creates a new bookmark with auto-populated defaults and validation.
-
+<Tabs items={['Bookmark Ops', 'Navigation & Loop', 'Queries', 'Lifecycle']}>
+  <Tab value="Bookmark Ops">
     ```typescript
     async addBookmark(
       title?: string,
       timestamp?: number,
       description?: string,
-      tags?: string[]
-    ): Promise<void>
+      tags?: string[],
+      options?: {
+        skipDuplicateCheck?: boolean;
+        color?: BookmarkColor;
+        endTimestamp?: number;
+        scratchpad?: boolean;
+      }
+    ): Promise<string | undefined>;
+
+    removeBookmark(id: string): void;
+    updateBookmark(id: string, data: BookmarkUpdatableFields): void;
+    jumpToBookmark(id: string): void;
     ```
 
-    **Parameters:**
-    - `title` (optional) - Bookmark title. If omitted, auto-generated from filename and timestamp.
-    - `timestamp` (optional) - Playback position in seconds. If omitted, uses current playback position.
-    - `description` (optional) - User description. If omitted, auto-generated.
-    - `tags` (optional) - Array of tags. Defaults to empty array.
+    Notes:
 
-    **Behavior:**
-    - Validates timestamp is within valid range (0 to MAX_TIMESTAMP)
-    - Enforces maximum bookmark limit from preferences (default: 1000)
-    - Auto-generates title from filename if not provided
-    - Sanitizes all inputs to prevent XSS (strips HTML tags)
-    - Generates unique ID using timestamp + counter + random component
-    - Saves immediately and refreshes all UIs
+    - `addBookmark` can return `undefined` (for example, near-duplicate detection).
+    - Input text is sanitized before persistence.
+    - `jumpToBookmark` supports same-file seek and cross-file open+seek.
 
-    **Example:**
-    ```typescript
-    // Quick bookmark at current position with auto-generated title
-    await manager.addBookmark();
-
-    // Custom bookmark with full details
-    await manager.addBookmark(
-      "Epic Battle Scene",
-      2847.5,
-      "Amazing fight choreography",
-      ["action", "favorite"]
-    );
-    ```
-
-    ---
-
-    ### `removeBookmark()`
-
-    Removes a bookmark by ID.
-
-    ```typescript
-    removeBookmark(id: string): void
-    ```
-
-    **Parameters:**
-    - `id` - Unique bookmark identifier
-
-    **Behavior:**
-    - Filters bookmark array to remove matching ID
-    - Logs warning if bookmark not found
-    - Saves immediately and refreshes all UIs
-
-    ---
-
-    ### `updateBookmark()`
-
-    Updates bookmark properties.
-
-    ```typescript
-    updateBookmark(id: string, data: BookmarkUpdatableFields): void
-    ```
-
-    **Parameters:**
-    - `id` - Unique bookmark identifier
-    - `data` - Partial update object containing title, description, and/or tags
-
-    **Behavior:**
-    - Finds bookmark by ID
-    - Sanitizes updated fields (strips HTML tags)
-    - Updates `updatedAt` timestamp
-    - Saves immediately and refreshes all UIs
-    - Logs warning if bookmark not found
-
-    **Example:**
-    ```typescript
-    manager.updateBookmark("bookmark_123", {
-      title: "Updated Title",
-      description: "New description",
-      tags: ["updated", "favorite"]
-    });
-    ```
-
-    ---
-
-    ### `jumpToBookmark()`
-
-    Seeks to the bookmark's timestamp in the current media.
-
-    ```typescript
-    jumpToBookmark(id: string): void
-    ```
-
-    **Parameters:**
-    - `id` - Unique bookmark identifier
-
-    **Behavior:**
-    - Finds bookmark by ID
-    - Calls `iina.core.seekTo(timestamp)` to jump to position
-    - Logs error if bookmark not found or seek unavailable
-    - Shows OSD message if seek operation fails
   </Tab>
 
-  <Tab value="Query Operations">
-    ### `getBookmarksForFile()`
-
-    Retrieves bookmarks filtered by file path.
-
+  <Tab value="Navigation & Loop">
     ```typescript
-    getBookmarksForFile(filepath?: string): BookmarkData[]
+    setABLoop(bookmarkId: string): void;
+    clearABLoop(): void;
+    navigateBookmark(
+      currentId: string,
+      direction: 'next' | 'prev',
+      scope: 'file' | 'all'
+    ): void;
     ```
 
-    **Parameters:**
-    - `filepath` (optional) - Absolute path to media file. If omitted, returns all bookmarks.
+    These are wired to plugin menu actions and shortcuts (`Ctrl+B`, `Ctrl+]`, `Ctrl+[`).
 
-    **Returns:**
-    - Array of matching bookmarks
-
-    **Example:**
-    ```typescript
-    // Get all bookmarks
-    const all = manager.getBookmarksForFile();
-
-    // Get bookmarks for specific file
-    const movieBookmarks = manager.getBookmarksForFile('/Movies/Inception.mp4');
-    ```
-
-    ---
-
-    ### `getAllBookmarks()`
-
-    Returns a copy of all bookmarks.
-
-    ```typescript
-    getAllBookmarks(): BookmarkData[]
-    ```
-
-    **Returns:**
-    - Array copy of all bookmarks (prevents external mutation)
-
-    ---
-
-    ### `getBookmarkCount()`
-
-    Returns the total number of bookmarks.
-
-    ```typescript
-    getBookmarkCount(): number
-    ```
-
-    **Returns:**
-    - Total bookmark count
   </Tab>
+
+<Tab value="Queries">
+  ```typescript getBookmarksForFile(filepath?: string): BookmarkData[]; getAllBookmarks():
+  BookmarkData[]; getBookmarkCount(): number; ```
+</Tab>
 
   <Tab value="Lifecycle">
-    ### `destroy()`
-
-    Cleans up event listeners registered by this instance.
-
     ```typescript
-    destroy(): void
+    destroy(): void;
     ```
 
-    **Behavior:**
-    - Unregisters all file-loaded event listeners
-    - Clears event ID array
+    `destroy()` unregisters event listeners, clears playback timers, and cancels pending seek work.
 
-    <Callout type="warn">
-      Call this method before discarding a BookmarkManager instance to prevent memory leaks.
-    </Callout>
   </Tab>
 </Tabs>
 
-## Private Methods
+## Message Protocol (Practical)
 
-The BookmarkManager uses several private methods for internal operations:
+`BookmarkManager` handles UI messages such as:
 
-### UI Communication
+- CRUD + seek: `ADD_BOOKMARK`, `UPDATE_BOOKMARK`, `DELETE_BOOKMARK`, `JUMP_TO_BOOKMARK`
+- import/export: `IMPORT_BOOKMARKS`, `EXPORT_BOOKMARKS`
+- reconciliation: `RECONCILE_FILES`, `FILE_RECONCILIATION_REQUEST`
+- collections and batch operations
+- timeline/loop/navigation actions
 
-- `setupWebUI()` - Loads sidebar, overlay, and window HTML files
-- `setupUIMessageListeners()` - Registers message handlers for all UI message types
-- `handleUIMessage()` - Routes incoming messages to appropriate handlers
-- `getUITarget()` - Returns the correct UI API object (sidebar/overlay/window)
-- `sendCurrentFilePath()` - Sends current media file path to UI
-- `sendBookmarksToUI()` - Sends filtered bookmarks to UI
-- `sendBookmarkDefaults()` - Sends auto-populated bookmark defaults for creation
-- `refreshUI()` - Refreshes all three UI interfaces
+And emits updates such as:
 
-### Event Handling
+- `BOOKMARKS_UPDATED`, `BOOKMARK_DEFAULTS`, `CURRENT_FILE_PATH`
+- `BOOKMARK_ADDED`, `BOOKMARK_DELETED`, `BOOKMARK_JUMPED`
+- `IMPORT_RESULT`, `EXPORT_RESULT`, `PLAYBACK_STATUS`, `ERROR`
 
-- `setupEventListeners()` - Registers file-loaded events and menu items
-- `loadSortPreferences()` - Loads and sends sort preferences to all UIs
-- `saveSortPreferencesFromUI()` - Saves sort preferences from UI
+## Related References
 
-### Data Management
-
-- `saveBookmarks()` - Delegates to BookmarkPersistence, then refreshes UIs
-- `importBookmarks()` - Delegates to BookmarkImportExport
-- `exportBookmarks()` - Delegates to BookmarkImportExport
-- `handleCloudSync()` - Delegates to CloudSyncHandler
-
-### File Reconciliation
-
-- `handleReconcileFiles()` - Finds bookmarks with missing files
-- `handleFileReconciliation()` - Routes reconciliation actions (update_path, remove_bookmark, search_similar)
-- `updateBookmarkPath()` - Updates a bookmark's file path
-- `searchForSimilarFiles()` - Placeholder for similar file search (not yet implemented)
-
-### Utilities
-
-- `generateId()` - Generates unique bookmark IDs using timestamp + counter + random
-
-## UI Message Protocol
-
-The BookmarkManager handles the following messages from UIs:
-
-**Incoming Messages (UI → Backend):**
-- `UI_READY` - UI initialization complete, triggers bookmark sync
-- `REQUEST_FILE_PATH` - Request current media file path
-- `REQUEST_BOOKMARK_DEFAULTS` - Request auto-populated defaults for new bookmark
-- `ADD_BOOKMARK` - Create new bookmark
-- `DELETE_BOOKMARK` - Remove bookmark by ID
-- `UPDATE_BOOKMARK` - Update bookmark fields
-- `JUMP_TO_BOOKMARK` - Seek to bookmark timestamp
-- `HIDE_OVERLAY` - Hide overlay UI
-- `IMPORT_BOOKMARKS` - Import bookmarks from external data
-- `EXPORT_BOOKMARKS` - Export bookmarks to JSON/CSV
-- `CLOUD_SYNC_REQUEST` - Perform cloud sync operation
-- `FILE_RECONCILIATION_REQUEST` - Handle file path reconciliation
-- `RECONCILE_FILES` - Show file reconciliation dialog
-- `SAVE_SORT_PREFERENCES` - Save sort preferences
-
-**Outgoing Messages (Backend → UI):**
-- `BOOKMARKS_UPDATED` - Current bookmarks for file
-- `CURRENT_FILE_PATH` - Current media file path
-- `BOOKMARK_ADDED` - Confirmation of bookmark creation
-- `BOOKMARK_DELETED` - Confirmation of bookmark deletion
-- `BOOKMARK_JUMPED` - Confirmation of seek operation
-- `BOOKMARK_DEFAULTS` - Auto-populated bookmark defaults
-- `SORT_PREFERENCES` - Current sort preferences
-- `IMPORT_RESULT` - Import operation result
-- `EXPORT_RESULT` - Export operation result
-- `CLOUD_SYNC_RESULT` - Cloud sync operation result
-- `SHOW_FILE_RECONCILIATION_DIALOG` - Trigger reconciliation dialog
-- `FILE_RECONCILIATION_RESULT` - File reconciliation result
-
-## Example Usage
-
-```typescript
-// Initialize BookmarkManager with IINA runtime dependencies
-const manager = new BookmarkManager({
-  console: iina.console,
-  core: iina.core,
-  preferences: iina.preferences,
-  menu: iina.menu,
-  event: iina.event,
-  sidebar: iina.sidebar,
-  overlay: iina.overlay,
-  standaloneWindow: iina.standaloneWindow,
-  utils: iina.utils,
-  file: iina.file,
-  http: httpAdapter
-});
-
-// Add a bookmark at current position
-await manager.addBookmark();
-
-// Add a bookmark with custom details
-await manager.addBookmark(
-  "Important Scene",
-  1234.5,
-  "Key plot point revealed",
-  ["plot", "important"]
-);
-
-// Get bookmarks for current file
-const currentPath = iina.core.status.path;
-const bookmarks = manager.getBookmarksForFile(currentPath);
-
-// Jump to a bookmark
-manager.jumpToBookmark("bookmark_id_here");
-
-// Update bookmark
-manager.updateBookmark("bookmark_id", {
-  title: "Updated Title",
-  tags: ["updated"]
-});
-
-// Remove bookmark
-manager.removeBookmark("bookmark_id");
-
-// Clean up when done
-manager.destroy();
-```
-
-<Callout type="info">
-  BookmarkManager delegates to internal modules: BookmarkPersistence (file I/O), BookmarkImportExport (import/export), and CloudSyncHandler (cloud sync). See the [Interfaces](/docs/api/interfaces) page for their type definitions.
-</Callout>
+- [Interfaces & Types](/docs/api/interfaces)
+- [Architecture](/docs/development/architecture)

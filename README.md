@@ -11,7 +11,7 @@ A bookmark management plugin for [IINA](https://iina.io) that lets you save, org
 - **Tag System** -- Organize bookmarks with tags, auto-tagging, and multi-criteria filtering
 - **Search and Sort** -- Advanced search across titles, descriptions, and tags with multi-criteria sorting
 - **Import / Export** -- JSON and CSV support with duplicate handling and validation
-- **Cloud Backup** -- Optional Google Drive and Dropbox integration for backup and sync
+- **Cloud Sync (Roadmap)** -- Provider-based sync is planned; use JSON/CSV export/import for backup and transfer today
 - **File Reconciliation** -- Detect and resolve bookmarks pointing to moved or renamed files
 - **Multiple Interfaces** -- IINA sidebar tab, standalone management window, and video overlay
 - **Smart Metadata** -- Automatic title detection from media metadata with intelligent fallbacks
@@ -24,9 +24,9 @@ A bookmark management plugin for [IINA](https://iina.io) that lets you save, org
 
 ## Installation
 
-1. In IINA, open **Preferences → Plugins** and use **Install from GitHub** with:
+1. In IINA, open **Preferences → Plugins** and use **Install from GitHub** (recommended) with:
    - `https://github.com/wyattowalsh/iina-plugin-bookmarks`
-2. Or download the latest `.iinaplgz` file from [Releases](https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest), then double-click it to install (or extract manually):
+2. Or install from a release asset: download the latest `.iinaplgz` file from [Releases](https://github.com/wyattowalsh/iina-plugin-bookmarks/releases/latest), then double-click it (or extract manually):
    ```bash
    mkdir -p ~/Library/Application\ Support/com.colliderli.iina/plugins/
    unzip iina-plugin-bookmarks.iinaplgz -d ~/Library/Application\ Support/com.colliderli.iina/plugins/iina-plugin-bookmarks.iinaplugin
@@ -77,9 +77,10 @@ Direct-release install URLs:
 ```text
 src/
   index.ts                  Main plugin entry point
-  bookmark-manager.ts       Core bookmark logic
-  cloud-storage.ts          Cloud backup service
-  metadata-detector.ts      Media metadata detection
+  bookmark-manager.ts       Core bookmark orchestration
+  bookmark-import-export.ts Import/export and duplicate handling
+  bookmark-persistence.ts   Local persistence and backup recovery
+  thumbnail-generator.ts    Thumbnail generation utilities
   types.ts                  TypeScript type definitions
 
 ui/

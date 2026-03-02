@@ -11,9 +11,10 @@ Use this checklist when testing the plugin in a real IINA environment.
 
 ## Release Gate (Before Pushing a Release Tag)
 
-1. Run `make release` locally (full lint/type-check/test/e2e/build/package/validate pipeline).
-2. Complete all P0 tests in this playbook.
-3. Follow the tag-based publish checklist in [`.github/RELEASE_RUNBOOK.md`](../.github/RELEASE_RUNBOOK.md) (`v*` tags trigger the Release workflow).
+1. Run `RELEASE_TAG=vX.Y.Z make release-run` locally (canonical release lane).
+2. Optionally run `make release` for a clean-install gate.
+3. Complete all P0 tests in this playbook.
+4. Follow the tag-based publish checklist in [`.github/RELEASE_RUNBOOK.md`](../.github/RELEASE_RUNBOOK.md) (`v*` tags trigger the Release workflow).
 
 ## P0 — Critical Path (Must Pass Before Release)
 
@@ -47,19 +48,17 @@ Use this checklist when testing the plugin in a real IINA environment.
 
 ## P2 — Nice to Have
 
-| ID    | Test                  | Steps                                                   | Expected                            |
-| ----- | --------------------- | ------------------------------------------------------- | ----------------------------------- |
-| P2-01 | Cloud sync (GDrive)   | Configure Google Drive credentials, upload/download     | Bookmarks synced                    |
-| P2-02 | Cloud sync (Dropbox)  | Configure Dropbox credentials, upload/download          | Bookmarks synced                    |
-| P2-03 | Multi-sort            | Enable multi-sort in window                             | Multiple sort criteria applied      |
-| P2-04 | Filter presets        | Save and apply filter presets in window                 | Presets saved and restore correctly |
-| P2-05 | Max bookmarks         | Set max bookmarks preference, add beyond limit          | OSD warning, bookmark rejected      |
-| P2-06 | Special characters    | Add bookmark with `<script>alert('xss')</script>` title | HTML stripped, no XSS               |
-| P2-07 | Long titles           | Add bookmark with 255-char title                        | Title truncated/displayed correctly |
-| P2-08 | Concurrent cloud sync | Start upload, immediately try another sync              | "Already in progress" error         |
+| ID    | Test               | Steps                                                   | Expected                            |
+| ----- | ------------------ | ------------------------------------------------------- | ----------------------------------- |
+| P2-01 | Multi-sort         | Enable multi-sort in window                             | Multiple sort criteria applied      |
+| P2-02 | Filter presets     | Save and apply filter presets in window                 | Presets saved and restore correctly |
+| P2-03 | Max bookmarks      | Set max bookmarks preference, add beyond limit          | OSD warning, bookmark rejected      |
+| P2-04 | Special characters | Add bookmark with `<script>alert('xss')</script>` title | HTML stripped, no XSS               |
+| P2-05 | Long titles        | Add bookmark with 255-char title                        | Title truncated/displayed correctly |
 
 ## Regression Notes
 
 - After any persistence change, always verify P0-05
 - After any UI change, check all 3 variants (sidebar, overlay, window)
 - After any message handler change, verify the full CRUD flow (P0-02 through P0-04)
+- Cloud provider sync is roadmap-only; do not treat it as a release gate for current versions.
