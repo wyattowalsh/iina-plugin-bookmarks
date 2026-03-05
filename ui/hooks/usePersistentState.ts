@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { FilterState } from '../components/FilterComponent';
+import { AppWindow } from '../types';
 
 /**
  * Custom hook for persisting state in localStorage
@@ -20,8 +21,8 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, (value:
 
   const setValue = (value: T) => {
     try {
-      setState(value);
       window.localStorage.setItem(key, JSON.stringify(value));
+      setState(value);
     } catch (error) {
       console.warn(`Error setting localStorage key "${key}":`, error);
     }
@@ -51,7 +52,7 @@ export const usePersistentSortPreferences = (viewId: string) => {
     (preferences: Partial<FilterState>) => {
       setSortPreferences(preferences);
       // Send to plugin for persistence
-      const appWindow = window as any;
+      const appWindow = window as unknown as AppWindow;
       if (appWindow.iina?.postMessage) {
         appWindow.iina.postMessage('SAVE_SORT_PREFERENCES', {
           preferences: { viewId, ...preferences },

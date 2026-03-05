@@ -26,6 +26,11 @@ import { ThumbnailGenerator } from './thumbnail-generator';
 import { isSafeBookmarkId, isValidEndTimestamp, stripHtmlTags } from './utils/validation';
 import { formatTime } from './utils/formatTime';
 
+interface QueuedUIMessage {
+  type: string;
+  payload: unknown;
+}
+
 export class BookmarkManager {
   private bookmarks: BookmarkData[] = [];
   private collections: BookmarkCollection[] = [];
@@ -40,6 +45,27 @@ export class BookmarkManager {
   private thumbnailGenerator: ThumbnailGenerator;
   private eventIds: Array<{ event: string; id: string }> = [];
   private uiInitialized = false;
+  private readonly uiReady: Record<UISource, boolean> = {
+    sidebar: false,
+    overlay: false,
+    window: false,
+  };
+  private readonly queuedUIMessages: Record<UISource, QueuedUIMessage[]> = {
+    sidebar: [],
+    overlay: [],
+    window: [],
+  };
+  private readonly coalescedMessageTypes = new Set([
+    'BOOKMARKS_UPDATED',
+    'COLLECTIONS_UPDATED',
+    'SMART_COLLECTIONS_UPDATED',
+    'CURRENT_FILE_PATH',
+    'BOOKMARK_DEFAULTS',
+    'SORT_PREFERENCES',
+    'PLAYBACK_STATUS',
+    'RESUME_POSITION',
+  ]);
+  private readonly uiTargets: Record<UISource, IINAUIAPI>;
   private idCounter = 0;
   private pendingSeek: { cancel: () => void } | null = null;
   private playbackInterval: ReturnType<typeof setInterval> | null = null;
@@ -51,6 +77,11 @@ export class BookmarkManager {
 
   constructor(dependencies: IINARuntimeDependencies) {
     this.deps = dependencies;
+    this.uiTargets = {
+      sidebar: this.createUITarget('sidebar', dependencies.sidebar),
+      overlay: this.createUITarget('overlay', dependencies.overlay),
+      window: this.createUITarget('window', dependencies.standaloneWindow),
+    };
 
     this.persistence = new BookmarkPersistence(
       dependencies.preferences,
@@ -89,6 +120,82 @@ export class BookmarkManager {
     this.setupUIMessageListeners();
     this.loadSortPreferences();
     this.deps.console.log('UI initialized after window loaded');
+  }
+
+  private createUITarget(uiSource: UISource, target: IINAUIAPI): IINAUIAPI {
+    return {
+      loadFile: (path: string) => target.loadFile(path),
+      postMessage: (name: string, data?: unknown) => this.postUIMessage(uiSource, name, data),
+      onMessage: (name: string, callback: (data: Record<string, unknown>) => void) =>
+        target.onMessage(name, callback),
+    };
+  }
+
+  private getRawUITarget(uiSource: UISource): IINAUIAPI {
+    switch (uiSource) {
+      case 'overlay':
+        return this.deps.overlay;
+      case 'sidebar':
+        return this.deps.sidebar;
+      case 'window':
+        return this.deps.standaloneWindow;
+      default:
+        return this.deps.sidebar;
+    }
+  }
+
+  private queueUIMessage(uiSource: UISource, type: string, payload: unknown): void {
+    const queue = this.queuedUIMessages[uiSource];
+    if (this.coalescedMessageTypes.has(type)) {
+      const existing = queue.find((message) => message.type === type);
+      if (existing) {
+        existing.payload = payload;
+        return;
+      }
+    }
+    queue.push({ type, payload });
+  }
+
+  private flushQueuedUIMessages(uiSource: UISource): void {
+    const queue = this.queuedUIMessages[uiSource];
+    if (queue.length === 0) return;
+    const target = this.getRawUITarget(uiSource);
+    for (const message of queue) {
+      target.postMessage(message.type, message.payload);
+    }
+    this.queuedUIMessages[uiSource] = [];
+    this.deps.console.log(`[${uiSource}] Flushed ${queue.length} queued message(s)`);
+  }
+
+  private postUIMessage(uiSource: UISource, type: string, payload: unknown): void {
+    if (!this.uiReady[uiSource]) {
+      this.queueUIMessage(uiSource, type, payload);
+      return;
+    }
+    this.getRawUITarget(uiSource).postMessage(type, payload);
+  }
+
+  private syncUIState(uiSource: UISource): void {
+    this.sendBookmarksToUI(uiSource);
+    this.getUITarget(uiSource).postMessage('COLLECTIONS_UPDATED', this.collections);
+    this.getUITarget(uiSource).postMessage(
+      'SMART_COLLECTIONS_UPDATED',
+      this.smartCollections.map((sc) => this.resolveSmartCollectionDates(sc)),
+    );
+  }
+
+  private markUIReady(uiSource: UISource, includeSyncState: boolean): void {
+    if (this.uiReady[uiSource]) {
+      if (includeSyncState) {
+        this.syncUIState(uiSource);
+      }
+      return;
+    }
+    if (includeSyncState) {
+      this.syncUIState(uiSource);
+    }
+    this.uiReady[uiSource] = true;
+    this.flushQueuedUIMessages(uiSource);
   }
 
   private setupWebUI(): void {
@@ -174,6 +281,9 @@ export class BookmarkManager {
 
   private handleUIMessage(message: UIMessage, uiSource: UISource): void {
     const p = message.payload;
+    if (message.type !== 'UI_READY' && !this.uiReady[uiSource]) {
+      this.markUIReady(uiSource, false);
+    }
     switch (message.type) {
       case 'REQUEST_FILE_PATH':
         this.sendCurrentFilePath(uiSource);
@@ -201,7 +311,8 @@ export class BookmarkManager {
           skipDuplicateCheck?: boolean;
           color?: BookmarkColor;
           endTimestamp?: number;
-        } = {};
+          persistImmediately?: boolean;
+        } = { persistImmediately: true };
         if (typeof p?.color === 'string') addOptions.color = p.color as BookmarkColor;
         if (typeof p?.endTimestamp === 'number') addOptions.endTimestamp = p.endTimestamp;
         this.addBookmark(
@@ -209,7 +320,7 @@ export class BookmarkManager {
           typeof p?.timestamp === 'number' ? p.timestamp : undefined,
           typeof p?.description === 'string' ? p.description : undefined,
           Array.isArray(p?.tags) ? (p.tags as string[]) : undefined,
-          Object.keys(addOptions).length > 0 ? addOptions : undefined,
+          addOptions,
         )
           .then(() => {
             this.getUITarget(uiSource).postMessage('BOOKMARK_ADDED', {});
@@ -310,12 +421,7 @@ export class BookmarkManager {
         break;
 
       case 'UI_READY':
-        this.sendBookmarksToUI(uiSource);
-        this.getUITarget(uiSource).postMessage('COLLECTIONS_UPDATED', this.collections);
-        this.getUITarget(uiSource).postMessage(
-          'SMART_COLLECTIONS_UPDATED',
-          this.smartCollections.map((sc) => this.resolveSmartCollectionDates(sc)),
-        );
+        this.markUIReady(uiSource, true);
         break;
 
       // Collections
@@ -437,14 +543,14 @@ export class BookmarkManager {
       // Navigation
       case 'NEXT_BOOKMARK':
         if (typeof p?.currentId === 'string') {
-          const scope = (typeof p?.scope === 'string' ? p.scope : 'file') as 'file' | 'all';
+          const scope = this.normalizeBookmarkNavigationScope(p?.scope);
           this.navigateBookmark(p.currentId, 'next', scope);
         }
         break;
 
       case 'PREV_BOOKMARK':
         if (typeof p?.currentId === 'string') {
-          const scope = (typeof p?.scope === 'string' ? p.scope : 'file') as 'file' | 'all';
+          const scope = this.normalizeBookmarkNavigationScope(p?.scope);
           this.navigateBookmark(p.currentId, 'prev', scope);
         }
         break;
@@ -482,6 +588,7 @@ export class BookmarkManager {
           const endTime = Math.max(this.pendingInPoint, outTime);
           this.addBookmark(undefined, startTime, undefined, undefined, {
             skipDuplicateCheck: true,
+            persistImmediately: true,
           })
             .then((bookmarkId) => {
               if (bookmarkId) {
@@ -525,7 +632,7 @@ export class BookmarkManager {
           typeof p?.timestamp === 'number' ? p.timestamp : undefined,
           typeof p?.description === 'string' ? p.description : undefined,
           Array.isArray(p?.tags) ? (p.tags as string[]) : undefined,
-          { skipDuplicateCheck: true },
+          { skipDuplicateCheck: true, persistImmediately: true },
         )
           .then(() => {
             this.getUITarget(uiSource).postMessage('BOOKMARK_ADDED', {});
@@ -548,16 +655,7 @@ export class BookmarkManager {
   }
 
   private getUITarget(uiSource: UISource): IINAUIAPI {
-    switch (uiSource) {
-      case 'overlay':
-        return this.deps.overlay;
-      case 'sidebar':
-        return this.deps.sidebar;
-      case 'window':
-        return this.deps.standaloneWindow;
-      default:
-        return this.deps.sidebar;
-    }
+    return this.uiTargets[uiSource] ?? this.uiTargets.sidebar;
   }
 
   private sendCurrentFilePath(uiSource: UISource): void {
@@ -607,10 +705,25 @@ export class BookmarkManager {
     }
   }
 
+  private normalizeBookmarkNavigationScope(scope: unknown): 'file' | 'all' {
+    return scope === 'all' || scope === 'file' ? scope : 'file';
+  }
+
+  private isValidSortPreferences(preferences: unknown): preferences is SortPreferences {
+    if (!preferences || typeof preferences !== 'object') {
+      return false;
+    }
+    const parsed = preferences as Record<string, unknown>;
+    return (
+      typeof parsed.sortBy === 'string' &&
+      (parsed.sortDirection === 'asc' || parsed.sortDirection === 'desc')
+    );
+  }
+
   private setupEventListeners(): void {
     const fileLoadedId = this.deps.event.on('iina.file-loaded', () => {
       this.deps.console.log('File loaded event');
-      this.refreshUI();
+      this.refreshUI('overlay');
       this.startPlaybackBroadcast();
       this.checkResumePosition();
     });
@@ -618,7 +731,9 @@ export class BookmarkManager {
 
     this.deps.menu.addItem(
       this.deps.menu.item('Add Bookmark at Current Time', () => {
-        this.addBookmark().catch((error) => {
+        this.addBookmark(undefined, undefined, undefined, undefined, {
+          persistImmediately: true,
+        }).catch((error) => {
           this.deps.console.error(`Failed to add bookmark from menu: ${errorMessage(error)}`);
         });
       }),
@@ -686,6 +801,7 @@ export class BookmarkManager {
       color?: BookmarkColor;
       endTimestamp?: number;
       scratchpad?: boolean;
+      persistImmediately?: boolean;
     },
   ): Promise<string | undefined> {
     const maxBookmarks = parseInt(this.deps.preferences.get('maxBookmarks') || '1000', 10) || 1000;
@@ -783,7 +899,7 @@ export class BookmarkManager {
     if (subtitleText?.trim()) bookmark.subtitleText = subtitleText.trim();
 
     this.bookmarks.push(bookmark);
-    this.saveBookmarks();
+    this.saveBookmarks(options?.persistImmediately === true);
 
     this.deps.console.log(`Bookmark added: ${bookmark.title}`);
     return bookmark.id;
@@ -1157,14 +1273,18 @@ export class BookmarkManager {
     }
   }
 
-  private saveBookmarks(): void {
-    this.persistence.save(this.bookmarks);
+  private saveBookmarks(immediate = false): void {
+    this.persistence.save(this.bookmarks, immediate ? { immediate: true } : undefined);
     this.persistence.saveAutoBackup(this.bookmarks);
     this.refreshUI();
   }
 
-  private refreshUI(): void {
+  private refreshUI(scope: 'all' | 'overlay' = 'all'): void {
     if (!this.uiInitialized) return;
+    if (scope === 'overlay') {
+      this.sendBookmarksToUI('overlay');
+      return;
+    }
     this.sendBookmarksToUI('sidebar');
     this.sendBookmarksToUI('overlay');
     this.sendBookmarksToUI('window');
@@ -1175,6 +1295,10 @@ export class BookmarkManager {
       const stored = this.deps.preferences.get(this.SORT_PREFERENCES_KEY);
       if (stored) {
         const preferences = JSON.parse(stored);
+        if (!this.isValidSortPreferences(preferences)) {
+          this.deps.console.warn(`Ignored invalid sort preferences payload: ${stored}`);
+          return;
+        }
         this.deps.console.log(`Sort preferences loaded: ${stored}`);
         for (const ui of ['sidebar', 'overlay', 'window'] as const) {
           this.getUITarget(ui).postMessage('SORT_PREFERENCES', preferences);
@@ -1290,7 +1414,7 @@ export class BookmarkManager {
 
     const position = this.resumePositions[path];
     if (typeof position === 'number' && Number.isFinite(position) && position > 5) {
-      this.deps.sidebar.postMessage('RESUME_POSITION', {
+      this.getUITarget('sidebar').postMessage('RESUME_POSITION', {
         filepath: path,
         timestamp: position,
       });
@@ -1814,6 +1938,7 @@ export class BookmarkManager {
     const bookmarkId = await this.addBookmark(undefined, undefined, undefined, undefined, {
       skipDuplicateCheck: false,
       ...(scratchpadMode ? { scratchpad: true } : {}),
+      persistImmediately: true,
     });
 
     if (!bookmarkId) {
@@ -1890,6 +2015,7 @@ export class BookmarkManager {
 
   /** Clean up event listeners registered by this instance */
   destroy(): void {
+    this.persistence.flush();
     for (const { event, id } of this.eventIds) {
       this.deps.event.off(event, id);
     }

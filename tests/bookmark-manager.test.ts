@@ -47,6 +47,38 @@ describe('BookmarkManager', () => {
       expect(m.getAllBookmarks()).toHaveLength(1);
       expect(m.getAllBookmarks()[0].title).toBe('Stored');
     });
+
+    it('should broadcast valid stored sort preferences on startup', () => {
+      const sortPreferences = { sortBy: 'timestamp', sortDirection: 'asc' } as const;
+      const d = createMockDeps();
+      (d.preferences.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
+        if (key === 'sortPreferences') return JSON.stringify(sortPreferences);
+        return null;
+      });
+
+      new BookmarkManager(d);
+
+      expect(d.console.log).toHaveBeenCalledWith(
+        expect.stringContaining(`Sort preferences loaded: ${JSON.stringify(sortPreferences)}`),
+      );
+    });
+
+    it('should ignore invalid stored sort preferences payloads', () => {
+      const d = createMockDeps();
+      (d.preferences.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
+        if (key === 'sortPreferences') return JSON.stringify({ sortBy: 1, sortDirection: 'asc' });
+        return null;
+      });
+
+      new BookmarkManager(d);
+
+      expect(d.console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Ignored invalid sort preferences payload'),
+      );
+      expect(d.console.log).not.toHaveBeenCalledWith(
+        expect.stringContaining('Sort preferences loaded:'),
+      );
+    });
   });
 
   // ---------------------------------------------------------------
@@ -97,11 +129,17 @@ describe('BookmarkManager', () => {
     });
 
     it('should save bookmarks to preferences after adding', async () => {
-      await manager.addBookmark('Save Test', 10);
-      expect(deps.preferences.set).toHaveBeenCalledWith(
-        'bookmarks',
-        expect.stringContaining('Save Test'),
-      );
+      vi.useFakeTimers();
+      try {
+        await manager.addBookmark('Save Test', 10);
+        vi.advanceTimersByTime(250);
+        expect(deps.preferences.set).toHaveBeenCalledWith(
+          'bookmarks',
+          expect.stringContaining('Save Test'),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should enforce maxBookmarks limit', async () => {
@@ -137,16 +175,23 @@ describe('BookmarkManager', () => {
   // ---------------------------------------------------------------
   describe('removeBookmark', () => {
     it('should remove existing bookmark and save immediately', async () => {
-      await manager.addBookmark('ToRemove', 10);
-      const id = manager.getAllBookmarks()[0].id;
+      vi.useFakeTimers();
+      try {
+        await manager.addBookmark('ToRemove', 10);
+        vi.advanceTimersByTime(250);
+        const id = manager.getAllBookmarks()[0].id;
 
-      // Reset to track save calls after removal
-      (deps.preferences.set as ReturnType<typeof vi.fn>).mockClear();
+        // Reset to track save calls after removal
+        (deps.preferences.set as ReturnType<typeof vi.fn>).mockClear();
 
-      manager.removeBookmark(id);
+        manager.removeBookmark(id);
+        vi.advanceTimersByTime(250);
 
-      expect(manager.getAllBookmarks()).toHaveLength(0);
-      expect(deps.preferences.set).toHaveBeenCalledWith('bookmarks', expect.any(String));
+        expect(manager.getAllBookmarks()).toHaveLength(0);
+        expect(deps.preferences.set).toHaveBeenCalledWith('bookmarks', expect.any(String));
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should warn when bookmark not found', () => {
@@ -220,10 +265,16 @@ describe('BookmarkManager', () => {
         return null;
       });
 
-      await m.addBookmark('New', 10);
+      vi.useFakeTimers();
+      try {
+        await m.addBookmark('New', 10);
+        vi.advanceTimersByTime(250);
 
-      // Should have set the backup key
-      expect(d.preferences.set).toHaveBeenCalledWith('bookmarks_backup', existingData);
+        // Should have set the backup key
+        expect(d.preferences.set).toHaveBeenCalledWith('bookmarks_backup', existingData);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -524,6 +575,30 @@ describe('BookmarkManager', () => {
       // off should have been called once for the single event
       expect(d.event.off).toHaveBeenCalledTimes(1);
     });
+
+    it('should flush pending bookmark writes on destroy', async () => {
+      vi.useFakeTimers();
+      try {
+        const d = createMockDeps();
+        const m = new BookmarkManager(d);
+
+        const id = await m.addBookmark('Pending Flush', 10);
+        expect(id).toBeDefined();
+        (d.preferences.set as ReturnType<typeof vi.fn>).mockClear();
+
+        m.updateBookmark(id!, { title: 'Pending Flush Updated' });
+        expect(d.preferences.set).not.toHaveBeenCalledWith('bookmarks', expect.any(String));
+
+        m.destroy();
+
+        expect(d.preferences.set).toHaveBeenCalledWith(
+          'bookmarks',
+          expect.stringContaining('Pending Flush Updated'),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   // ---------------------------------------------------------------
@@ -600,8 +675,11 @@ describe('BookmarkManager', () => {
         return null;
       });
       (deps.event.on as ReturnType<typeof vi.fn>).mockClear();
+      (deps.sidebar.onMessage as ReturnType<typeof vi.fn>).mockClear();
       void new BookmarkManager(deps);
       const fileLoadedHandler = findHandler(deps.event.on, 'iina.file-loaded');
+      const readyHandler = findHandler(deps.sidebar.onMessage, 'UI_READY');
+      readyHandler({ uiType: 'sidebar' });
       (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
       fileLoadedHandler({});
       expect(deps.sidebar.postMessage).toHaveBeenCalledWith('RESUME_POSITION', {
@@ -685,6 +763,10 @@ describe('BookmarkManager', () => {
       const regularId = bookmarks[0].id;
       const scratchpadId = bookmarks[1].id;
 
+      const readyHandler = findHandler(deps.sidebar.onMessage, 'UI_READY');
+      readyHandler({ uiType: 'sidebar' });
+      (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
       manager.updateBookmark(scratchpadId, { scratchpad: true });
       manager.createCollection('Scratchpad Collection');
       const collectionId = (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mock.calls.find(
@@ -712,6 +794,12 @@ describe('BookmarkManager', () => {
   // Collections
   // ---------------------------------------------------------------
   describe('Collections', () => {
+    beforeEach(() => {
+      const readyHandler = findHandler(deps.sidebar.onMessage, 'UI_READY');
+      readyHandler({ uiType: 'sidebar' });
+      (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+    });
+
     it('should create a collection', () => {
       manager.createCollection('Test Collection', 'A test', 'blue');
       expect(deps.sidebar.postMessage).toHaveBeenCalledWith(
@@ -1311,6 +1399,34 @@ describe('BookmarkManager', () => {
       expect(deps.core.osd).toHaveBeenCalledWith('End of bookmarks');
     });
 
+    it('should default NEXT_BOOKMARK to file scope for invalid scope values', async () => {
+      (deps.core.status as any).path = '/test/aaa.mp4';
+      await manager.addBookmark('A', 10);
+      (deps.core.status as any).path = '/test/zzz.mp4';
+      await manager.addBookmark('B', 20);
+      const bookmarks = manager.getAllBookmarks();
+
+      const handler = findHandler(deps.sidebar.onMessage, 'NEXT_BOOKMARK');
+      handler({ currentId: bookmarks[0].id, scope: 'invalid' });
+
+      expect(deps.core.seekTo).not.toHaveBeenCalled();
+      expect(deps.core.osd).toHaveBeenCalledWith('End of bookmarks');
+    });
+
+    it('should default PREV_BOOKMARK to file scope for invalid scope values', async () => {
+      (deps.core.status as any).path = '/test/aaa.mp4';
+      await manager.addBookmark('A', 10);
+      (deps.core.status as any).path = '/test/zzz.mp4';
+      await manager.addBookmark('B', 20);
+      const bookmarks = manager.getAllBookmarks();
+
+      const handler = findHandler(deps.sidebar.onMessage, 'PREV_BOOKMARK');
+      handler({ currentId: bookmarks[1].id, scope: 'invalid' });
+
+      expect(deps.core.seekTo).not.toHaveBeenCalled();
+      expect(deps.core.osd).toHaveBeenCalledWith('End of bookmarks');
+    });
+
     it('should support all scope for cross-file navigation', async () => {
       (deps.core.status as any).path = '/test/aaa.mp4';
       await manager.addBookmark('A', 10);
@@ -1465,7 +1581,7 @@ describe('BookmarkManager', () => {
   // Manage Bookmarks menu handler call order (HR-S-005)
   // ---------------------------------------------------------------
   describe('Manage Bookmarks menu handler', () => {
-    it('should call postMessage before show() when Manage Bookmarks is clicked', async () => {
+    it('should queue bookmarks until window UI_READY when Manage Bookmarks is clicked', async () => {
       await manager.addBookmark('Menu Test', 5);
       const callOrder: string[] = [];
 
@@ -1484,8 +1600,20 @@ describe('BookmarkManager', () => {
       expect(manageItemCall).toBeDefined();
       manageItemCall![1](); // invoke the callback (2nd arg to menu.item)
 
-      expect(callOrder[0]).toBe('postMessage');
-      expect(callOrder[1]).toBe('show');
+      expect(callOrder).toEqual(['show']);
+      expect(deps.standaloneWindow.postMessage).not.toHaveBeenCalled();
+
+      const readyHandler = findHandler(deps.standaloneWindow.onMessage, 'UI_READY');
+      readyHandler({ uiType: 'window' });
+
+      const bookmarkUpdates = (
+        deps.standaloneWindow.postMessage as ReturnType<typeof vi.fn>
+      ).mock.calls.filter((call: unknown[]) => call[0] === 'BOOKMARKS_UPDATED');
+      expect(bookmarkUpdates).toHaveLength(1);
+      expect(bookmarkUpdates[0]?.[1]).toEqual(
+        expect.arrayContaining([expect.objectContaining({ title: 'Menu Test' })]),
+      );
+      expect(callOrder[1]).toBe('postMessage');
     });
   });
 
@@ -1784,6 +1912,58 @@ describe('BookmarkManager', () => {
     });
   });
 
+  describe('refreshUI scope', () => {
+    it('should only refresh overlay bookmarks on file-loaded events', async () => {
+      const d = createMockDeps();
+      let fileLoadedCb: (() => void) | null = null;
+      (d.event.on as ReturnType<typeof vi.fn>).mockImplementation(
+        (event: string, cb: () => void) => {
+          if (event === 'iina.file-loaded') {
+            fileLoadedCb = cb;
+          }
+          return `${event}-id`;
+        },
+      );
+      const m = new BookmarkManager(d);
+
+      for (const [ui, target] of [
+        ['sidebar', d.sidebar],
+        ['overlay', d.overlay],
+        ['window', d.standaloneWindow],
+      ] as const) {
+        const readyHandler = findHandler(target.onMessage, 'UI_READY');
+        readyHandler({ uiType: ui });
+      }
+
+      await m.addBookmark('Current', 10);
+      (d.core.status as any).path = '/other/file.mp4';
+      await m.addBookmark('Other', 20);
+      (d.core.status as any).path = '/test/video.mp4';
+
+      (d.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+      (d.overlay.postMessage as ReturnType<typeof vi.fn>).mockClear();
+      (d.standaloneWindow.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      expect(fileLoadedCb).not.toBeNull();
+      fileLoadedCb!();
+
+      expect(d.overlay.postMessage).toHaveBeenCalledWith(
+        'BOOKMARKS_UPDATED',
+        expect.arrayContaining([expect.objectContaining({ title: 'Current' })]),
+      );
+      expect(d.sidebar.postMessage).not.toHaveBeenCalledWith(
+        'BOOKMARKS_UPDATED',
+        expect.anything(),
+      );
+      expect(d.standaloneWindow.postMessage).not.toHaveBeenCalledWith(
+        'BOOKMARKS_UPDATED',
+        expect.anything(),
+      );
+
+      m.destroy();
+    });
+  });
+
   // ---------------------------------------------------------------
   // Playback status broadcast
   // ---------------------------------------------------------------
@@ -1800,6 +1980,15 @@ describe('BookmarkManager', () => {
         },
       );
       const m = new BookmarkManager(d);
+
+      for (const [ui, target] of [
+        ['sidebar', d.sidebar],
+        ['overlay', d.overlay],
+        ['window', d.standaloneWindow],
+      ] as const) {
+        const readyHandler = findHandler(target.onMessage, 'UI_READY');
+        readyHandler({ uiType: ui });
+      }
 
       (d.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
       (d.overlay.postMessage as ReturnType<typeof vi.fn>).mockClear();
@@ -1840,6 +2029,15 @@ describe('BookmarkManager', () => {
           },
         );
         const m = new BookmarkManager(d);
+
+        for (const [ui, target] of [
+          ['sidebar', d.sidebar],
+          ['overlay', d.overlay],
+          ['window', d.standaloneWindow],
+        ] as const) {
+          const readyHandler = findHandler(target.onMessage, 'UI_READY');
+          readyHandler({ uiType: ui });
+        }
 
         fileLoadedCb!();
 
