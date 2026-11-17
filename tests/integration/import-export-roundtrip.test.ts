@@ -10,8 +10,8 @@ describe('Import/Export Round-trip', () => {
   it('should round-trip JSON export and import with full fidelity', async () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
-    deps.core.status.currentTime = 100;
+    deps.core.status.url = '/test/video.mp4';
+    deps.core.status.position = 100;
 
     // Add 5 bookmarks
     const bookmarks = [
@@ -82,8 +82,8 @@ describe('Import/Export Round-trip', () => {
   it('should export bookmarks as CSV with headers', async () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
-    deps.core.status.currentTime = 100;
+    deps.core.status.url = '/test/video.mp4';
+    deps.core.status.position = 100;
 
     send('sidebar', 'ADD_BOOKMARK', {
       title: 'CSV Test',
@@ -107,7 +107,7 @@ describe('Import/Export Round-trip', () => {
   it('should merge bookmarks with merge option', async () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
+    deps.core.status.url = '/test/video.mp4';
 
     // Add initial bookmark
     send('sidebar', 'ADD_BOOKMARK', { title: 'Original', timestamp: 100, tags: ['tag1'] });
@@ -146,7 +146,7 @@ describe('Import/Export Round-trip', () => {
   it('should replace bookmarks with replace option', async () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
+    deps.core.status.url = '/test/video.mp4';
 
     // Add initial bookmarks
     send('sidebar', 'ADD_BOOKMARK', { title: 'Set A - 1', timestamp: 10 });
@@ -174,7 +174,7 @@ describe('Import/Export Round-trip', () => {
   it('should report correct counts for mixed valid/invalid import data', async () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
+    deps.core.status.url = '/test/video.mp4';
 
     // Mixed array: some valid, some invalid
     const mixed = [
@@ -221,8 +221,8 @@ describe('Import/Export Round-trip', () => {
   it('should round-trip annotation fields (color, endTimestamp, pinned, scratchpad)', async () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
-    deps.core.status.currentTime = 100;
+    deps.core.status.url = '/test/video.mp4';
+    deps.core.status.position = 100;
 
     // Add a bookmark with annotation fields
     send('sidebar', 'ADD_BOOKMARK', {
@@ -287,7 +287,7 @@ describe('Import/Export Round-trip', () => {
   it('should skip duplicates when re-importing the same bookmarks', async () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
+    deps.core.status.url = '/test/video.mp4';
 
     // Add 3 bookmarks
     const bookmarks = [

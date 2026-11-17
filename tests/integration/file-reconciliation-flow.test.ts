@@ -13,18 +13,18 @@ describe('File reconciliation flow', () => {
 
   it('full flow: detects missing files, shows dialog, updates path on request', async () => {
     // Setup: Add 3 bookmarks
-    harness.deps.core.status.path = '/test/file1.mp4';
-    harness.deps.core.status.currentTime = 60;
+    harness.deps.core.status.url = '/test/file1.mp4';
+    harness.deps.core.status.position = 60;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 1', timestamp: 60 });
     await new Promise((r) => setTimeout(r, 50));
 
-    harness.deps.core.status.path = '/test/file2.mp4';
-    harness.deps.core.status.currentTime = 120;
+    harness.deps.core.status.url = '/test/file2.mp4';
+    harness.deps.core.status.position = 120;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 2', timestamp: 120 });
     await new Promise((r) => setTimeout(r, 50));
 
-    harness.deps.core.status.path = '/test/file3.mp4';
-    harness.deps.core.status.currentTime = 180;
+    harness.deps.core.status.url = '/test/file3.mp4';
+    harness.deps.core.status.position = 180;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 3', timestamp: 180 });
     await new Promise((r) => setTimeout(r, 50));
 
@@ -85,8 +85,8 @@ describe('File reconciliation flow', () => {
   });
 
   it('removes bookmark via reconciliation action', async () => {
-    harness.deps.core.status.path = '/test/file1.mp4';
-    harness.deps.core.status.currentTime = 60;
+    harness.deps.core.status.url = '/test/file1.mp4';
+    harness.deps.core.status.position = 60;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 1', timestamp: 60 });
     await new Promise((r) => setTimeout(r, 10));
 
@@ -116,8 +116,8 @@ describe('File reconciliation flow', () => {
   });
 
   it('reports empty movedFiles when all files exist', async () => {
-    harness.deps.core.status.path = '/test/file1.mp4';
-    harness.deps.core.status.currentTime = 60;
+    harness.deps.core.status.url = '/test/file1.mp4';
+    harness.deps.core.status.position = 60;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 1', timestamp: 60 });
     await new Promise((r) => setTimeout(r, 10));
 
@@ -134,8 +134,8 @@ describe('File reconciliation flow', () => {
   });
 
   it('rejects invalid new path (does not start with /)', async () => {
-    harness.deps.core.status.path = '/test/file1.mp4';
-    harness.deps.core.status.currentTime = 60;
+    harness.deps.core.status.url = '/test/file1.mp4';
+    harness.deps.core.status.position = 60;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 1', timestamp: 60 });
     await new Promise((r) => setTimeout(r, 10));
 
@@ -189,13 +189,13 @@ describe('File reconciliation flow', () => {
   });
 
   it('treats files as missing when file.exists throws', async () => {
-    harness.deps.core.status.path = '/test/file1.mp4';
-    harness.deps.core.status.currentTime = 60;
+    harness.deps.core.status.url = '/test/file1.mp4';
+    harness.deps.core.status.position = 60;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 1', timestamp: 60 });
     await new Promise((r) => setTimeout(r, 10));
 
-    harness.deps.core.status.path = '/test/file2.mp4';
-    harness.deps.core.status.currentTime = 120;
+    harness.deps.core.status.url = '/test/file2.mp4';
+    harness.deps.core.status.position = 120;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 2', timestamp: 120 });
     await new Promise((r) => setTimeout(r, 10));
 
@@ -220,18 +220,18 @@ describe('File reconciliation flow', () => {
   });
 
   it('handles sequential reconciliation actions correctly', async () => {
-    harness.deps.core.status.path = '/test/file1.mp4';
-    harness.deps.core.status.currentTime = 60;
+    harness.deps.core.status.url = '/test/file1.mp4';
+    harness.deps.core.status.position = 60;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 1', timestamp: 60 });
     await new Promise((r) => setTimeout(r, 50));
 
-    harness.deps.core.status.path = '/test/file2.mp4';
-    harness.deps.core.status.currentTime = 120;
+    harness.deps.core.status.url = '/test/file2.mp4';
+    harness.deps.core.status.position = 120;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 2', timestamp: 120 });
     await new Promise((r) => setTimeout(r, 50));
 
-    harness.deps.core.status.path = '/test/file3.mp4';
-    harness.deps.core.status.currentTime = 180;
+    harness.deps.core.status.url = '/test/file3.mp4';
+    harness.deps.core.status.position = 180;
     harness.send('sidebar', 'ADD_BOOKMARK', { title: 'Video 3', timestamp: 180 });
     await new Promise((r) => setTimeout(r, 50));
 

@@ -10,7 +10,7 @@ const noop = vi.fn();
 const minimalIINA = {
   console: { log: noop, error: noop, warn: noop },
   preferences: { get: vi.fn().mockReturnValue(null), set: noop },
-  core: { status: { path: '', currentTime: 0 } },
+  core: { status: { url: '', position: 0 } },
   event: { on: noop, off: noop },
   menu: { addItem: noop, item: vi.fn(() => ({})) },
   sidebar: { loadFile: noop, postMessage: noop, onMessage: noop },

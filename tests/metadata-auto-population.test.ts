@@ -3,17 +3,14 @@ import type { IINARuntimeDependencies } from '../src/types';
 import { BookmarkManager } from '../src/bookmark-manager';
 import { createMockDeps as _createMockDeps } from './helpers/mock-deps';
 
-/** Wrapper that accepts path/time overrides for metadata tests */
-function createMockDeps(
-  pathOverride?: string,
-  currentTimeOverride?: number,
-): IINARuntimeDependencies {
+/** Wrapper that accepts url/position overrides for metadata tests */
+function createMockDeps(urlOverride?: string, positionOverride?: number): IINARuntimeDependencies {
   const deps = _createMockDeps();
-  if (pathOverride !== undefined) {
-    (deps.core.status as any).path = pathOverride;
+  if (urlOverride !== undefined) {
+    deps.core.status.url = urlOverride;
   }
-  if (currentTimeOverride !== undefined) {
-    (deps.core.status as any).currentTime = currentTimeOverride;
+  if (positionOverride !== undefined) {
+    deps.core.status.position = positionOverride;
   }
   return deps;
 }

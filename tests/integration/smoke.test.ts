@@ -18,8 +18,8 @@ describe('Integration Smoke Test', () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
     // Set up current file path
-    deps.core.status.path = '/test/movie.mp4';
-    deps.core.status.currentTime = 42;
+    deps.core.status.url = '/test/movie.mp4';
+    deps.core.status.position = 42;
 
     // Add bookmark from sidebar
     send('sidebar', 'ADD_BOOKMARK', { title: 'Test Bookmark' });
@@ -49,8 +49,8 @@ describe('Integration Smoke Test', () => {
   it('should respond to REQUEST_BOOKMARK_DEFAULTS with defaults', () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/movies/inception.mkv';
-    deps.core.status.currentTime = 300;
+    deps.core.status.url = '/movies/inception.mkv';
+    deps.core.status.position = 300;
 
     send('window', 'REQUEST_BOOKMARK_DEFAULTS', {});
 

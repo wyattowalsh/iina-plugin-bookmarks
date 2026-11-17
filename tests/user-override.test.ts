@@ -6,8 +6,8 @@ import { createMockDeps as _createMockDeps } from './helpers/mock-deps';
 /** Wrapper with user-override-specific defaults (movie path + 30 min playback) */
 function createMockDeps(): IINARuntimeDependencies {
   const deps = _createMockDeps();
-  (deps.core.status as any).path = '/test/video/Sample.Movie.2023.1080p.BluRay.x264.mp4';
-  (deps.core.status as any).currentTime = 1800;
+  (deps.core.status as any).url = '/test/video/Sample.Movie.2023.1080p.BluRay.x264.mp4';
+  (deps.core.status as any).position = 1800;
   return deps;
 }
 
@@ -33,9 +33,9 @@ describe('User Override Capabilities', () => {
     // Description should be auto-generated
     expect(bookmarks[0].description).toContain('Bookmark at');
     expect(bookmarks[0].description).toContain('30:00');
-    // Timestamp should default to currentTime
+    // Timestamp should default to the player position
     expect(bookmarks[0].timestamp).toBe(1800);
-    // Filepath should come from core.status.path
+    // Filepath should come from the url the player reports
     expect(bookmarks[0].filepath).toBe('/test/video/Sample.Movie.2023.1080p.BluRay.x264.mp4');
   });
 

@@ -111,7 +111,7 @@ describe('BookmarkManager', () => {
       await manager.addBookmark('No TS');
 
       const bookmarks = manager.getAllBookmarks();
-      expect(bookmarks[0].timestamp).toBe(120); // from deps.core.status.currentTime
+      expect(bookmarks[0].timestamp).toBe(120); // from deps.core.status.position
     });
 
     it('should ignore invalid endTimestamp values in add options', async () => {
@@ -348,7 +348,7 @@ describe('BookmarkManager', () => {
     it('should filter bookmarks by filepath', async () => {
       await manager.addBookmark('A', 1);
       // Change the mock path for the second bookmark
-      (deps.core.status as any).path = '/other/file.mp4';
+      (deps.core.status as any).url = '/other/file.mp4';
       await manager.addBookmark('B', 2);
 
       expect(manager.getBookmarksForFile('/test/video.mp4')).toHaveLength(1);
@@ -431,6 +431,61 @@ describe('BookmarkManager', () => {
       await vi.waitFor(() => {
         expect(deps.sidebar.postMessage).toHaveBeenCalledWith('BOOKMARK_ADDED', {});
       });
+    });
+
+    it('should not send BOOKMARK_ADDED for a near-duplicate ADD_BOOKMARK', async () => {
+      await manager.addBookmark('First', 100);
+      (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      const handler = findHandler(deps.sidebar.onMessage, 'ADD_BOOKMARK');
+      handler({ title: 'Second', timestamp: 102 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(deps.sidebar.postMessage).toHaveBeenCalledWith(
+        'BOOKMARK_NEAR_DUPLICATE',
+        expect.objectContaining({ proposedTimestamp: 102 }),
+      );
+      expect(deps.sidebar.postMessage).not.toHaveBeenCalledWith('BOOKMARK_ADDED', {});
+      expect(manager.getAllBookmarks()).toHaveLength(1);
+    });
+
+    it('should not send BOOKMARK_ADDED when ADD_BOOKMARK hits the max cap', async () => {
+      const d = createMockDeps();
+      (d.preferences.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
+        if (key === 'maxBookmarks') return '1';
+        return null;
+      });
+      const m = new BookmarkManager(d);
+      await m.addBookmark('Only', 10);
+      (d.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      const handler = findHandler(d.sidebar.onMessage, 'ADD_BOOKMARK');
+      handler({ title: 'Overflow', timestamp: 50 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(m.getAllBookmarks()).toHaveLength(1);
+      expect(d.sidebar.postMessage).not.toHaveBeenCalledWith('BOOKMARK_ADDED', {});
+      m.destroy();
+    });
+
+    it('should send BOOKMARK_ADDED for CONFIRM_BOOKMARK only when an id is created', async () => {
+      const handler = findHandler(deps.sidebar.onMessage, 'CONFIRM_BOOKMARK');
+      handler({ title: 'Confirmed', timestamp: 15 });
+
+      await vi.waitFor(() => {
+        expect(deps.sidebar.postMessage).toHaveBeenCalledWith('BOOKMARK_ADDED', {});
+      });
+
+      (deps.preferences.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
+        if (key === 'maxBookmarks') return '1';
+        return null;
+      });
+      (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+      handler({ title: 'Blocked', timestamp: 80 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(manager.getAllBookmarks()).toHaveLength(1);
+      expect(deps.sidebar.postMessage).not.toHaveBeenCalledWith('BOOKMARK_ADDED', {});
     });
 
     it('should send BOOKMARK_DELETED confirmation after DELETE_BOOKMARK', async () => {
@@ -518,17 +573,50 @@ describe('BookmarkManager', () => {
   // ---------------------------------------------------------------
   describe('edge cases', () => {
     it('should handle missing filepath gracefully', async () => {
-      (deps.core.status as any).path = undefined;
+      deps.core.status.url = undefined;
+      deps.core.status.path = undefined;
       await manager.addBookmark('No Path', 10);
 
       expect(manager.getAllBookmarks()[0].filepath).toBe('/unknown/file.mp4');
     });
 
-    it('should handle missing currentTime gracefully', async () => {
-      (deps.core.status as any).currentTime = undefined;
+    it('should store a legacy path when url is missing', async () => {
+      deps.core.status.url = undefined;
+      deps.core.status.path = '/legacy/movie.mp4';
+      await manager.addBookmark('Legacy Path', 10);
+
+      expect(manager.getAllBookmarks()[0].filepath).toBe('/legacy/movie.mp4');
+    });
+
+    it('should store the url string the player reports', async () => {
+      deps.core.status.url = 'file:///Users/me/Movie.mkv?token=1';
+      deps.core.status.path = '/should/not/win.mp4';
+      await manager.addBookmark('Exact URL', 10);
+
+      expect(manager.getAllBookmarks()[0].filepath).toBe('file:///Users/me/Movie.mkv?token=1');
+    });
+
+    it('should handle missing playback position gracefully', async () => {
+      deps.core.status.position = undefined;
+      deps.core.status.currentTime = undefined;
       await manager.addBookmark('No Time');
 
       expect(manager.getAllBookmarks()[0].timestamp).toBe(0);
+    });
+
+    it('should fall back to currentTime when position is missing', async () => {
+      deps.core.status.position = undefined;
+      deps.core.status.currentTime = 42;
+      await manager.addBookmark('Legacy Time');
+
+      expect(manager.getAllBookmarks()[0].timestamp).toBe(42);
+    });
+
+    it('should use status.title for an auto-generated bookmark title', async () => {
+      deps.core.status.title = 'Inception';
+      await manager.addBookmark(undefined, 90);
+
+      expect(manager.getAllBookmarks()[0].title).toContain('Inception');
     });
 
     it('should return a copy of bookmarks (not the internal array)', async () => {
@@ -576,7 +664,7 @@ describe('BookmarkManager', () => {
       expect(d.event.off).toHaveBeenCalledTimes(1);
     });
 
-    it('should flush pending bookmark writes on destroy', async () => {
+    it('should flush pending auto-backup on destroy', async () => {
       vi.useFakeTimers();
       try {
         const d = createMockDeps();
@@ -584,15 +672,15 @@ describe('BookmarkManager', () => {
 
         const id = await m.addBookmark('Pending Flush', 10);
         expect(id).toBeDefined();
-        (d.preferences.set as ReturnType<typeof vi.fn>).mockClear();
+        expect(d.file.write).not.toHaveBeenCalled();
 
         m.updateBookmark(id!, { title: 'Pending Flush Updated' });
-        expect(d.preferences.set).not.toHaveBeenCalledWith('bookmarks', expect.any(String));
+        expect(d.file.write).not.toHaveBeenCalled();
 
         m.destroy();
 
-        expect(d.preferences.set).toHaveBeenCalledWith(
-          'bookmarks',
+        expect(d.file.write).toHaveBeenCalledWith(
+          '@data/bookmarks-backup.json',
           expect.stringContaining('Pending Flush Updated'),
         );
       } finally {
@@ -622,11 +710,11 @@ describe('BookmarkManager', () => {
   describe('Chapter & subtitle enrichment', () => {
     it('should auto-populate chapter title when chapters available', async () => {
       (deps.core.getChapters as ReturnType<typeof vi.fn>).mockReturnValue([
-        { title: 'Introduction', time: 0 },
-        { title: 'Main Content', time: 60 },
-        { title: 'Conclusion', time: 300 },
+        { title: 'Introduction', start: 0 },
+        { title: 'Main Content', start: 60 },
+        { title: 'Conclusion', start: 300 },
       ]);
-      deps.core.status.currentTime = 120;
+      deps.core.status.position = 120;
       await manager.addBookmark();
       const bookmarks = manager.getAllBookmarks();
       expect(bookmarks[0].chapterTitle).toBe('Main Content');
@@ -640,11 +728,20 @@ describe('BookmarkManager', () => {
 
     it('should generate chapter-aware auto-title', async () => {
       (deps.core.getChapters as ReturnType<typeof vi.fn>).mockReturnValue([
-        { title: 'Intro', time: 0 },
+        { title: 'Intro', start: 0 },
       ]);
-      deps.core.status.currentTime = 30;
+      deps.core.status.position = 30;
       await manager.addBookmark();
       expect(manager.getAllBookmarks()[0].title).toContain('Ch: Intro');
+    });
+
+    it('should fall back to legacy chapter.time when start is missing', async () => {
+      (deps.core.getChapters as ReturnType<typeof vi.fn>).mockReturnValue([
+        { title: 'Legacy Chapter', time: 10 },
+      ]);
+      deps.core.status.position = 20;
+      await manager.addBookmark();
+      expect(manager.getAllBookmarks()[0].chapterTitle).toBe('Legacy Chapter');
     });
   });
 
@@ -704,6 +801,28 @@ describe('BookmarkManager', () => {
         expect.anything(),
       );
     });
+
+    it('should treat boolean false and the string false as autoResume off', () => {
+      for (const value of [false, 'false'] as const) {
+        const d = createMockDeps();
+        (d.preferences.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
+          if (key === 'resumePositions') return JSON.stringify({ '/test/video.mp4': 300 });
+          if (key === 'autoResume') return value;
+          return null;
+        });
+        new BookmarkManager(d);
+        const fileLoadedHandler = findHandler(d.event.on, 'iina.file-loaded');
+        const readyHandler = findHandler(d.sidebar.onMessage, 'UI_READY');
+        readyHandler({ uiType: 'sidebar' });
+        (d.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+        fileLoadedHandler({});
+
+        expect(d.sidebar.postMessage).not.toHaveBeenCalledWith(
+          'RESUME_POSITION',
+          expect.anything(),
+        );
+      }
+    });
   });
 
   // ---------------------------------------------------------------
@@ -738,6 +857,36 @@ describe('BookmarkManager', () => {
   // Scratchpad lifecycle
   // ---------------------------------------------------------------
   describe('Scratchpad lifecycle', () => {
+    async function invokeQuickBookmark(d: IINARuntimeDependencies): Promise<void> {
+      const quickCall = (d.menu.item as ReturnType<typeof vi.fn>).mock.calls.find(
+        (call) => call[0] === 'Quick Bookmark',
+      );
+      expect(quickCall).toBeDefined();
+      quickCall![1]();
+    }
+
+    it('should treat boolean false and the string false as scratchpad off', async () => {
+      for (const value of [false, 'false', true, null] as const) {
+        const d = createMockDeps();
+        (d.preferences.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
+          if (key === 'scratchpadMode') return value;
+          return null;
+        });
+        const m = new BookmarkManager(d);
+        await invokeQuickBookmark(d);
+        await vi.waitFor(() => {
+          expect(m.getAllBookmarks()).toHaveLength(1);
+        });
+        const scratchpad = m.getAllBookmarks()[0].scratchpad;
+        if (value === false || value === 'false') {
+          expect(scratchpad).toBeFalsy();
+        } else {
+          expect(scratchpad).toBe(true);
+        }
+        m.destroy();
+      }
+    });
+
     it('should promote scratchpad bookmarks', async () => {
       await manager.addBookmark('Test');
       const id = manager.getAllBookmarks()[0].id;
@@ -1222,9 +1371,9 @@ describe('BookmarkManager', () => {
     });
 
     it('should navigate across files in all scope', async () => {
-      (deps.core.status as any).path = '/test/aaa.mp4';
+      (deps.core.status as any).url = '/test/aaa.mp4';
       await manager.addBookmark('A', 10);
-      (deps.core.status as any).path = '/test/zzz.mp4';
+      (deps.core.status as any).url = '/test/zzz.mp4';
       await manager.addBookmark('B', 20);
       const bookmarks = manager.getAllBookmarks();
       const next = manager.getAdjacentBookmark(bookmarks[0].id, 'next', 'all');
@@ -1317,13 +1466,13 @@ describe('BookmarkManager', () => {
   // ---------------------------------------------------------------
   describe('I/O range marking', () => {
     it('should create range bookmark from in/out points', async () => {
-      (deps.core.status as any).currentTime = 100;
+      (deps.core.status as any).position = 100;
       const inHandler = findHandler(deps.sidebar.onMessage, 'SET_IN_POINT');
       inHandler({});
 
       expect(deps.core.osd).toHaveBeenCalledWith(expect.stringContaining('In:'));
 
-      (deps.core.status as any).currentTime = 200;
+      (deps.core.status as any).position = 200;
       const outHandler = findHandler(deps.sidebar.onMessage, 'SET_OUT_POINT');
       outHandler({});
 
@@ -1343,11 +1492,11 @@ describe('BookmarkManager', () => {
     });
 
     it('should swap in/out if out time is before in time', async () => {
-      (deps.core.status as any).currentTime = 200;
+      (deps.core.status as any).position = 200;
       const inHandler = findHandler(deps.sidebar.onMessage, 'SET_IN_POINT');
       inHandler({});
 
-      (deps.core.status as any).currentTime = 100;
+      (deps.core.status as any).position = 100;
       const outHandler = findHandler(deps.sidebar.onMessage, 'SET_OUT_POINT');
       outHandler({});
 
@@ -1389,7 +1538,7 @@ describe('BookmarkManager', () => {
 
     it('should default to file scope when scope not provided', async () => {
       await manager.addBookmark('A', 10);
-      (deps.core.status as any).path = '/test/other.mp4';
+      (deps.core.status as any).url = '/test/other.mp4';
       await manager.addBookmark('B', 20);
       const bookmarks = manager.getAllBookmarks();
 
@@ -1400,9 +1549,9 @@ describe('BookmarkManager', () => {
     });
 
     it('should default NEXT_BOOKMARK to file scope for invalid scope values', async () => {
-      (deps.core.status as any).path = '/test/aaa.mp4';
+      (deps.core.status as any).url = '/test/aaa.mp4';
       await manager.addBookmark('A', 10);
-      (deps.core.status as any).path = '/test/zzz.mp4';
+      (deps.core.status as any).url = '/test/zzz.mp4';
       await manager.addBookmark('B', 20);
       const bookmarks = manager.getAllBookmarks();
 
@@ -1414,9 +1563,9 @@ describe('BookmarkManager', () => {
     });
 
     it('should default PREV_BOOKMARK to file scope for invalid scope values', async () => {
-      (deps.core.status as any).path = '/test/aaa.mp4';
+      (deps.core.status as any).url = '/test/aaa.mp4';
       await manager.addBookmark('A', 10);
-      (deps.core.status as any).path = '/test/zzz.mp4';
+      (deps.core.status as any).url = '/test/zzz.mp4';
       await manager.addBookmark('B', 20);
       const bookmarks = manager.getAllBookmarks();
 
@@ -1428,9 +1577,9 @@ describe('BookmarkManager', () => {
     });
 
     it('should support all scope for cross-file navigation', async () => {
-      (deps.core.status as any).path = '/test/aaa.mp4';
+      (deps.core.status as any).url = '/test/aaa.mp4';
       await manager.addBookmark('A', 10);
-      (deps.core.status as any).path = '/test/zzz.mp4';
+      (deps.core.status as any).url = '/test/zzz.mp4';
       await manager.addBookmark('B', 20);
       const bookmarks = manager.getAllBookmarks();
 
@@ -1747,7 +1896,7 @@ describe('BookmarkManager', () => {
       await m.addBookmark('Target', 45);
       const bm = m.getAllBookmarks()[0];
 
-      (d.core.status as any).path = '/different/file.mp4';
+      (d.core.status as any).url = '/different/file.mp4';
 
       let fileStartedCallback: (() => void) | null = null;
       (d.event.on as ReturnType<typeof vi.fn>).mockImplementation(
@@ -1778,7 +1927,7 @@ describe('BookmarkManager', () => {
       await m.addBookmark('Second', 20);
       const [bm1, bm2] = m.getAllBookmarks();
 
-      (d.core.status as any).path = '/different/file.mp4';
+      (d.core.status as any).url = '/different/file.mp4';
 
       const fileStartedCallbacks: (() => void)[] = [];
       let listenerIdCounter = 0;
@@ -1815,7 +1964,7 @@ describe('BookmarkManager', () => {
         await m.addBookmark('Timeout', 50);
         const bm = m.getAllBookmarks()[0];
 
-        (d.core.status as any).path = '/different/file.mp4';
+        (d.core.status as any).url = '/different/file.mp4';
 
         (d.event.on as ReturnType<typeof vi.fn>).mockImplementation(() => 'timeout-listener');
 
@@ -1839,7 +1988,7 @@ describe('BookmarkManager', () => {
       await m.addBookmark('No Open', 50);
       const bm = m.getAllBookmarks()[0];
 
-      (d.core.status as any).path = '/different/file.mp4';
+      (d.core.status as any).url = '/different/file.mp4';
 
       m.jumpToBookmark(bm.id);
 
@@ -1858,9 +2007,9 @@ describe('BookmarkManager', () => {
   describe('sendBookmarksToUI scope', () => {
     it('should send all bookmarks to sidebar', async () => {
       await manager.addBookmark('Current', 10);
-      (deps.core.status as any).path = '/other/file.mp4';
+      (deps.core.status as any).url = '/other/file.mp4';
       await manager.addBookmark('Other', 20);
-      (deps.core.status as any).path = '/test/video.mp4';
+      (deps.core.status as any).url = '/test/video.mp4';
 
       (deps.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
 
@@ -1876,9 +2025,9 @@ describe('BookmarkManager', () => {
 
     it('should send all bookmarks to window', async () => {
       await manager.addBookmark('Current', 10);
-      (deps.core.status as any).path = '/other/file.mp4';
+      (deps.core.status as any).url = '/other/file.mp4';
       await manager.addBookmark('Other', 20);
-      (deps.core.status as any).path = '/test/video.mp4';
+      (deps.core.status as any).url = '/test/video.mp4';
 
       (deps.standaloneWindow.postMessage as ReturnType<typeof vi.fn>).mockClear();
 
@@ -1894,9 +2043,9 @@ describe('BookmarkManager', () => {
 
     it('should send only current-file bookmarks to overlay', async () => {
       await manager.addBookmark('Current', 10);
-      (deps.core.status as any).path = '/other/file.mp4';
+      (deps.core.status as any).url = '/other/file.mp4';
       await manager.addBookmark('Other', 20);
-      (deps.core.status as any).path = '/test/video.mp4';
+      (deps.core.status as any).url = '/test/video.mp4';
 
       (deps.overlay.postMessage as ReturnType<typeof vi.fn>).mockClear();
 
@@ -1936,9 +2085,9 @@ describe('BookmarkManager', () => {
       }
 
       await m.addBookmark('Current', 10);
-      (d.core.status as any).path = '/other/file.mp4';
+      (d.core.status as any).url = '/other/file.mp4';
       await m.addBookmark('Other', 20);
-      (d.core.status as any).path = '/test/video.mp4';
+      (d.core.status as any).url = '/test/video.mp4';
 
       (d.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
       (d.overlay.postMessage as ReturnType<typeof vi.fn>).mockClear();
@@ -1968,6 +2117,47 @@ describe('BookmarkManager', () => {
   // Playback status broadcast
   // ---------------------------------------------------------------
   describe('Playback status broadcast', () => {
+    it('should push CURRENT_FILE_PATH when a UI becomes ready', () => {
+      const readyHandler = findHandler(deps.sidebar.onMessage, 'UI_READY');
+      readyHandler({ uiType: 'sidebar' });
+
+      expect(deps.sidebar.postMessage).toHaveBeenCalledWith('CURRENT_FILE_PATH', '/test/video.mp4');
+    });
+
+    it('should push the current file url to every UI on file-loaded', () => {
+      const d = createMockDeps();
+      let fileLoadedCb: (() => void) | null = null;
+      (d.event.on as ReturnType<typeof vi.fn>).mockImplementation(
+        (event: string, cb: () => void) => {
+          if (event === 'iina.file-loaded') {
+            fileLoadedCb = cb;
+          }
+          return 'fl-id';
+        },
+      );
+      const m = new BookmarkManager(d);
+      for (const target of [d.sidebar, d.overlay, d.standaloneWindow]) {
+        findHandler(target.onMessage, 'UI_READY')({});
+      }
+
+      d.core.status.url = 'https://cdn.example/movie.mkv?token=1';
+      (d.sidebar.postMessage as ReturnType<typeof vi.fn>).mockClear();
+      (d.overlay.postMessage as ReturnType<typeof vi.fn>).mockClear();
+      (d.standaloneWindow.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      expect(fileLoadedCb).not.toBeNull();
+      fileLoadedCb!();
+
+      for (const ui of [d.sidebar, d.overlay, d.standaloneWindow]) {
+        expect(ui.postMessage).toHaveBeenCalledWith(
+          'CURRENT_FILE_PATH',
+          'https://cdn.example/movie.mkv?token=1',
+        );
+      }
+
+      m.destroy();
+    });
+
     it('should broadcast playback status on file-loaded event', () => {
       const d = createMockDeps();
       let fileLoadedCb: (() => void) | null = null;

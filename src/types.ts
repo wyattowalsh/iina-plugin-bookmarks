@@ -58,7 +58,23 @@ export interface BookmarkData {
 
 export interface ChapterInfo {
   title: string;
-  time: number;
+  /** Start time in seconds (IINA `Chapter.start`). */
+  start?: number;
+  /** Legacy start time. Read only when `start` is missing. */
+  time?: number;
+}
+
+/** Chapter start in seconds, preferring IINA `start` and falling back to legacy `time`. */
+export function chapterStart(
+  chapter: { start?: number; time?: number } | null | undefined,
+): number {
+  if (typeof chapter?.start === 'number' && Number.isFinite(chapter.start)) {
+    return chapter.start;
+  }
+  if (typeof chapter?.time === 'number' && Number.isFinite(chapter.time)) {
+    return chapter.time;
+  }
+  return 0;
 }
 
 export interface BookmarkCollection {
@@ -348,10 +364,17 @@ export interface BackendToUIPayloadMap {
 
 export interface IINACore {
   status: {
+    /** Current file URL reported by IINA StatusAPI. */
+    url?: string;
+    /** Legacy file path. Read only when `url` is missing. */
     path?: string;
-    currentTime?: number;
-    duration?: number;
-    position?: number;
+    /** Media title reported by IINA StatusAPI. */
+    title?: string;
+    /** Playback position in seconds. */
+    position?: number | null;
+    /** Legacy playback time. Read only when `position` is missing. */
+    currentTime?: number | null;
+    duration?: number | null;
     metadata?: {
       title?: string;
     };

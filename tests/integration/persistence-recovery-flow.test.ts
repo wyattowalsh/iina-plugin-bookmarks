@@ -59,8 +59,8 @@ describe('Persistence and Recovery Flow', () => {
 
     const { send, deps } = createTestHarness({ preferences });
 
-    deps.core.status.path = '/test/video.mp4';
-    deps.core.status.currentTime = 200;
+    deps.core.status.url = '/test/video.mp4';
+    deps.core.status.position = 200;
 
     send('sidebar', 'ADD_BOOKMARK', { title: 'New Bookmark' });
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -88,8 +88,8 @@ describe('Persistence and Recovery Flow', () => {
       preferences: failingPrefs,
     });
 
-    deps.core.status.path = '/test/video.mp4';
-    deps.core.status.currentTime = 100;
+    deps.core.status.url = '/test/video.mp4';
+    deps.core.status.position = 100;
 
     send('sidebar', 'ADD_BOOKMARK', { title: 'Test Bookmark' });
     await new Promise((resolve) => setTimeout(resolve, 50));

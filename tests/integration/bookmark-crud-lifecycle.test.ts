@@ -10,8 +10,8 @@ describe('Bookmark CRUD Lifecycle', () => {
   it('should handle full CRUD from sidebar: ADD → UPDATE → DELETE with broadcasts', async () => {
     const { send, getLastMessage, deps, clearMessages } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
-    deps.core.status.currentTime = 60;
+    deps.core.status.url = '/test/video.mp4';
+    deps.core.status.position = 60;
 
     // ADD
     send('sidebar', 'ADD_BOOKMARK', { title: 'First Bookmark', timestamp: 60 });
@@ -63,8 +63,8 @@ describe('Bookmark CRUD Lifecycle', () => {
   it('should route messages from different UIs correctly', async () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
-    deps.core.status.currentTime = 100;
+    deps.core.status.url = '/test/video.mp4';
+    deps.core.status.position = 100;
 
     // ADD from overlay
     send('overlay', 'ADD_BOOKMARK', { title: 'From Overlay' });
@@ -92,18 +92,18 @@ describe('Bookmark CRUD Lifecycle', () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
     // Add bookmarks for two different files
-    deps.core.status.path = '/movies/file1.mp4';
-    deps.core.status.currentTime = 50;
+    deps.core.status.url = '/movies/file1.mp4';
+    deps.core.status.position = 50;
     send('sidebar', 'ADD_BOOKMARK', { title: 'File 1 Bookmark' });
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    deps.core.status.path = '/movies/file2.mp4';
-    deps.core.status.currentTime = 100;
+    deps.core.status.url = '/movies/file2.mp4';
+    deps.core.status.position = 100;
     send('sidebar', 'ADD_BOOKMARK', { title: 'File 2 Bookmark' });
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Simulate switching back to file1 and sending UI_READY
-    deps.core.status.path = '/movies/file1.mp4';
+    deps.core.status.url = '/movies/file1.mp4';
     send('overlay', 'UI_READY', { uiType: 'overlay' });
 
     const bookmarks = getLastMessage('overlay', 'BOOKMARKS_UPDATED');
@@ -116,8 +116,8 @@ describe('Bookmark CRUD Lifecycle', () => {
   it('should jump to bookmark when requested', async () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
-    deps.core.status.currentTime = 60;
+    deps.core.status.url = '/test/video.mp4';
+    deps.core.status.position = 60;
 
     send('sidebar', 'ADD_BOOKMARK', { title: 'Jump Test', timestamp: 120 });
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -137,8 +137,8 @@ describe('Bookmark CRUD Lifecycle', () => {
   it('should respond to REQUEST_BOOKMARK_DEFAULTS with current context', () => {
     const { send, getLastMessage, deps } = createTestHarness();
 
-    deps.core.status.path = '/movies/inception.mkv';
-    deps.core.status.currentTime = 300;
+    deps.core.status.url = '/movies/inception.mkv';
+    deps.core.status.position = 300;
     deps.core.status.metadata = { title: 'Inception' };
 
     send('window', 'REQUEST_BOOKMARK_DEFAULTS', {});
@@ -153,7 +153,7 @@ describe('Bookmark CRUD Lifecycle', () => {
   it('should reject bookmark with invalid timestamp (negative)', async () => {
     const { send, getLastMessage, deps, clearMessages } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
+    deps.core.status.url = '/test/video.mp4';
 
     // First, send UI_READY to get initial state
     send('sidebar', 'UI_READY', { uiType: 'sidebar' });
@@ -187,7 +187,7 @@ describe('Bookmark CRUD Lifecycle', () => {
   it('should reject bookmark with timestamp exceeding MAX_TIMESTAMP', async () => {
     const { send, getLastMessage, deps, clearMessages } = createTestHarness();
 
-    deps.core.status.path = '/test/video.mp4';
+    deps.core.status.url = '/test/video.mp4';
 
     // First, send UI_READY to get initial state
     send('sidebar', 'UI_READY', { uiType: 'sidebar' });

@@ -13,6 +13,7 @@ import { validateBookmarkArray } from './utils/validation';
 export class BookmarkPersistence {
   private readonly STORAGE_KEY = 'bookmarks';
   private backupTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingBackup: string | null = null;
 
   constructor(
     private preferences: IINAPreferences,
@@ -59,15 +60,31 @@ export class BookmarkPersistence {
   saveAutoBackup(bookmarks: BookmarkData[]): void {
     if (!this.file) return;
     if (this.backupTimer) clearTimeout(this.backupTimer);
-    const data = JSON.stringify(bookmarks);
+    this.pendingBackup = JSON.stringify(bookmarks);
     this.backupTimer = setTimeout(() => {
-      try {
-        this.file!.write('@data/bookmarks-backup.json', data);
-      } catch (error) {
-        this.console.warn(`[BookmarkPersistence] Auto-backup write failed: ${errorMessage(error)}`);
-      }
-      this.backupTimer = null;
+      this.writePendingBackup();
     }, 3000);
+  }
+
+  /** Write a debounced auto-backup immediately, if one is still pending. */
+  flush(): void {
+    if (this.backupTimer) {
+      clearTimeout(this.backupTimer);
+      this.backupTimer = null;
+    }
+    this.writePendingBackup();
+  }
+
+  private writePendingBackup(): void {
+    this.backupTimer = null;
+    if (!this.file || this.pendingBackup === null) return;
+    const data = this.pendingBackup;
+    this.pendingBackup = null;
+    try {
+      this.file.write('@data/bookmarks-backup.json', data);
+    } catch (error) {
+      this.console.warn(`[BookmarkPersistence] Auto-backup write failed: ${errorMessage(error)}`);
+    }
   }
 
   recover(): BookmarkData[] | null {

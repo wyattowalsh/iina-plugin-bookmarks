@@ -80,6 +80,31 @@ describe('BookmarkPersistence', () => {
     });
   });
 
+  describe('flush', () => {
+    it('writes a pending auto-backup immediately and does not write again when the timer fires', () => {
+      const persistence = new BookmarkPersistence(preferences, console, file);
+      persistence.saveAutoBackup(sampleBookmarks);
+
+      expect(file.write).not.toHaveBeenCalled();
+      persistence.flush();
+
+      expect(file.write).toHaveBeenCalledWith(
+        '@data/bookmarks-backup.json',
+        JSON.stringify(sampleBookmarks),
+      );
+
+      vi.advanceTimersByTime(3000);
+      expect(file.write).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw when no auto-backup is pending', () => {
+      const persistence = new BookmarkPersistence(preferences, console, file);
+
+      expect(() => persistence.flush()).not.toThrow();
+      expect(file.write).not.toHaveBeenCalled();
+    });
+  });
+
   describe('load', () => {
     it('should drop bookmarks with timestamps beyond MAX_TIMESTAMP', () => {
       const stored = JSON.stringify([

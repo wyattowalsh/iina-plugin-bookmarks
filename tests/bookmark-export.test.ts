@@ -56,7 +56,7 @@ describe('Bookmark Export Functionality', () => {
   describe('Bookmark filtering for export', () => {
     it('should filter bookmarks by filepath via getBookmarksForFile', async () => {
       await manager.addBookmark('Video 1 BM', 100);
-      (deps.core.status as any).path = '/other/movie.mp4';
+      (deps.core.status as any).url = '/other/movie.mp4';
       await manager.addBookmark('Video 2 BM', 200);
 
       const filtered = manager.getBookmarksForFile('/test/video.mp4');
