@@ -16,6 +16,7 @@ import useToast from '../hooks/useToast';
 import { useIinaMessages } from '../hooks/useIinaMessages';
 import {
   BookmarkData,
+  BookmarkDefaults,
   PlaybackStatus,
   ChapterInfo,
   AppWindow,
@@ -162,6 +163,7 @@ const App: React.FC = () => {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [bookmarkDefaults, setBookmarkDefaults] = useState<BookmarkDefaults | null>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showReconciliationDialog, setShowReconciliationDialog] = useState(false);
@@ -328,6 +330,7 @@ const App: React.FC = () => {
         window.postMessage({ type: 'FILE_RECONCILIATION_RESULT', data }, window.location.origin);
       },
       BOOKMARK_DEFAULTS: (data: any) => {
+        setBookmarkDefaults(data);
         window.postMessage({ type: 'BOOKMARK_DEFAULTS', data }, window.location.origin);
       },
       QUICK_BOOKMARK_CREATED: (data: any) => {
@@ -725,6 +728,7 @@ const App: React.FC = () => {
         onSave={handleSaveBookmark}
         availableTags={availableTags}
         postMessage={postMessage}
+        defaults={bookmarkDefaults}
       />
 
       <ImportDialog

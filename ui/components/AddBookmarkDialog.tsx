@@ -21,6 +21,7 @@ interface AddBookmarkDialogProps {
   ) => void;
   availableTags: string[];
   postMessage?: (type: string, data?: any) => void;
+  defaults?: BookmarkDefaults | null;
 }
 
 /** Parse a time string like "1:23:45" or "12:34" or "45" into seconds, or return null. */
@@ -51,6 +52,7 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
   onSave,
   availableTags,
   postMessage,
+  defaults,
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -94,6 +96,11 @@ const AddBookmarkDialog: React.FC<AddBookmarkDialogProps> = ({
   }, []);
 
   useWindowMessage('BOOKMARK_DEFAULTS', handleBookmarkDefaults, isOpen);
+
+  useEffect(() => {
+    if (!isOpen || !defaults) return;
+    handleBookmarkDefaults(defaults);
+  }, [defaults, handleBookmarkDefaults, isOpen]);
 
   const handleClose = useCallback(() => {
     requestedDefaultsForOpenRef.current = false;

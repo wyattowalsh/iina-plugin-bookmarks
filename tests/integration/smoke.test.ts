@@ -58,6 +58,22 @@ describe('Integration Smoke Test', () => {
     expect(defaults).toBeDefined();
     expect(defaults.timestamp).toBe(300);
     expect(defaults.filepath).toBe('/movies/inception.mkv');
-    expect(defaults.title).toContain('inception');
+  });
+
+  it('should build defaults from IINA url and position', () => {
+    const { send, getLastMessage, deps } = createTestHarness();
+    deps.core.status.url = 'file:///Movies/Real.mkv';
+    deps.core.status.position = 95;
+    deps.core.status.title = 'Real Title';
+    delete deps.core.status.path;
+    delete deps.core.status.currentTime;
+
+    send('sidebar', 'REQUEST_BOOKMARK_DEFAULTS', {});
+
+    const defaults = getLastMessage('sidebar', 'BOOKMARK_DEFAULTS');
+    expect(defaults.timestamp).toBe(95);
+    expect(defaults.filepath).toBe('file:///Movies/Real.mkv');
+    expect(defaults.title).toContain('Real Title');
+    expect(defaults.title).toContain('1:35');
   });
 });

@@ -25,6 +25,7 @@ import { useIinaMessages } from '../hooks/useIinaMessages';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import {
   BookmarkData,
+  BookmarkDefaults,
   BookmarkColor,
   BookmarkCollection,
   SmartCollection,
@@ -55,6 +56,7 @@ const App: React.FC = () => {
   const [parsedQuery, setParsedQuery] = useState<ParsedSearchQuery | undefined>();
   const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [bookmarkDefaults, setBookmarkDefaults] = useState<BookmarkDefaults | null>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -177,6 +179,7 @@ const App: React.FC = () => {
         window.postMessage({ type: 'EXPORT_RESULT', data: result }, window.location.origin);
       },
       BOOKMARK_DEFAULTS: (data: any) => {
+        setBookmarkDefaults(data);
         window.postMessage({ type: 'BOOKMARK_DEFAULTS', data }, window.location.origin);
       },
       ERROR: (data: any) => {
@@ -557,6 +560,7 @@ const App: React.FC = () => {
         onSave={handleSaveBookmark}
         availableTags={availableTags}
         postMessage={postMessage}
+        defaults={bookmarkDefaults}
       />
 
       <ImportDialog
