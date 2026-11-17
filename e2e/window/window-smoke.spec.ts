@@ -5,6 +5,7 @@ test.describe('Window Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: 'List' }).click();
   });
 
   test('page loads and renders window container', async ({ page }) => {
@@ -12,7 +13,7 @@ test.describe('Window Smoke Tests', () => {
   });
 
   test('shows empty state when no bookmarks match filters', async ({ page }) => {
-    await expect(page.locator('.empty-state-text')).toBeVisible();
+    await expect(page.getByText('No bookmarks yet')).toBeVisible();
   });
 
   test('harness can inject bookmarks', async ({ page, harness }) => {

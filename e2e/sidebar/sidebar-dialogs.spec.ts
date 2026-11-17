@@ -91,13 +91,12 @@ test.describe('Sidebar Dialog Interactions', () => {
     await expect(dialog).not.toBeVisible();
   });
 
-  test('cloud sync dialog opens on button click', async ({ page }) => {
-    const cloudButton = page.locator('[aria-label="Sync bookmarks with cloud storage"]');
-    await cloudButton.click();
+  test('check files button asks the plugin to reconcile moved files', async ({ page, harness }) => {
+    const checkFiles = page.locator('[aria-label="Check for moved files"]');
+    await checkFiles.click();
 
-    const dialog = page.locator('[role="dialog"]');
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText(/cloud|sync/i);
+    const message = await harness.getLastOutbound('RECONCILE_FILES');
+    expect(message).toBeDefined();
   });
 
   test('reconciliation dialog displays moved files', async ({ page, harness }) => {

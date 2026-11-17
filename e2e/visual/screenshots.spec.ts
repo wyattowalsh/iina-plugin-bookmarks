@@ -65,6 +65,7 @@ test.describe('Visual Regression — Window', () => {
 
   test('with bookmarks', async ({ page, harness }) => {
     await harness.sendBookmarks(SAMPLE_BOOKMARKS);
+    await page.getByRole('tab', { name: 'List' }).click();
     await expect(page.locator('.bookmark-item')).toHaveCount(SAMPLE_BOOKMARKS.length);
 
     await expect(page).toHaveScreenshot('window-with-bookmarks.png', {

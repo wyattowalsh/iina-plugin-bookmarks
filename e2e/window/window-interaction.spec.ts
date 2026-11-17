@@ -10,6 +10,7 @@ test.describe('Window Interaction Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: 'List' }).click();
   });
 
   test('displays all bookmarks in list panel', async ({ page, harness }) => {

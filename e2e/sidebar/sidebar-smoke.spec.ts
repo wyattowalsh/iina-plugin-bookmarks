@@ -46,7 +46,7 @@ test.describe('Sidebar Smoke Tests', () => {
     await expect(page.locator('[aria-label="Export bookmarks to file"]')).toBeVisible();
   });
 
-  test('cloud sync button exists with correct ARIA label', async ({ page }) => {
-    await expect(page.locator('[aria-label="Sync bookmarks with cloud storage"]')).toBeVisible();
+  test('check files button exists with correct ARIA label', async ({ page }) => {
+    await expect(page.locator('[aria-label="Check for moved files"]')).toBeVisible();
   });
 });
