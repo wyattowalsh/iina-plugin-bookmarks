@@ -1,0 +1,74 @@
+{
+  "stage": "interview",
+  "title": "Close out the IINA plugin failures",
+  "goalSlug": "close-out-iina-plugins",
+  "questions": [
+    {
+      "id": "scope",
+      "prompt": "Which failures should this close-out fix?",
+      "description": "The audit found player bugs in bookmarks and a starter that never loads its menu or overlay. The June 2025 wishlist (i18n, drag reorder, markdown, themes, sharing) is separate.",
+      "answerMode": "multi-custom",
+      "recommendedAnswer": "Fix the bookmarks player path, the starter boot path, the docs that describe behavior the code does not have, and bump ghVersion so IINA can see the update.",
+      "recommendedOptionIds": ["bookmarks-player", "starter-boot", "docs-truth", "version-signal"],
+      "options": [
+        {
+          "id": "bookmarks-player",
+          "label": "Bookmarks: real file, time, and chapter; overlay can reopen; rejected adds do not toast success; typecheck and unit tests pass"
+        },
+        {
+          "id": "starter-boot",
+          "label": "Starter: Info.json globalEntry, load webviews after the window loads, show the overlay, relative webview script URLs"
+        },
+        {
+          "id": "docs-truth",
+          "label": "Docs and README match the code, including the dev symlink and the cloud-sync claims"
+        },
+        {
+          "id": "version-signal",
+          "label": "Bump bookmarks to 1.2.0 and ghVersion to 2, without publishing a GitHub release"
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "wishlist",
+      "prompt": "What should happen to features that were never built?",
+      "description": "Duplicate resolution, collections, and scratchpad promotion have UI that is not mounted. i18n, drag reorder, markdown, and themes have no implementation.",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "Leave the unbuilt wishlist. Wire the duplicate-add path so a near match is visible instead of looking like a no-op. Do not build collections, i18n, drag reorder, markdown, or themes in this close-out.",
+      "recommendedOptionIds": ["duplicate-only"],
+      "options": [
+        {
+          "id": "defer",
+          "label": "Fix only broken existing behavior. Do not mount unused dialogs."
+        },
+        {
+          "id": "duplicate-only",
+          "label": "Also make a near-duplicate add visible. Leave collections and the rest of the wishlist."
+        },
+        {
+          "id": "mount-built",
+          "label": "Mount the dialogs that already exist: duplicates, collections, batch tag, and batch color."
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "verify",
+      "prompt": "What counts as assured, given this machine cannot run IINA?",
+      "description": "Linux has no IINA app. Playwright can drive the webviews with a fake bridge. A real player check stays on your Mac.",
+      "answerMode": "multi-custom",
+      "recommendedAnswer": "Typecheck and the full Vitest suite must pass. Playwright covers the add, duplicate, and overlay-reopen paths. Call out the macOS IINA check instead of pretending it ran.",
+      "recommendedOptionIds": ["typecheck-unit", "playwright", "macos-gap"],
+      "options": [
+        { "id": "typecheck-unit", "label": "pnpm run type-check and make test must pass" },
+        { "id": "playwright", "label": "Playwright covers add, duplicate, and overlay reopen" },
+        {
+          "id": "macos-gap",
+          "label": "Document the manual IINA check and do not claim it was run here"
+        }
+      ],
+      "required": true
+    }
+  ]
+}
