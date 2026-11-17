@@ -12,8 +12,12 @@ import { validateBookmarkArray } from './utils/validation';
 
 export class BookmarkPersistence {
   private readonly STORAGE_KEY = 'bookmarks';
+  private readonly SAVE_DELAY_MS = 250;
+  private readonly BACKUP_DELAY_MS = 3000;
   private backupTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingBookmarks: BookmarkData[] | null = null;
+  private pendingBackup: string | null = null;
 
   constructor(
     private preferences: IINAPreferences,
@@ -44,23 +48,50 @@ export class BookmarkPersistence {
   }
 
   save(bookmarks: BookmarkData[], options?: { immediate?: boolean }): void {
-    if (!options?.immediate) {
-      this.pendingBookmarks = bookmarks;
+    this.pendingBookmarks = bookmarks;
+    if (options?.immediate) {
+      this.clearSaveTimer();
+      this.writePendingBookmarks();
       return;
     }
-    this.pendingBookmarks = null;
-    this.writeBookmarks(bookmarks);
+    this.clearSaveTimer();
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.writePendingBookmarks();
+    }, this.SAVE_DELAY_MS);
   }
 
   flush(): void {
-    if (this.pendingBookmarks) {
-      const pending = this.pendingBookmarks;
-      this.pendingBookmarks = null;
-      this.writeBookmarks(pending);
-    }
+    this.clearSaveTimer();
+    this.writePendingBookmarks();
+    this.writePendingBackup();
+  }
+
+  private clearSaveTimer(): void {
+    if (!this.saveTimer) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+  }
+
+  private writePendingBookmarks(): void {
+    if (!this.pendingBookmarks) return;
+    const pending = this.pendingBookmarks;
+    this.pendingBookmarks = null;
+    this.writeBookmarks(pending);
+  }
+
+  private writePendingBackup(): void {
     if (this.backupTimer) {
       clearTimeout(this.backupTimer);
       this.backupTimer = null;
+    }
+    if (this.pendingBackup === null || !this.file) return;
+    const data = this.pendingBackup;
+    this.pendingBackup = null;
+    try {
+      this.file.write('@data/bookmarks-backup.json', data);
+    } catch (error) {
+      this.console.warn(`[BookmarkPersistence] Auto-backup write failed: ${errorMessage(error)}`);
     }
   }
 
@@ -81,15 +112,11 @@ export class BookmarkPersistence {
   saveAutoBackup(bookmarks: BookmarkData[]): void {
     if (!this.file) return;
     if (this.backupTimer) clearTimeout(this.backupTimer);
-    const data = JSON.stringify(bookmarks);
+    this.pendingBackup = JSON.stringify(bookmarks);
     this.backupTimer = setTimeout(() => {
-      try {
-        this.file!.write('@data/bookmarks-backup.json', data);
-      } catch (error) {
-        this.console.warn(`[BookmarkPersistence] Auto-backup write failed: ${errorMessage(error)}`);
-      }
       this.backupTimer = null;
-    }, 3000);
+      this.writePendingBackup();
+    }, this.BACKUP_DELAY_MS);
   }
 
   recover(): BookmarkData[] | null {

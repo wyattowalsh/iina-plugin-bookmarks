@@ -40,6 +40,26 @@ describe('BookmarkPersistence', () => {
     vi.useRealTimers();
   });
 
+  describe('save', () => {
+    it('writes a deferred save after 250ms', () => {
+      const persistence = new BookmarkPersistence(preferences, console, file);
+      persistence.save(sampleBookmarks);
+
+      expect(preferences.set).not.toHaveBeenCalledWith('bookmarks', expect.any(String));
+      vi.advanceTimersByTime(250);
+
+      expect(preferences.set).toHaveBeenCalledWith('bookmarks', JSON.stringify(sampleBookmarks));
+    });
+
+    it('flush writes a deferred save immediately', () => {
+      const persistence = new BookmarkPersistence(preferences, console, file);
+      persistence.save(sampleBookmarks);
+      persistence.flush();
+
+      expect(preferences.set).toHaveBeenCalledWith('bookmarks', JSON.stringify(sampleBookmarks));
+    });
+  });
+
   describe('saveAutoBackup', () => {
     it('writes compact JSON to @data/bookmarks-backup.json after debounce', () => {
       const persistence = new BookmarkPersistence(preferences, console, file);
@@ -47,6 +67,17 @@ describe('BookmarkPersistence', () => {
 
       expect(file.write).not.toHaveBeenCalled();
       vi.advanceTimersByTime(3000);
+
+      expect(file.write).toHaveBeenCalledWith(
+        '@data/bookmarks-backup.json',
+        JSON.stringify(sampleBookmarks),
+      );
+    });
+
+    it('flush writes the backup file before the debounce', () => {
+      const persistence = new BookmarkPersistence(preferences, console, file);
+      persistence.saveAutoBackup(sampleBookmarks);
+      persistence.flush();
 
       expect(file.write).toHaveBeenCalledWith(
         '@data/bookmarks-backup.json',
