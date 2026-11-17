@@ -34,6 +34,7 @@ import {
   normalizeExportResult,
 } from '../types';
 import { formatTime, formatDate, formatRelativeTime } from '../utils/formatTime';
+import { sameMedia } from '../../src/utils/media-identity';
 
 type ViewMode = 'grouped' | 'flat' | 'gallery' | 'timeline';
 
@@ -94,7 +95,7 @@ const App: React.FC = () => {
   // Apply file filter from FileSummaryCards
   const displayedBookmarks = useMemo(() => {
     if (!fileFilter) return filteredBookmarks;
-    return filteredBookmarks.filter((b) => b.filepath === fileFilter);
+    return filteredBookmarks.filter((b) => sameMedia(b.filepath, fileFilter));
   }, [filteredBookmarks, fileFilter]);
 
   const bookmarksByFile = useMemo(

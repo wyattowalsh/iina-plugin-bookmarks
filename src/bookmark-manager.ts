@@ -25,6 +25,7 @@ import { BookmarkImportExport } from './bookmark-import-export';
 import { ThumbnailGenerator } from './thumbnail-generator';
 import { isSafeBookmarkId, isValidEndTimestamp, stripHtmlTags } from './utils/validation';
 import { formatTime } from './utils/formatTime';
+import { sameMedia } from './utils/media-identity';
 
 interface QueuedUIMessage {
   type: string;
@@ -853,8 +854,13 @@ export class BookmarkManager {
       return;
     }
 
-    const currentPath = this.mediaPath('/unknown/file.mp4');
+    const currentPath = this.mediaPath('');
     const currentTime = this.mediaTime(timestamp);
+    if (!currentPath) {
+      this.deps.console.warn('No media URL available for a new bookmark');
+      this.deps.core.osd?.('Open a file before adding a bookmark');
+      return undefined;
+    }
 
     if (!Number.isFinite(currentTime) || currentTime < 0 || currentTime > MAX_TIMESTAMP) {
       throw new Error(
@@ -867,7 +873,8 @@ export class BookmarkManager {
     const threshold = thresholdStr ? parseInt(thresholdStr, 10) : 5;
     if (threshold > 0 && !options?.skipDuplicateCheck) {
       const nearDuplicate = this.bookmarks.find(
-        (b) => b.filepath === currentPath && Math.abs(b.timestamp - currentTime) <= threshold,
+        (b) =>
+          sameMedia(b.filepath, currentPath) && Math.abs(b.timestamp - currentTime) <= threshold,
       );
       if (nearDuplicate) {
         for (const ui of ['sidebar', 'overlay', 'window'] as const) {
@@ -1005,7 +1012,7 @@ export class BookmarkManager {
     this.deps.console.log(`Jumping to: ${bookmark.title} at ${formatTime(bookmark.timestamp)}`);
 
     const currentPath = this.mediaPath('');
-    if (bookmark.filepath === currentPath) {
+    if (sameMedia(bookmark.filepath, currentPath)) {
       try {
         if (this.deps.core.seekTo) {
           this.deps.core.seekTo(bookmark.timestamp);
@@ -1064,7 +1071,7 @@ export class BookmarkManager {
     if (!filepath) {
       return this.bookmarks;
     }
-    return this.bookmarks.filter((bookmark) => bookmark.filepath === filepath);
+    return this.bookmarks.filter((bookmark) => sameMedia(bookmark.filepath, filepath));
   }
 
   private handleReconcileFiles(uiSource: UISource): void {
@@ -1936,7 +1943,7 @@ export class BookmarkManager {
     let candidates: BookmarkData[];
     if (scope === 'file') {
       candidates = this.bookmarks
-        .filter((b) => b.filepath === current.filepath)
+        .filter((b) => sameMedia(b.filepath, current.filepath))
         .sort((a, b) => a.timestamp - b.timestamp);
     } else {
       candidates = [...this.bookmarks].sort((a, b) => {
@@ -1999,7 +2006,7 @@ export class BookmarkManager {
     const currentTime = this.mediaTime();
 
     const currentFileBookmarks = this.bookmarks
-      .filter((b) => b.filepath === currentPath)
+      .filter((b) => sameMedia(b.filepath, currentPath))
       .sort((a, b) => a.timestamp - b.timestamp);
 
     if (currentFileBookmarks.length === 0) {

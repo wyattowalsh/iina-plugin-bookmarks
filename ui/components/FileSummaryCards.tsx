@@ -1,6 +1,7 @@
 import React from 'react';
 import { BookmarkData } from '../types';
 import { formatDate } from '../utils/formatTime';
+import { sameMedia } from '../../src/utils/media-identity';
 
 interface FileSummaryCardsProps {
   bookmarksByFile: Map<string, BookmarkData[]>;
@@ -16,8 +17,8 @@ const FileSummaryCards: React.FC<FileSummaryCardsProps> = ({
   selectedFile,
 }) => {
   const entries = Array.from(bookmarksByFile.entries()).sort(([a], [b]) => {
-    if (a === currentFile) return -1;
-    if (b === currentFile) return 1;
+    if (sameMedia(a, currentFile)) return -1;
+    if (sameMedia(b, currentFile)) return 1;
     return a.localeCompare(b);
   });
 
@@ -32,8 +33,8 @@ const FileSummaryCards: React.FC<FileSummaryCardsProps> = ({
       }}
     >
       {entries.map(([filepath, bookmarks]) => {
-        const isSelected = filepath === selectedFile;
-        const isCurrent = filepath === currentFile;
+        const isSelected = sameMedia(filepath, selectedFile);
+        const isCurrent = sameMedia(filepath, currentFile);
         const fileName = filepath.split('/').pop() || filepath;
         const mostRecent = bookmarks.reduce((latest, b) => {
           const d = new Date(b.createdAt).getTime();

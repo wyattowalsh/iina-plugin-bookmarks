@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { FilterState } from '../components/FilterComponent';
 import { ParsedSearchQuery } from '../components/AdvancedSearch';
 import { BookmarkData, BookmarkCollection } from '../types';
+import { sameMedia } from '../../src/utils/media-identity';
 
 interface UseAdvancedBookmarkFiltersProps {
   bookmarks: BookmarkData[];
@@ -57,7 +58,7 @@ export const useAdvancedBookmarkFilters = ({
 
     // Apply file filter
     if (filters.fileFilter) {
-      result = result.filter((bookmark) => bookmark.filepath === filters.fileFilter);
+      result = result.filter((bookmark) => sameMedia(bookmark.filepath, filters.fileFilter));
     }
 
     // Apply tag filter

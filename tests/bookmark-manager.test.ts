@@ -539,9 +539,11 @@ describe('BookmarkManager', () => {
   describe('edge cases', () => {
     it('should handle missing filepath gracefully', async () => {
       (deps.core.status as any).path = undefined;
-      await manager.addBookmark('No Path', 10);
+      (deps.core.status as any).url = undefined;
+      const id = await manager.addBookmark('No Path', 10);
 
-      expect(manager.getAllBookmarks()[0].filepath).toBe('/unknown/file.mp4');
+      expect(id).toBeUndefined();
+      expect(manager.getAllBookmarks()).toHaveLength(0);
     });
 
     it('should handle missing currentTime gracefully', async () => {

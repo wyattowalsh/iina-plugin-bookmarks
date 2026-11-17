@@ -23,6 +23,7 @@ import {
   normalizeExportResult,
 } from '../types';
 import { formatTime, formatDate, formatRelativeTime } from '../utils/formatTime';
+import { sameMedia } from '../../src/utils/media-identity';
 
 // ---------------------------------------------------------------------------
 // Tag hierarchy helpers
@@ -196,7 +197,7 @@ const App: React.FC = () => {
 
   // Compute current file bookmarks for the timeline
   const currentFileBookmarks = useMemo(
-    () => (currentFile ? bookmarks.filter((b) => b.filepath === currentFile) : []),
+    () => (currentFile ? bookmarks.filter((b) => sameMedia(b.filepath, currentFile)) : []),
     [bookmarks, currentFile],
   );
 
@@ -655,7 +656,7 @@ const App: React.FC = () => {
             {/* File badge in all-files mode */}
             {scope === 'all' && (
               <div className="file-badge">
-                {bookmark.filepath === currentFile && (
+                {sameMedia(bookmark.filepath, currentFile) && (
                   <span
                     className="now-playing-indicator"
                     aria-label="Now playing"

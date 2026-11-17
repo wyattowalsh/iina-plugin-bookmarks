@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BookmarkData } from '../types';
 import { formatTime, formatRelativeTime } from '../utils/formatTime';
+import { sameMedia } from '../../src/utils/media-identity';
 import { getColorHex } from './BookmarkColorPicker';
 import TextHighlighter from './TextHighlighter';
 
@@ -66,7 +67,7 @@ const FileGroupedBookmarkList: React.FC<FileGroupedBookmarkListProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {sortedEntries.map(([filepath, bookmarks]) => {
         const isExpanded = expandedFiles.has(filepath);
-        const isCurrent = filepath === currentFile;
+        const isCurrent = sameMedia(filepath, currentFile);
 
         return (
           <div key={filepath} style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
