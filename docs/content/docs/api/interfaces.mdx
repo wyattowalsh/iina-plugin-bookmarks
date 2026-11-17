@@ -243,12 +243,20 @@ export type BookmarkNavigationScope = 'file' | 'all';
     ### Core Runtime Interfaces
 
     ```typescript
+    interface ChapterInfo {
+      title: string;
+      start?: number;
+      time?: number;
+    }
+
     interface IINACore {
       status: {
+        url?: string;
+        title?: string;
+        position?: number;
+        duration?: number;
         path?: string;
         currentTime?: number;
-        duration?: number;
-        position?: number;
         metadata?: { title?: string };
       };
       window?: { loaded: boolean };
