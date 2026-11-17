@@ -13,6 +13,14 @@ import { formatTime } from '../utils/formatTime';
 
 const BOTTOM_PROXIMITY_THRESHOLD = 0.7; // Show timeline when cursor is in bottom 30%
 
+/** IINA's menu only calls overlay.show(); the React tree must stay mounted. */
+function nativeOverlayHost(): boolean {
+  const host = window as Window & {
+    webkit?: { messageHandlers?: { iina?: unknown } };
+  };
+  return host.webkit?.messageHandlers?.iina != null;
+}
+
 const App: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
   const [isVisible, setIsVisible] = useState(true);
@@ -50,6 +58,9 @@ const App: React.FC = () => {
         }
         setIsVisible(true);
       },
+      SHOW_OVERLAY: () => {
+        setIsVisible(true);
+      },
       CURRENT_FILE_PATH: (data: string) => {
         setCurrentFile(data);
         setFilters((prev) => ({ ...prev, fileFilter: data || '' }));
@@ -79,12 +90,16 @@ const App: React.FC = () => {
     appWindow.iina?.postMessage?.('JUMP_TO_BOOKMARK', { id });
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     appWindow.iina?.postMessage?.('HIDE_OVERLAY');
-    setIsVisible(false);
-  };
+    if (!nativeOverlayHost()) {
+      setIsVisible(false);
+    }
+  }, [appWindow]);
 
-  useEscapeKey(isVisible, handleClose);
+  const overlayShown = nativeOverlayHost() || isVisible;
+
+  useEscapeKey(overlayShown, handleClose);
 
   // Proximity-based timeline visibility: show when cursor is in the bottom 30%
   useEffect(() => {
@@ -122,7 +137,7 @@ const App: React.FC = () => {
   const displayedBookmarks = allFilteredBookmarks;
 
   return (
-    <div className="bookmark-overlay" hidden={!isVisible}>
+    <div className="bookmark-overlay" hidden={!overlayShown}>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="bookmark-overlay-header">
         <h3>Bookmarks ({displayedBookmarks.length})</h3>

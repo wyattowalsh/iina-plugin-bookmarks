@@ -164,6 +164,11 @@
   }
 }
 
+/* Keep the tree mounted after close. Author display rules must not override this. */
+.bookmark-overlay[hidden] {
+  display: none !important;
+}
+
 /* Animation for overlay appearance */
 .bookmark-overlay {
   animation: slideInFromRight 0.3s ease-out;
