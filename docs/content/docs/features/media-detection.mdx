@@ -83,28 +83,7 @@ The system automatically removes common quality and source indicators:
 
 ## Technical Implementation
 
-The media detection is handled by the `MetadataDetector` class:
-
-```typescript
-class MetadataDetector {
-  async getCurrentTitle(): Promise<string> {
-    // 1. Try metadata title
-    const metadataTitle = this.core.status.title;
-    if (metadataTitle && this.isValidTitle(metadataTitle)) {
-      return metadataTitle;
-    }
-    
-    // 2. Fall back to cleaned filename
-    const cleanedTitle = this.extractTitleFromFilename();
-    if (cleanedTitle) {
-      return cleanedTitle;
-    }
-    
-    // 3. Final fallback
-    return 'Unknown';
-  }
-}
-```
+Titles come from `BookmarkManager`. The player title is `core.status.title`. The file location is `core.status.url`. The time is `core.status.position`. When a chapter is active, `core.getChapters()` supplies `{ title, start }`, and the stored chapter is the latest one whose `start` is at or before the playback position. There is no `MetadataDetector` class.
 
 ## Best Practices
 

@@ -172,7 +172,7 @@ The system uses a clear hierarchy when determining bookmark titles:
 </Callout>
 
 - **Removed duplicate code**: Eliminated `extractMediaTitle()` method from `BookmarkManager`
-- **Centralized logic**: All fallback logic now handled by `MetadataDetector.extractTitleFromFilename()`
+- **Centralized logic**: Title fallback lives in `BookmarkManager`, using `core.status.title`, then the filename from `core.status.url`
 - **Improved consistency**: Same fallback behavior used throughout the application
 - **Enhanced cleaning**: More sophisticated filename cleaning algorithm
 
