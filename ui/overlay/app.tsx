@@ -13,6 +13,18 @@ import { formatTime } from '../utils/formatTime';
 
 const BOTTOM_PROXIMITY_THRESHOLD = 0.7; // Show timeline when cursor is in bottom 30%
 
+/**
+ * IINA's menu calls overlay.show(), which only unhides this webview.
+ * It does not reload the page or post a show message, so the React tree
+ * has to stay rendered whenever that webview is on screen.
+ */
+function nativeOverlayHost(): boolean {
+  const host = window as Window & {
+    webkit?: { messageHandlers?: { iina?: unknown } };
+  };
+  return host.webkit?.messageHandlers?.iina != null;
+}
+
 const App: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
   const [isVisible, setIsVisible] = useState(true);
@@ -46,6 +58,10 @@ const App: React.FC = () => {
     {
       BOOKMARKS_UPDATED: (data: BookmarkData[]) => {
         setBookmarks(data);
+        setIsVisible(true);
+      },
+      SHOW_OVERLAY: () => {
+        setIsVisible(true);
       },
       CURRENT_FILE_PATH: (data: string) => {
         setCurrentFile(data);
@@ -76,12 +92,18 @@ const App: React.FC = () => {
     appWindow.iina?.postMessage?.('JUMP_TO_BOOKMARK', { id });
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     appWindow.iina?.postMessage?.('HIDE_OVERLAY');
-    setIsVisible(false);
-  };
+    // Outside IINA there is no native hide, so conceal the tree with CSS.
+    // Inside IINA, leave it mounted: the next overlay.show() must not be blank.
+    if (!nativeOverlayHost()) {
+      setIsVisible(false);
+    }
+  }, [appWindow]);
 
-  useEscapeKey(isVisible, handleClose);
+  const overlayShown = nativeOverlayHost() || isVisible;
+
+  useEscapeKey(overlayShown, handleClose);
 
   // Proximity-based timeline visibility: show when cursor is in the bottom 30%
   useEffect(() => {
@@ -118,12 +140,8 @@ const App: React.FC = () => {
   // Overlay displays bookmarks for the current file only
   const displayedBookmarks = allFilteredBookmarks;
 
-  if (!isVisible) {
-    return null;
-  }
-
   return (
-    <div className="bookmark-overlay">
+    <div className="bookmark-overlay" hidden={!overlayShown}>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="bookmark-overlay-header">
         <h3>Bookmarks ({displayedBookmarks.length})</h3>

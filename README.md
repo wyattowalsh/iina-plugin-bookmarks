@@ -36,11 +36,13 @@ A bookmark management plugin for [IINA](https://iina.io) that lets you save, org
 
 ### Development Symlink
 
-For development, create a symlink so IINA loads the plugin directly from your working copy:
+IINA loads the plugin entry from `Info.json` (`index.js`). The build writes that file inside `dist`, and `make link` symlinks `dist` into IINA's plugin folder:
 
 ```bash
-ln -s /path/to/iina-plugin-bookmarks ~/Library/Application\ Support/com.colliderli.iina/plugins/iina-plugin-bookmarks.iinaplugin-dev
+ln -s /path/to/iina-plugin-bookmarks/dist ~/Library/Application\ Support/com.colliderli.iina/plugins/iina-plugin-bookmarks.iinaplugin-dev
 ```
+
+`make link` builds the plugin and creates this symlink.
 
 ## Development
 
@@ -48,8 +50,8 @@ ln -s /path/to/iina-plugin-bookmarks ~/Library/Application\ Support/com.collider
 pnpm install          # Install dependencies
 make dev              # Start dev servers (sidebar, overlay, window)
 make build            # Build plugin (TypeScript + UI)
-make test             # Run tests
-pnpm test             # Run tests (alternative)
+make test             # One-shot test run
+pnpm test             # Vitest stays in watch mode
 pnpm run lint         # Run linter
 pnpm run format       # Format code
 pnpm run type-check   # TypeScript type checking

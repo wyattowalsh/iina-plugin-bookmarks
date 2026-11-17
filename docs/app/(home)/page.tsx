@@ -59,11 +59,11 @@ export default function HomePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CloudIcon className="size-5" />
-                Cloud Synchronization
+                Backup and Transfer
               </CardTitle>
               <CardDescription>
-                Sync your bookmarks across devices with built-in conflict resolution and offline
-                support. Works with any cloud storage provider.
+                Move bookmarks between machines with JSON and CSV import/export. Provider sync
+                remains on the roadmap.
               </CardDescription>
             </CardHeader>
           </Card>
