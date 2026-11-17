@@ -59,11 +59,11 @@ export default function HomePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CloudIcon className="size-5" />
-                Cloud Synchronization
+                Portable Backups
               </CardTitle>
               <CardDescription>
-                Sync your bookmarks across devices with built-in conflict resolution and offline
-                support. Works with any cloud storage provider.
+                Export bookmarks to JSON or CSV and import them on another machine. Provider sync is
+                not part of this plugin.
               </CardDescription>
             </CardHeader>
           </Card>

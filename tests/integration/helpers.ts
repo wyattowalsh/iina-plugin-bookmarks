@@ -64,6 +64,10 @@ export function createTestHarness(depsOverrides: Record<string, any> = {}): Test
     }
   }
 
+  send('sidebar', 'UI_READY', { uiType: 'sidebar' });
+  send('overlay', 'UI_READY', { uiType: 'overlay' });
+  send('window', 'UI_READY', { uiType: 'window' });
+
   return { manager, deps, send, getMessages, getLastMessage, clearMessages };
 }
 

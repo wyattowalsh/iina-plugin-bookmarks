@@ -10,7 +10,7 @@
   },
   "entry": "index.js",
   "ghRepo": "wyattowalsh/iina-plugin-bookmarks",
-  "ghVersion": 1,
+  "ghVersion": 2,
   "permissions": ["show-osd", "video-overlay", "file-system", "network-request"],
   "sidebarTab": {
     "name": "Bookmarks"

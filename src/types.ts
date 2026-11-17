@@ -58,7 +58,10 @@ export interface BookmarkData {
 
 export interface ChapterInfo {
   title: string;
-  time: number;
+  /** IINA chapter start, in seconds. */
+  start?: number;
+  /** Legacy alias kept for older timeline payloads. */
+  time?: number;
 }
 
 export interface BookmarkCollection {
@@ -348,6 +351,8 @@ export interface BackendToUIPayloadMap {
 
 export interface IINACore {
   status: {
+    url?: string;
+    title?: string;
     path?: string;
     currentTime?: number;
     duration?: number;

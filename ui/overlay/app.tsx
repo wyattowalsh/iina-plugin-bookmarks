@@ -45,7 +45,10 @@ const App: React.FC = () => {
   useIinaMessages(
     {
       BOOKMARKS_UPDATED: (data: BookmarkData[]) => {
-        setBookmarks(data);
+        if (Array.isArray(data)) {
+          setBookmarks(data);
+        }
+        setIsVisible(true);
       },
       CURRENT_FILE_PATH: (data: string) => {
         setCurrentFile(data);
@@ -118,12 +121,8 @@ const App: React.FC = () => {
   // Overlay displays bookmarks for the current file only
   const displayedBookmarks = allFilteredBookmarks;
 
-  if (!isVisible) {
-    return null;
-  }
-
   return (
-    <div className="bookmark-overlay">
+    <div className="bookmark-overlay" hidden={!isVisible}>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="bookmark-overlay-header">
         <h3>Bookmarks ({displayedBookmarks.length})</h3>

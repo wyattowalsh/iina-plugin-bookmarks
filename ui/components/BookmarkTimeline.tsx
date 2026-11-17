@@ -2,6 +2,12 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { BookmarkData, ChapterInfo } from '../types';
 import { formatTime } from '../utils/formatTime';
 
+function chapterOffset(chapter: ChapterInfo): number {
+  if (typeof chapter.start === 'number') return chapter.start;
+  if (typeof chapter.time === 'number') return chapter.time;
+  return 0;
+}
+
 const BOOKMARK_COLOR_HEX: Record<string, string> = {
   red: '#FF3B30',
   orange: '#FF9500',
@@ -150,7 +156,7 @@ const BookmarkTimeline: React.FC<BookmarkTimelineProps> = ({
       if (!chapters || chapters.length === 0) return undefined;
       let found: ChapterInfo | undefined;
       for (const ch of chapters) {
-        if (ch.time <= ts) found = ch;
+        if (chapterOffset(ch) <= ts) found = ch;
         else break;
       }
       return found?.title;
@@ -178,9 +184,10 @@ const BookmarkTimeline: React.FC<BookmarkTimelineProps> = ({
       {showChapterLanes && chapters && chapters.length > 0 && (
         <div className="timeline-chapter-lanes">
           {chapters.map((chapter, idx) => {
-            const startPct = (chapter.time / duration) * 100;
-            const nextTime = idx < chapters.length - 1 ? chapters[idx + 1].time : duration;
-            const widthPct = ((nextTime - chapter.time) / duration) * 100;
+            const startPct = (chapterOffset(chapter) / duration) * 100;
+            const nextTime =
+              idx < chapters.length - 1 ? chapterOffset(chapters[idx + 1]) : duration;
+            const widthPct = ((nextTime - chapterOffset(chapter)) / duration) * 100;
             return (
               <div
                 key={`ch-${idx}`}

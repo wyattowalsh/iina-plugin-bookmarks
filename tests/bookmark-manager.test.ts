@@ -114,6 +114,26 @@ describe('BookmarkManager', () => {
       expect(bookmarks[0].timestamp).toBe(120); // from deps.core.status.currentTime
     });
 
+    it('should prefer IINA url, position, title, and chapter.start', async () => {
+      const deps = createMockDeps();
+      deps.core.status.url = 'file:///Movies/Real.mkv';
+      deps.core.status.position = 95;
+      deps.core.status.title = 'Real Title';
+      delete (deps.core.status as { path?: string }).path;
+      delete (deps.core.status as { currentTime?: number }).currentTime;
+      deps.core.getChapters = () => [{ title: 'Cold Open', start: 90 }];
+      const local = new BookmarkManager(deps);
+
+      await local.addBookmark();
+
+      expect(local.getAllBookmarks()[0]).toMatchObject({
+        filepath: 'file:///Movies/Real.mkv',
+        timestamp: 95,
+        chapterTitle: 'Cold Open',
+      });
+      expect(local.getAllBookmarks()[0].title).toContain('Cold Open');
+    });
+
     it('should ignore invalid endTimestamp values in add options', async () => {
       await manager.addBookmark('NaN end', 10, undefined, undefined, { endTimestamp: Number.NaN });
       await manager.addBookmark('Over max end', 20, undefined, undefined, {

@@ -182,6 +182,7 @@ export class BookmarkManager {
       'SMART_COLLECTIONS_UPDATED',
       this.smartCollections.map((sc) => this.resolveSmartCollectionDates(sc)),
     );
+    this.sendCurrentFilePath(uiSource);
   }
 
   private markUIReady(uiSource: UISource, includeSyncState: boolean): void {
@@ -322,8 +323,10 @@ export class BookmarkManager {
           Array.isArray(p?.tags) ? (p.tags as string[]) : undefined,
           addOptions,
         )
-          .then(() => {
-            this.getUITarget(uiSource).postMessage('BOOKMARK_ADDED', {});
+          .then((id) => {
+            if (id) {
+              this.getUITarget(uiSource).postMessage('BOOKMARK_ADDED', {});
+            }
           })
           .catch((error) => {
             this.deps.console.error(`Failed to add bookmark: ${errorMessage(error)}`);
@@ -575,14 +578,14 @@ export class BookmarkManager {
 
       // Range I/O marking
       case 'SET_IN_POINT': {
-        const inTime = this.deps.core.status.currentTime || 0;
+        const inTime = this.mediaTime();
         this.pendingInPoint = inTime;
         this.deps.core.osd?.(`In: ${formatTime(inTime)}`);
         break;
       }
 
       case 'SET_OUT_POINT': {
-        const outTime = this.deps.core.status.currentTime || 0;
+        const outTime = this.mediaTime();
         if (this.pendingInPoint !== null) {
           const startTime = Math.min(this.pendingInPoint, outTime);
           const endTime = Math.max(this.pendingInPoint, outTime);
@@ -634,8 +637,10 @@ export class BookmarkManager {
           Array.isArray(p?.tags) ? (p.tags as string[]) : undefined,
           { skipDuplicateCheck: true, persistImmediately: true },
         )
-          .then(() => {
-            this.getUITarget(uiSource).postMessage('BOOKMARK_ADDED', {});
+          .then((id) => {
+            if (id) {
+              this.getUITarget(uiSource).postMessage('BOOKMARK_ADDED', {});
+            }
           })
           .catch((error) => {
             this.deps.console.error(`Failed to confirm bookmark: ${errorMessage(error)}`);
@@ -658,17 +663,48 @@ export class BookmarkManager {
     return this.uiTargets[uiSource] ?? this.uiTargets.sidebar;
   }
 
+  /** Player file location. Prefers IINA `status.url`, then the legacy `status.path`. */
+  private mediaPath(fallback = ''): string {
+    const status = this.deps.core.status;
+    return status.url || status.path || fallback;
+  }
+
+  /**
+   * Playback position in seconds.
+   * IINA reports `status.position`. `currentTime` remains a fallback for older hosts.
+   */
+  private mediaTime(explicit?: number): number {
+    if (explicit !== undefined) return explicit;
+    const status = this.deps.core.status;
+    if (typeof status.position === 'number' && Number.isFinite(status.position)) {
+      return status.position;
+    }
+    if (typeof status.currentTime === 'number' && Number.isFinite(status.currentTime)) {
+      return status.currentTime;
+    }
+    return 0;
+  }
+
+  private chapterOffset(chapter: { start?: number; time?: number }): number {
+    if (typeof chapter.start === 'number') return chapter.start;
+    if (typeof chapter.time === 'number') return chapter.time;
+    return Number.POSITIVE_INFINITY;
+  }
+
+  private preferenceIsOff(value: unknown): boolean {
+    return value === false || value === 'false' || value === '0' || value === 0;
+  }
+
   private sendCurrentFilePath(uiSource: UISource): void {
-    const currentPath = this.deps.core.status.path;
     const target = this.getUITarget(uiSource);
-    target.postMessage('CURRENT_FILE_PATH', currentPath);
+    target.postMessage('CURRENT_FILE_PATH', this.mediaPath(''));
   }
 
   private sendBookmarksToUI(uiSource: UISource): void {
     if (!this.uiInitialized) return;
     if (uiSource === 'overlay') {
       // Overlay: server-filtered for performance during playback
-      const currentPath = this.deps.core.status.path;
+      const currentPath = this.mediaPath('');
       const currentBookmarks = this.getBookmarksForFile(currentPath);
       this.getUITarget('overlay').postMessage('BOOKMARKS_UPDATED', currentBookmarks);
       this.deps.console.log(`Sent ${currentBookmarks.length} bookmarks to overlay`);
@@ -682,13 +718,14 @@ export class BookmarkManager {
 
   private sendBookmarkDefaults(uiSource: UISource): void {
     const target = this.getUITarget(uiSource);
-    const currentPath = this.deps.core.status.path || '';
-    const currentTime = this.deps.core.status.currentTime || 0;
+    const currentPath = this.mediaPath('');
+    const currentTime = this.mediaTime();
     const filename = currentPath.split('/').pop() || currentPath;
     const cleanFilename = filename.replace(/\.[^/.]+$/, '') || 'Unknown Media';
+    const titleBase = this.deps.core.status.title || cleanFilename;
 
     target.postMessage('BOOKMARK_DEFAULTS', {
-      title: `${cleanFilename} - ${formatTime(currentTime)}`,
+      title: `${titleBase} - ${formatTime(currentTime)}`,
       description: `Bookmark at ${formatTime(currentTime)}`,
       tags: [],
       timestamp: currentTime,
@@ -724,6 +761,9 @@ export class BookmarkManager {
     const fileLoadedId = this.deps.event.on('iina.file-loaded', () => {
       this.deps.console.log('File loaded event');
       this.refreshUI('overlay');
+      for (const ui of ['sidebar', 'overlay', 'window'] as const) {
+        this.sendCurrentFilePath(ui);
+      }
       this.startPlaybackBroadcast();
       this.checkResumePosition();
     });
@@ -813,9 +853,8 @@ export class BookmarkManager {
       return;
     }
 
-    const currentPath = this.deps.core.status.path || '/unknown/file.mp4';
-    const currentTime =
-      timestamp !== undefined ? timestamp : this.deps.core.status.currentTime || 0;
+    const currentPath = this.mediaPath('/unknown/file.mp4');
+    const currentTime = this.mediaTime(timestamp);
 
     if (!Number.isFinite(currentTime) || currentTime < 0 || currentTime > MAX_TIMESTAMP) {
       throw new Error(
@@ -890,8 +929,8 @@ export class BookmarkManager {
     // Chapter enrichment
     const chapters = this.deps.core.getChapters?.() || [];
     const activeChapter = chapters
-      .filter((ch) => ch.time <= bookmark.timestamp)
-      .sort((a, b) => b.time - a.time)[0];
+      .filter((ch) => this.chapterOffset(ch) <= bookmark.timestamp)
+      .sort((a, b) => this.chapterOffset(b) - this.chapterOffset(a))[0];
     if (activeChapter) bookmark.chapterTitle = activeChapter.title;
 
     // Subtitle capture
@@ -899,7 +938,7 @@ export class BookmarkManager {
     if (subtitleText?.trim()) bookmark.subtitleText = subtitleText.trim();
 
     this.bookmarks.push(bookmark);
-    this.saveBookmarks(options?.persistImmediately === true);
+    this.saveBookmarks(options?.persistImmediately !== false);
 
     this.deps.console.log(`Bookmark added: ${bookmark.title}`);
     return bookmark.id;
@@ -949,7 +988,7 @@ export class BookmarkManager {
         ...sanitized,
         updatedAt: new Date().toISOString(),
       };
-      this.saveBookmarks();
+      this.saveBookmarks(false);
       this.deps.console.log(`Bookmark updated: ${id}`);
     } else {
       this.deps.console.warn(`Bookmark not found for update: ${id}`);
@@ -965,7 +1004,7 @@ export class BookmarkManager {
 
     this.deps.console.log(`Jumping to: ${bookmark.title} at ${formatTime(bookmark.timestamp)}`);
 
-    const currentPath = this.deps.core.status.path;
+    const currentPath = this.mediaPath('');
     if (bookmark.filepath === currentPath) {
       try {
         if (this.deps.core.seekTo) {
@@ -1273,8 +1312,8 @@ export class BookmarkManager {
     }
   }
 
-  private saveBookmarks(immediate = false): void {
-    this.persistence.save(this.bookmarks, immediate ? { immediate: true } : undefined);
+  private saveBookmarks(immediate = true): void {
+    this.persistence.save(this.bookmarks, { immediate });
     this.persistence.saveAutoBackup(this.bookmarks);
     this.refreshUI();
   }
@@ -1390,8 +1429,8 @@ export class BookmarkManager {
   }
 
   saveResumePosition(): void {
-    const path = this.deps.core.status.path;
-    const position = this.deps.core.status.position || this.deps.core.status.currentTime || 0;
+    const path = this.mediaPath('');
+    const position = this.mediaTime();
     const duration = this.deps.core.status.duration || 0;
 
     // Only save if > 5 seconds in and not near the end
@@ -1406,11 +1445,10 @@ export class BookmarkManager {
   }
 
   private checkResumePosition(): void {
-    const path = this.deps.core.status.path;
+    const path = this.mediaPath('');
     if (!path) return;
 
-    const autoResume = this.deps.preferences.get('autoResume');
-    if (autoResume === 'false') return;
+    if (this.preferenceIsOff(this.deps.preferences.get('autoResume'))) return;
 
     const position = this.resumePositions[path];
     if (typeof position === 'number' && Number.isFinite(position) && position > 5) {
@@ -1425,8 +1463,8 @@ export class BookmarkManager {
   private generateAutoTitle(cleanFilename: string, timestamp: number): string {
     const chapters = this.deps.core.getChapters?.() || [];
     const activeChapter = chapters
-      .filter((ch) => ch.time <= timestamp)
-      .sort((a, b) => b.time - a.time)[0];
+      .filter((ch) => this.chapterOffset(ch) <= timestamp)
+      .sort((a, b) => this.chapterOffset(b) - this.chapterOffset(a))[0];
 
     if (activeChapter) {
       return `Ch: ${activeChapter.title} — ${formatTime(timestamp)}`;
@@ -1932,8 +1970,8 @@ export class BookmarkManager {
   // ---------------------------------------------------------------------------
 
   private async quickBookmark(): Promise<void> {
-    const currentTime = this.deps.core.status.currentTime || 0;
-    const scratchpadMode = this.deps.preferences.get('scratchpadMode') !== 'false';
+    const currentTime = this.mediaTime();
+    const scratchpadMode = !this.preferenceIsOff(this.deps.preferences.get('scratchpadMode'));
 
     const bookmarkId = await this.addBookmark(undefined, undefined, undefined, undefined, {
       skipDuplicateCheck: false,
@@ -1957,8 +1995,8 @@ export class BookmarkManager {
   }
 
   private navigateToAdjacentFromCurrent(direction: 'next' | 'prev'): void {
-    const currentPath = this.deps.core.status.path;
-    const currentTime = this.deps.core.status.currentTime || 0;
+    const currentPath = this.mediaPath('');
+    const currentTime = this.mediaTime();
 
     const currentFileBookmarks = this.bookmarks
       .filter((b) => b.filepath === currentPath)
@@ -1989,7 +2027,7 @@ export class BookmarkManager {
   private broadcastPlaybackStatus(includeChapters = false): void {
     if (!this.uiInitialized) return;
     const duration = this.deps.core.status.duration || 0;
-    const position = this.deps.core.status.position || this.deps.core.status.currentTime || 0;
+    const position = this.mediaTime();
     const status: Record<string, unknown> = { duration, position };
     if (includeChapters) {
       status.chapters = this.cachedChapters;

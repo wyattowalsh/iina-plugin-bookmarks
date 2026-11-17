@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Bookmark create, jump, and defaults read IINA `status.url`, `status.position`, `status.title`, and `chapter.start`.
+- A rejected add no longer reports success. Closing the overlay no longer leaves it blank after it is shown again.
+- Pending bookmark writes flush when the manager is destroyed.
+- `ghVersion` is 2 so IINA can offer this build over 1.1.0.
+
 ## [1.1.0] - 2026-03-02
 
 ### Added

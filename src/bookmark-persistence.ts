@@ -13,6 +13,7 @@ import { validateBookmarkArray } from './utils/validation';
 export class BookmarkPersistence {
   private readonly STORAGE_KEY = 'bookmarks';
   private backupTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingBookmarks: BookmarkData[] | null = null;
 
   constructor(
     private preferences: IINAPreferences,
@@ -42,7 +43,28 @@ export class BookmarkPersistence {
     }
   }
 
-  save(bookmarks: BookmarkData[]): void {
+  save(bookmarks: BookmarkData[], options?: { immediate?: boolean }): void {
+    if (!options?.immediate) {
+      this.pendingBookmarks = bookmarks;
+      return;
+    }
+    this.pendingBookmarks = null;
+    this.writeBookmarks(bookmarks);
+  }
+
+  flush(): void {
+    if (this.pendingBookmarks) {
+      const pending = this.pendingBookmarks;
+      this.pendingBookmarks = null;
+      this.writeBookmarks(pending);
+    }
+    if (this.backupTimer) {
+      clearTimeout(this.backupTimer);
+      this.backupTimer = null;
+    }
+  }
+
+  private writeBookmarks(bookmarks: BookmarkData[]): void {
     try {
       const currentData = this.preferences.get(this.STORAGE_KEY);
       if (currentData) {
